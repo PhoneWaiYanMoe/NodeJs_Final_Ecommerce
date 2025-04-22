@@ -1,0 +1,12 @@
+services:
+  - type: web
+    name: product-service
+    env: node
+    plan: free
+    buildCommand: cd product-service && npm install
+    startCommand: cd product-service && npm start
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: MONGO_URI
+        sync: false
