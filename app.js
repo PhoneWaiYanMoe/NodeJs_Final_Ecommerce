@@ -52,11 +52,15 @@ app.use((req, res, next) => {
     console.log('Incoming cookies:', req.headers.cookie);
     const originalEnd = res.end;
     res.end = function (chunk, encoding) {
-        console.log('Response headers:', res.getHeaders());
-        const setCookie = res.getHeader('set-cookie');
-        if (setCookie) {
-            console.log('Set-Cookie header:', setCookie);
-        }
+        setImmediate(() => {
+            console.log('Response headers after processing:', res.getHeaders());
+            const setCookie = res.getHeader('set-cookie');
+            if (setCookie) {
+                console.log('Set-Cookie header:', setCookie);
+            } else {
+                console.log('No Set-Cookie header found');
+            }
+        });
         return originalEnd.call(this, chunk, encoding);
     };
     next();
@@ -66,7 +70,7 @@ app.use((req, res, next) => {
 app.use(session({
     secret: process.env.SESSION_SECRET || 'your-secret-key',
     resave: false,
-    saveUninitialized: false,
+    saveUninitialized: true, // Allow uninitialized sessions for testing
     cookie: {
         secure: true,
         httpOnly: true,
