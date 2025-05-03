@@ -170,6 +170,10 @@ router.put('/admin/users/:userId', adminSessionRequired, async (req, res) => {
     }
 });
 
+router.get('/admin/verify', adminSessionRequired, (req, res) => {
+  res.status(200).json({ message: 'Admin session verified' });
+});
+
 // Admin: Delete User
 router.delete('/admin/users/:userId', adminSessionRequired, async (req, res) => {
     const { userId } = req.params;
