@@ -14,7 +14,7 @@ const app = express();
 
 // Middleware
 app.use(cors({
-    origin: 'https://62e0-171-250-182-137.ngrok-free.app', // Allow requests from any origin for now
+    origin: 'https://62e0-171-250-182-137.ngrok-free.app', // Allow requests from your friend's frontend
     credentials: true // Allow cookies/sessions
 }));
 app.use(express.json());
@@ -22,7 +22,12 @@ app.use(session({
     secret: process.env.SESSION_SECRET,
     resave: false,
     saveUninitialized: false,
-    cookie: { secure: process.env.NODE_ENV === 'production' }, // Secure cookies in production
+    cookie: {
+        secure: process.env.NODE_ENV === 'production', // Secure cookies in production (HTTPS)
+        httpOnly: true, // Prevent client-side JS from accessing the cookie
+        sameSite: 'lax', // Allow cookies in cross-origin requests (adjust if needed)
+        maxAge: 24 * 60 * 60 * 1000 // 24 hours
+    }
 }));
 
 // Connect to MongoDB
