@@ -1,18 +1,9 @@
 const express = require('express');
 const router = express.Router();
 const mongoose = require('mongoose');
-const bcrypt = require('bcryptjs');
-
 const User = require('../models/User');
-const {
-    adminSessionRequired,
-    userSessionRequired,
-    STATIC_ADMIN
-} = require('../middleware/auth');
-
-// ======================
-// Admin Routes
-// ======================
+const bcrypt = require('bcryptjs');
+const { adminSessionRequired, userSessionRequired, STATIC_ADMIN } = require('../middleware/auth');
 
 // Static Admin Login
 router.post('/admin/login', (req, res) => {
@@ -28,7 +19,7 @@ router.post('/admin/login', (req, res) => {
 
     req.session.adminEmail = email;
     const adminUser = {
-        id: 'static-admin-id',
+        id: 'static-admin-id', // Static ID for admin
         email: 'admin@example.com',
         name: 'Admin',
         role: 'admin'
@@ -42,95 +33,6 @@ router.post('/admin/logout', (req, res) => {
     delete req.session.userId;
     res.status(200).json({ message: 'Admin logged out successfully' });
 });
-
-// Admin: Verify session
-router.get('/admin/verify', adminSessionRequired, (req, res) => {
-    res.status(200).json({ message: 'Admin session verified' });
-});
-
-// Admin: Get all users
-router.get('/admin/users', adminSessionRequired, async (req, res) => {
-    try {
-        const users = await User.find();
-        res.status(200).json(users.map(user => ({
-            id: user._id.toString(),
-            email: user.email,
-            name: user.name,
-            role: user.role
-        })));
-    } catch (err) {
-        res.status(500).json({ message: 'Server error' });
-    }
-});
-
-// Admin: Create user
-router.post('/admin/users', adminSessionRequired, async (req, res) => {
-    const { email, password, name, role = 'user' } = req.body;
-
-    if (!email || !password) {
-        return res.status(400).json({ message: 'Missing email or password' });
-    }
-
-    try {
-        const existingUser = await User.findOne({ email });
-        if (existingUser) {
-            return res.status(400).json({ message: 'Email already exists' });
-        }
-
-        const hashedPassword = await bcrypt.hash(password, 10);
-        const user = new User({ email, password: hashedPassword, name, role });
-        const savedUser = await user.save();
-
-        res.status(201).json({ message: 'User created', id: savedUser._id.toString() });
-    } catch (err) {
-        res.status(500).json({ message: 'Server error' });
-    }
-});
-
-// Admin: Update user
-router.put('/admin/users/:userId', adminSessionRequired, async (req, res) => {
-    const { userId } = req.params;
-    const { email, password, name, role } = req.body;
-
-    try {
-        const user = await User.findById(userId);
-        if (!user) {
-            return res.status(404).json({ message: 'User not found' });
-        }
-
-        user.email = email || user.email;
-        if (password) {
-            user.password = await bcrypt.hash(password, 10);
-        }
-        user.name = name !== undefined ? name : user.name;
-        user.role = role || user.role;
-
-        await user.save();
-        res.status(200).json({ message: 'User updated' });
-    } catch (err) {
-        res.status(500).json({ message: 'Server error' });
-    }
-});
-
-// Admin: Delete user
-router.delete('/admin/users/:userId', adminSessionRequired, async (req, res) => {
-    const { userId } = req.params;
-
-    try {
-        const user = await User.findByIdAndDelete(userId);
-        if (!user) {
-            return res.status(404).json({ message: 'User not found' });
-        }
-
-        res.status(200).json({ message: 'User deleted' });
-    } catch (err) {
-        res.status(500).json({ message: 'Server error' });
-    }
-});
-
-// ======================
-// User Routes
-// ======================
 
 // Register
 router.post('/register', async (req, res) => {
@@ -157,7 +59,7 @@ router.post('/register', async (req, res) => {
     }
 });
 
-// Login
+// Login for regular users
 router.post('/login', async (req, res) => {
     const { email, password } = req.body;
 
@@ -173,30 +75,20 @@ router.post('/login', async (req, res) => {
         }
 
         req.session.userId = user._id.toString();
-        res.status(200).json({
-            user: {
-                id: user._id.toString(),
-                email: user.email,
-                name: user.name,
-                role: user.role
-            }
-        });
+        res.status(200).json({ user: { id: user._id.toString(), email: user.email, name: user.name, role: user.role } });
     } catch (err) {
         res.status(500).json({ message: 'Server error' });
     }
 });
 
-// Logout
+// User Logout
 router.post('/logout', (req, res) => {
-    req.session.destroy(err => {
-        if (err) {
-            return res.status(500).json({ message: 'Logout failed', error: err.message });
-        }
-        res.status(200).json({ message: 'User logged out successfully' });
-    });
+    delete req.session.userId;
+    delete req.session.adminEmail;
+    res.status(200).json({ message: 'User logged out successfully' });
 });
 
-// Media Login (simulated OAuth)
+// Media Login (Simulated OAuth)
 router.post('/media-login', async (req, res) => {
     const { email } = req.body;
 
@@ -214,37 +106,85 @@ router.post('/media-login', async (req, res) => {
     }
 });
 
-// Check Session
-router.get('/session', async (req, res) => {
+// Admin: Get All Users
+router.get('/admin/users', adminSessionRequired, async (req, res) => {
     try {
-        if (req.session.adminEmail) {
-            return res.status(200).json({
-                user: {
-                    id: 'static-admin-id',
-                    email: 'admin@example.com',
-                    name: 'Admin',
-                    role: 'admin'
-                }
-            });
+        const users = await User.find();
+        res.status(200).json(users.map(user => ({
+            id: user._id.toString(),
+            email: user.email,
+            name: user.name,
+            role: user.role,
+        })));
+    } catch (err) {
+        res.status(500).json({ message: 'Server error' });
+    }
+});
+
+// Admin: Create User
+router.post('/admin/users', adminSessionRequired, async (req, res) => {
+    const { email, password, name, role = 'user' } = req.body;
+
+    if (!email || !password) {
+        return res.status(400).json({ message: 'Missing email or password' });
+    }
+
+    try {
+        const existingUser = await User.findOne({ email });
+        if (existingUser) {
+            return res.status(400).json({ message: 'Email already exists' });
         }
 
-        if (req.session.userId) {
-            const user = await User.findById(req.session.userId);
-            if (!user) {
-                return res.status(401).json({ message: 'User not found' });
-            }
+        const hashedPassword = await bcrypt.hash(password, 10);
+        const user = new User({ email, password: hashedPassword, name, role });
+        const savedUser = await user.save();
 
-            return res.status(200).json({
-                user: {
-                    id: user._id.toString(),
-                    email: user.email,
-                    name: user.name,
-                    role: user.role
-                }
-            });
+        res.status(201).json({ message: 'User created', id: savedUser._id.toString() });
+    } catch (err) {
+        res.status(500).json({ message: 'Server error' });
+    }
+});
+
+// Admin: Update User
+router.put('/admin/users/:userId', adminSessionRequired, async (req, res) => {
+    const { userId } = req.params;
+    const { email, password, name, role } = req.body;
+
+    try {
+        const user = await User.findById(userId);
+        if (!user) {
+            return res.status(404).json({ message: 'User not found' });
         }
 
-        res.status(401).json({ message: 'Not authenticated' });
+        user.email = email || user.email;
+        if (password) {
+            user.password = await bcrypt.hash(password, 10);
+        }
+        user.name = name !== undefined ? name : user.name;
+        user.role = role || user.role;
+        await user.save();
+
+        res.status(200).json({ message: 'User updated' });
+    } catch (err) {
+        res.status(500).json({ message: 'Server error' });
+    }
+});
+
+router.get('/admin/verify', adminSessionRequired, (req, res) => {
+  res.status(200).json({ message: 'Admin session verified' });
+});
+
+// Admin: Delete User
+router.delete('/admin/users/:userId', adminSessionRequired, async (req, res) => {
+    const { userId } = req.params;
+
+    try {
+        const user = await User.findByIdAndDelete(userId);
+        if (!user) {
+            return res.status(404).json({ message: 'User not found' });
+        }
+
+        res.status(200).json({ message: 'User deleted' });
     } catch (err) {
         res.status(500).json({ message: 'Server error' });
     }
