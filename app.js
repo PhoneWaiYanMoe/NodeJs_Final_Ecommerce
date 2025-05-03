@@ -21,11 +21,14 @@ mongoose.connect(process.env.MONGO_URI, {
     tls: true
 })
     .then(() => console.log('Connected to MongoDB'))
-    .catch(err => console.error('MongoDB connection error:', err));
+    .catch(err => {
+        console.error('MongoDB connection error:', err);
+        process.exit(1); // Exit if MongoDB fails to connect
+    });
 
 // Middleware
 app.use(cors({
-    origin: ['https://d5d2-2401-d800-2820-2662-65e1-172b-8529-78fd.ngrok-free.app', 'http://localhost:3000'], // Allow Ngrok and local dev
+    origin: ['https://62e0-171-250-182-137.ngrok-free.app', 'http://localhost:3000'], // Allow Ngrok and local dev
     credentials: true // Allow cookies/sessions
 }));
 app.use(express.json());
@@ -35,7 +38,8 @@ app.use(session({
     saveUninitialized: false,
     store: MongoStore.create({
         mongoUrl: process.env.MONGO_URI,
-        collectionName: 'sessions'
+        collectionName: 'sessions',
+        ttl: 24 * 60 * 60 // 24 hours in seconds
     }),
     cookie: {
         secure: true, // Required for HTTPS (Ngrok and Render use HTTPS)
