@@ -22,14 +22,14 @@ router.post('/admin/login', (req, res) => {
         return res.status(400).json({ message: 'Missing email or password' });
     }
 
-    if (email !== 'admin@example.com' || password !== 'admin123') {
+    if (email !== STATIC_ADMIN.email || password !== STATIC_ADMIN.password) {
         return res.status(401).json({ message: 'Invalid admin credentials' });
     }
 
     req.session.adminEmail = email;
     const adminUser = {
         id: 'static-admin-id',
-        email: 'admin@example.com',
+        email: STATIC_ADMIN.email,
         name: 'Admin',
         role: 'admin'
     };
@@ -38,9 +38,12 @@ router.post('/admin/login', (req, res) => {
 
 // Admin Logout
 router.post('/admin/logout', (req, res) => {
-    delete req.session.adminEmail;
-    delete req.session.userId;
-    res.status(200).json({ message: 'Admin logged out successfully' });
+    req.session.destroy(err => {
+        if (err) {
+            return res.status(500).json({ message: 'Logout failed', error: err.message });
+        }
+        res.status(200).json({ message: 'Admin logged out successfully' });
+    });
 });
 
 // Admin: Verify session
@@ -151,7 +154,15 @@ router.post('/register', async (req, res) => {
         const savedUser = await user.save();
 
         req.session.userId = savedUser._id.toString();
-        res.status(201).json({ message: 'Registration successful' });
+        res.status(201).json({ 
+            message: 'Registration successful',
+            user: {
+                id: savedUser._id.toString(),
+                email: savedUser.email,
+                name: savedUser.name,
+                role: savedUser.role
+            }
+        });
     } catch (err) {
         res.status(500).json({ message: 'Server error' });
     }
@@ -208,7 +219,14 @@ router.post('/media-login', async (req, res) => {
         }
 
         req.session.userId = user._id.toString();
-        res.status(200).json({ message: 'Media login successful' });
+        res.status(200).json({ 
+            message: 'Media login successful',
+            user: {
+                id: user._id.toString(),
+                email: user.email,
+                role: user.role
+            }
+        });
     } catch (err) {
         res.status(500).json({ message: 'Server error' });
     }
@@ -221,7 +239,7 @@ router.get('/session', async (req, res) => {
             return res.status(200).json({
                 user: {
                     id: 'static-admin-id',
-                    email: 'admin@example.com',
+                    email: STATIC_ADMIN.email,
                     name: 'Admin',
                     role: 'admin'
                 }
@@ -231,6 +249,9 @@ router.get('/session', async (req, res) => {
         if (req.session.userId) {
             const user = await User.findById(req.session.userId);
             if (!user) {
+                req.session.destroy(err => {
+                    if (err) console.error('Session destroy error:', err);
+                });
                 return res.status(401).json({ message: 'User not found' });
             }
 
