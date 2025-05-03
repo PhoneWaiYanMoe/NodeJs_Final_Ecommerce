@@ -2,7 +2,6 @@ const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
 const session = require('express-session');
-const MongoStore = require('connect-mongo');
 const dotenv = require('dotenv');
 const userRoutes = require('./routes/userRoutes');
 
@@ -67,12 +66,7 @@ app.use(session({
     secret: process.env.SESSION_SECRET || 'your-secret-key',
     resave: false,
     saveUninitialized: false,
-    store: MongoStore.create({
-        mongoUrl: process.env.MONGO_URI,
-        collectionName: 'sessions',
-        ttl: 24 * 60 * 60,
-        client: mongoose.connection // Reuse mongoose connection
-    }),
+    // Temporarily use in-memory store for debugging
     cookie: {
         secure: true,
         httpOnly: true,
