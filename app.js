@@ -25,7 +25,7 @@ mongoose.connect(process.env.MONGO_URI, {
 
 // Middleware
 app.use(cors({
-    origin: ['https://62e0-171-250-182-137.ngrok-free.app', 'http://localhost:3000'], // Allow Ngrok and local dev
+    origin: ['https://d5d2-2401-d800-2820-2662-65e1-172b-8529-78fd.ngrok-free.app', 'http://localhost:3000'], // Allow Ngrok and local dev
     credentials: true // Allow cookies/sessions
 }));
 app.use(express.json());
