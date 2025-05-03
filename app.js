@@ -70,20 +70,26 @@ app.use((req, res, next) => {
 app.use(session({
     secret: process.env.SESSION_SECRET || 'your-secret-key',
     resave: false,
-    saveUninitialized: true, // Allow uninitialized sessions for testing
+    saveUninitialized: true,
     cookie: {
         secure: true,
         httpOnly: true,
-        sameSite: 'none',
+        sameSite: 'lax', // Relaxed for testing
         maxAge: 24 * 60 * 60 * 1000 // 24 hours
     }
 }));
 
-// Log session creation
+// Log session creation and force save
 app.use((req, res, next) => {
     if (!req.session.test) {
         req.session.test = 'Session test value';
-        console.log('Session initialized:', req.session);
+        req.session.save(err => {
+            if (err) {
+                console.error('Session save error:', err);
+            } else {
+                console.log('Session initialized and saved:', req.session);
+            }
+        });
     }
     next();
 });
