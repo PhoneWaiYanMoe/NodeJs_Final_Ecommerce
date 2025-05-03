@@ -62,11 +62,11 @@ app.use((req, res, next) => {
     next();
 });
 
+// Session middleware
 app.use(session({
     secret: process.env.SESSION_SECRET || 'your-secret-key',
     resave: false,
     saveUninitialized: false,
-    // Temporarily use in-memory store for debugging
     cookie: {
         secure: true,
         httpOnly: true,
@@ -74,6 +74,24 @@ app.use(session({
         maxAge: 24 * 60 * 60 * 1000 // 24 hours
     }
 }));
+
+// Log session creation
+app.use((req, res, next) => {
+    if (!req.session.test) {
+        req.session.test = 'Session test value';
+        console.log('Session initialized:', req.session);
+    }
+    next();
+});
+
+// Test route to verify session
+app.get('/test-session', (req, res) => {
+    if (req.session.test) {
+        res.status(200).json({ message: 'Session working', value: req.session.test });
+    } else {
+        res.status(400).json({ message: 'Session not found' });
+    }
+});
 
 // Routes
 app.use('/user', userRoutes);
