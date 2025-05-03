@@ -27,14 +27,20 @@ router.post('/admin/login', (req, res) => {
     }
 
     req.session.adminEmail = email;
-    console.log('Admin session set:', req.session); // Debug log
-    const adminUser = {
-        id: 'static-admin-id',
-        email: STATIC_ADMIN.email,
-        name: 'Admin',
-        role: 'admin'
-    };
-    res.status(200).json({ user: adminUser });
+    req.session.save(err => {
+        if (err) {
+            console.error('Session save error:', err);
+            return res.status(500).json({ message: 'Failed to save session' });
+        }
+        console.log('Admin session set:', req.session);
+        const adminUser = {
+            id: 'static-admin-id',
+            email: STATIC_ADMIN.email,
+            name: 'Admin',
+            role: 'admin'
+        };
+        res.status(200).json({ user: adminUser });
+    });
 });
 
 // Admin Logout
@@ -155,15 +161,21 @@ router.post('/register', async (req, res) => {
         const savedUser = await user.save();
 
         req.session.userId = savedUser._id.toString();
-        console.log('User session set:', req.session); // Debug log
-        res.status(201).json({ 
-            message: 'Registration successful',
-            user: {
-                id: savedUser._id.toString(),
-                email: savedUser.email,
-                name: savedUser.name,
-                role: savedUser.role
+        req.session.save(err => {
+            if (err) {
+                console.error('Session save error:', err);
+                return res.status(500).json({ message: 'Failed to save session' });
             }
+            console.log('User session set:', req.session);
+            res.status(201).json({ 
+                message: 'Registration successful',
+                user: {
+                    id: savedUser._id.toString(),
+                    email: savedUser.email,
+                    name: savedUser.name,
+                    role: savedUser.role
+                }
+            });
         });
     } catch (err) {
         res.status(500).json({ message: 'Server error' });
@@ -186,14 +198,20 @@ router.post('/login', async (req, res) => {
         }
 
         req.session.userId = user._id.toString();
-        console.log('User session set:', req.session); // Debug log
-        res.status(200).json({
-            user: {
-                id: user._id.toString(),
-                email: user.email,
-                name: user.name,
-                role: user.role
+        req.session.save(err => {
+            if (err) {
+                console.error('Session save error:', err);
+                return res.status(500).json({ message: 'Failed to save session' });
             }
+            console.log('User session set:', req.session);
+            res.status(200).json({
+                user: {
+                    id: user._id.toString(),
+                    email: user.email,
+                    name: user.name,
+                    role: user.role
+                }
+            });
         });
     } catch (err) {
         res.status(500).json({ message: 'Server error' });
@@ -222,14 +240,20 @@ router.post('/media-login', async (req, res) => {
         }
 
         req.session.userId = user._id.toString();
-        console.log('Media login session set:', req.session); // Debug log
-        res.status(200).json({ 
-            message: 'Media login successful',
-            user: {
-                id: user._id.toString(),
-                email: user.email,
-                role: user.role
+        req.session.save(err => {
+            if (err) {
+                console.error('Session save error:', err);
+                return res.status(500).json({ message: 'Failed to save session' });
             }
+            console.log('Media login session set:', req.session);
+            res.status(200).json({ 
+                message: 'Media login successful',
+                user: {
+                    id: user._id.toString(),
+                    email: user.email,
+                    role: user.role
+                }
+            });
         });
     } catch (err) {
         res.status(500).json({ message: 'Server error' });
@@ -239,7 +263,7 @@ router.post('/media-login', async (req, res) => {
 // Check Session
 router.get('/session', async (req, res) => {
     try {
-        console.log('Checking session:', req.session); // Debug log
+        console.log('Checking session:', req.session);
         if (req.session.adminEmail) {
             return res.status(200).json({
                 user: {
