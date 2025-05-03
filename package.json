@@ -1,0 +1,19 @@
+{
+    "name": "cart-and-checkout",
+    "version": "1.0.0",
+    "main": "app.js",
+    "scripts": {
+        "start": "node app.js"
+    },
+    "dependencies": {
+        "axios": "^1.9.0",
+        "cart-and-checkout": "file:",
+        "cors": "^2.8.5",
+        "dotenv": "^10.0.0",
+        "express": "^4.17.1",
+        "express-session": "^1.17.2",
+        "mongoose": "^6.0.0",
+        "punycode": "^2.3.1",
+        "uuid": "^8.3.2"
+    }
+}
