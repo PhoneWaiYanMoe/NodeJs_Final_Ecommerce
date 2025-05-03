@@ -1,14 +1,5 @@
 import mongoose from 'mongoose';
 
-<<<<<<< Updated upstream
-const productSchema = new mongoose.Schema({ 
-  name: { type: String, required: true },
-  description: { type: String, required: true }, 
-  price: { type: Number, required: true, min: 0 }, 
-  category: { type: String, required: true }, 
-  stock: { type: Number, required: true, min: 0 }, 
-  createdAt: { type: Date, default: Date.now }, });
-=======
 const reviewSchema = new mongoose.Schema({
     userId: { type: String, default: null },
     userName: { type: String, default: 'Anonymous' },
@@ -36,6 +27,5 @@ const productSchema = new mongoose.Schema({
     salesCount: { type: Number, default: 0 },
     createdAt: { type: Date, default: Date.now } // Add createdAt
 });
->>>>>>> Stashed changes
 
 export default mongoose.model('Product', productSchema);

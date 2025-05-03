@@ -35,9 +35,6 @@ export const createProduct = async (req, res) => {
   }
 
   try {
-<<<<<<< Updated upstream
-    const product = new Product(req.body);
-=======
     await validateCategory(category);
 
     const product = new Product({
@@ -53,7 +50,6 @@ export const createProduct = async (req, res) => {
       salesCount: 0,
       createdAt: new Date(),
     });
->>>>>>> Stashed changes
     await product.save();
     res.status(201).json(product);
   } catch (error) {
@@ -217,8 +213,6 @@ export const updateProduct = async (req, res) => {
       .json({ message: "Error updating product", error: error.message });
   }
 };
-<<<<<<< Updated upstream
-=======
 
 // DELETE /api/products/:id - Delete a product (admin-only, already implemented)
 export const deleteProduct = async (req, res) => {
@@ -429,4 +423,3 @@ export const updateInventory = async (req, res) => {
       .json({ message: "Error updating inventory", error: error.message });
   }
 };
->>>>>>> Stashed changes
