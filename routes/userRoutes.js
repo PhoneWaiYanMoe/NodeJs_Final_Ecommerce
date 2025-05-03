@@ -27,6 +27,7 @@ router.post('/admin/login', (req, res) => {
     }
 
     req.session.adminEmail = email;
+    console.log('Admin session set:', req.session); // Debug log
     const adminUser = {
         id: 'static-admin-id',
         email: STATIC_ADMIN.email,
@@ -154,6 +155,7 @@ router.post('/register', async (req, res) => {
         const savedUser = await user.save();
 
         req.session.userId = savedUser._id.toString();
+        console.log('User session set:', req.session); // Debug log
         res.status(201).json({ 
             message: 'Registration successful',
             user: {
@@ -184,6 +186,7 @@ router.post('/login', async (req, res) => {
         }
 
         req.session.userId = user._id.toString();
+        console.log('User session set:', req.session); // Debug log
         res.status(200).json({
             user: {
                 id: user._id.toString(),
@@ -219,6 +222,7 @@ router.post('/media-login', async (req, res) => {
         }
 
         req.session.userId = user._id.toString();
+        console.log('Media login session set:', req.session); // Debug log
         res.status(200).json({ 
             message: 'Media login successful',
             user: {
@@ -235,6 +239,7 @@ router.post('/media-login', async (req, res) => {
 // Check Session
 router.get('/session', async (req, res) => {
     try {
+        console.log('Checking session:', req.session); // Debug log
         if (req.session.adminEmail) {
             return res.status(200).json({
                 user: {
