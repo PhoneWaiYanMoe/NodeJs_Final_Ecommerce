@@ -36,23 +36,25 @@ const allowedOrigins = [
 app.use(cors({
     origin: (origin, callback) => {
         if (!origin || allowedOrigins.includes(origin)) {
-            callback(null, origin); // Return the origin to set Access-Control-Allow-Origin
+            callback(null, true);
         } else {
             callback(new Error('Not allowed by CORS'));
         }
     },
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization'],
-    exposedHeaders: ['Set-Cookie'] // Ensure Set-Cookie is exposed
+    allowedHeaders: ['Content-Type', 'Authorization']
 }));
 app.use(express.json());
 
-// Log incoming cookies and session for debugging
+// Log incoming cookies for debugging
 app.use((req, res, next) => {
     console.log('Incoming cookies:', req.headers.cookie);
-    console.log('Session ID:', req.sessionID);
-    console.log('Session data:', req.session);
+    const originalSend = res.send;
+    res.send = function (body) {
+        console.log('Response headers:', res.getHeaders());
+        return originalSend.call(this, body);
+    };
     next();
 });
 
