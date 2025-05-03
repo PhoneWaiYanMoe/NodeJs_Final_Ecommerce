@@ -27,11 +27,32 @@ mongoose.connect(process.env.MONGO_URI, {
     });
 
 // Middleware
+const allowedOrigins = [
+    'https://62e0-171-250-182-137.ngrok-free.app',
+    'https://d5d2-2401-d800-2820-2662-65e1-172b-8529-78fd.ngrok-free.app',
+    'http://localhost:3000'
+];
+
 app.use(cors({
-    origin: ['https://d5d2-2401-d800-2820-2662-65e1-172b-8529-78fd.ngrok-free.app', 'http://localhost:3000'], // Allow Ngrok and local dev
-    credentials: true // Allow cookies/sessions
+    origin: (origin, callback) => {
+        if (!origin || allowedOrigins.includes(origin)) {
+            callback(null, true);
+        } else {
+            callback(new Error('Not allowed by CORS'));
+        }
+    },
+    credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization']
 }));
 app.use(express.json());
+
+// Log incoming cookies for debugging
+app.use((req, res, next) => {
+    console.log('Incoming cookies:', req.headers.cookie);
+    next();
+});
+
 app.use(session({
     secret: process.env.SESSION_SECRET || 'your-secret-key',
     resave: false,
@@ -42,9 +63,9 @@ app.use(session({
         ttl: 24 * 60 * 60 // 24 hours in seconds
     }),
     cookie: {
-        secure: true, // Required for HTTPS (Ngrok and Render use HTTPS)
-        httpOnly: true, // Prevent client-side JS from accessing the cookie
-        sameSite: 'none', // Required for cross-origin cookies
+        secure: true,
+        httpOnly: true,
+        sameSite: 'none',
         maxAge: 24 * 60 * 60 * 1000 // 24 hours
     }
 }));
