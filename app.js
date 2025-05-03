@@ -27,7 +27,7 @@ mongoose.connect(process.env.MONGO_URI, {
 
 // Middleware
 const allowedOrigins = [
-    'https://62e0-171-250-182-137.ngrok-free.app',
+    'https://149f-2401-d800-2820-2662-e85c-630b-971a-8bac.ngrok-free.app',
     'https://d5d2-2401-d800-2820-2662-65e1-172b-8529-78fd.ngrok-free.app',
     'http://localhost:3000'
 ];
@@ -46,23 +46,10 @@ app.use(cors({
 }));
 app.use(express.json());
 
-// Log incoming cookies and requests for debugging
+// Basic logging
 app.use((req, res, next) => {
     console.log(`Request: ${req.method} ${req.url}`);
     console.log('Incoming cookies:', req.headers.cookie);
-    const originalEnd = res.end;
-    res.end = function (chunk, encoding) {
-        setImmediate(() => {
-            console.log('Response headers after processing:', res.getHeaders());
-            const setCookie = res.getHeader('set-cookie');
-            if (setCookie) {
-                console.log('Set-Cookie header:', setCookie);
-            } else {
-                console.log('No Set-Cookie header found');
-            }
-        });
-        return originalEnd.call(this, chunk, encoding);
-    };
     next();
 });
 
@@ -74,7 +61,8 @@ app.use(session({
     cookie: {
         secure: true,
         httpOnly: true,
-        sameSite: 'lax', // Relaxed for testing
+        sameSite: 'none',
+        domain: 'nodejs-final-ecommerce.onrender.com', // Explicitly set domain
         maxAge: 24 * 60 * 60 * 1000 // 24 hours
     }
 }));
@@ -96,6 +84,7 @@ app.use((req, res, next) => {
 
 // Test route to verify session
 app.get('/test-session', (req, res) => {
+    console.log('Session in /test-session:', req.session);
     if (req.session.test) {
         res.status(200).json({ message: 'Session working', value: req.session.test });
     } else {
