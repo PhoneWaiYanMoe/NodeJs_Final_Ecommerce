@@ -47,13 +47,18 @@ app.use(cors({
 }));
 app.use(express.json());
 
-// Log incoming cookies for debugging
+// Log incoming cookies and requests for debugging
 app.use((req, res, next) => {
+    console.log(`Request: ${req.method} ${req.url}`);
     console.log('Incoming cookies:', req.headers.cookie);
-    const originalSend = res.send;
-    res.send = function (body) {
+    const originalEnd = res.end;
+    res.end = function (chunk, encoding) {
         console.log('Response headers:', res.getHeaders());
-        return originalSend.call(this, body);
+        const setCookie = res.getHeader('set-cookie');
+        if (setCookie) {
+            console.log('Set-Cookie header:', setCookie);
+        }
+        return originalEnd.call(this, chunk, encoding);
     };
     next();
 });
@@ -65,7 +70,8 @@ app.use(session({
     store: MongoStore.create({
         mongoUrl: process.env.MONGO_URI,
         collectionName: 'sessions',
-        ttl: 24 * 60 * 60 // 24 hours in seconds
+        ttl: 24 * 60 * 60,
+        client: mongoose.connection // Reuse mongoose connection
     }),
     cookie: {
         secure: true,
