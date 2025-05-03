@@ -17,16 +17,17 @@ app.use(cors({
     origin: ['https://62e0-171-250-182-137.ngrok-free.app', 'http://localhost:3000'], // Allow Ngrok and local dev
     credentials: true // Allow cookies/sessions
 }));
-app.use(express.json());
+const MongoStore = require('connect-mongo');
 app.use(session({
-    secret: process.env.SESSION_SECRET || 'your-secret-key', // Ensure a secret is set
+    secret: process.env.SESSION_SECRET || 'your-secret-key',
     resave: false,
     saveUninitialized: false,
+    store: MongoStore.create({ mongoUrl: process.env.MONGO_URI }),
     cookie: {
-        secure: true, // Required for HTTPS (Ngrok uses HTTPS)
-        httpOnly: true, // Prevent client-side JS from accessing the cookie
-        sameSite: 'none', // Required for cross-origin cookies
-        maxAge: 24 * 60 * 60 * 1000 // 24 hours
+        secure: true,
+        httpOnly: true,
+        sameSite: 'none',
+        maxAge: 24 * 60 * 60 * 1000
     }
 }));
 
