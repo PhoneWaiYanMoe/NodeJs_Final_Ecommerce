@@ -14,18 +14,18 @@ const app = express();
 
 // Middleware
 app.use(cors({
-    origin: 'https://62e0-171-250-182-137.ngrok-free.app', // Allow requests from your friend's frontend
+    origin: ['https://62e0-171-250-182-137.ngrok-free.app', 'http://localhost:3000'], // Allow Ngrok and local dev
     credentials: true // Allow cookies/sessions
 }));
 app.use(express.json());
 app.use(session({
-    secret: process.env.SESSION_SECRET,
+    secret: process.env.SESSION_SECRET || 'your-secret-key', // Ensure a secret is set
     resave: false,
     saveUninitialized: false,
     cookie: {
-        secure: process.env.NODE_ENV === 'production', // Secure cookies in production (HTTPS)
+        secure: true, // Required for HTTPS (Ngrok uses HTTPS)
         httpOnly: true, // Prevent client-side JS from accessing the cookie
-        sameSite: 'lax', // Allow cookies in cross-origin requests (adjust if needed)
+        sameSite: 'none', // Required for cross-origin cookies
         maxAge: 24 * 60 * 60 * 1000 // 24 hours
     }
 }));
