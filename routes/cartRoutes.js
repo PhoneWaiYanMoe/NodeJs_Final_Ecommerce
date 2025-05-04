@@ -1,48 +1,55 @@
-// CartAndCheckout/routes/cartRoutes.js
 const express = require('express');
 const router = express.Router();
 const mongoose = require('mongoose');
+const jwt = require('jsonwebtoken');
 const CartItem = require('../models/CartItem');
 const Order = require('../models/Order');
 const DiscountCode = require('../models/DiscountCode');
-const { adminRequired, userOrGuestRequired, userRequired, STATIC_ADMIN } = require('../middleware/auth');
 
 // Constants
 const TAX_RATE = 0.1; // 10% tax
 const SHIPPING_FEE = 5.0;
+const SECRET_KEY = process.env.JWT_SECRET || 'your-jwt-secret-key';
 
-// Helper to get cart identifier
-const getCartIdentifier = (req) => {
-  if (req.session.userId) {
-    return { userId: req.session.userId };
+// Middleware to verify JWT
+const verifyToken = (req, res, next) => {
+  const token = req.headers.authorization?.split(' ')[1];
+  if (!token) {
+    return res.status(401).json({ error: 'No token provided' });
   }
-  return { sessionId: req.session.sessionId };
+
+  try {
+    const decoded = jwt.verify(token, SECRET_KEY);
+    req.user = decoded;
+    next();
+  } catch (err) {
+    res.status(401).json({ error: 'Invalid token' });
+  }
 };
 
-// Admin Login
-router.post('/admin/login', (req, res) => {
-  const { email, password } = req.body;
-
-  if (!email || !password) {
-    return res.status(400).json({ error: 'Missing email or password' });
+// Middleware to require admin role
+const adminRequired = (req, res, next) => {
+  if (!req.user || req.user.role !== 'admin') {
+    return res.status(403).json({ error: 'Admin access required' });
   }
+  next();
+};
 
-  if (email !== STATIC_ADMIN.email || password !== STATIC_ADMIN.password) {
-    return res.status(401).json({ error: 'Invalid admin credentials' });
+// Middleware to require user (no guest access)
+const userRequired = (req, res, next) => {
+  if (!req.user) {
+    return res.status(401).json({ error: 'User access required' });
   }
+  next();
+};
 
-  req.session.adminEmail = email;
-  res.status(200).json({ message: 'Admin login successful' });
-});
-
-// Admin Logout
-router.post('/admin/logout', (req, res) => {
-  delete req.session.adminEmail;
-  res.status(200).json({ message: 'Admin logged out successfully' });
-});
+// Helper to get cart identifier (userId only, no sessionId for guests)
+const getCartIdentifier = (req) => {
+  return { userId: req.user.id };
+};
 
 // Add to Cart
-router.post('/add', userOrGuestRequired, async (req, res) => {
+router.post('/add', [verifyToken, userRequired], async (req, res) => {
   const { product_id, quantity = 1, price } = req.body;
 
   if (!product_id || !price) {
@@ -73,12 +80,13 @@ router.post('/add', userOrGuestRequired, async (req, res) => {
 
     res.status(201).json({ message: 'Item added to cart' });
   } catch (err) {
+    console.error(err);
     res.status(500).json({ error: 'Server error' });
   }
 });
 
 // Update Cart Item Quantity
-router.put('/update/:itemId', userOrGuestRequired, async (req, res) => {
+router.put('/update/:itemId', [verifyToken, userRequired], async (req, res) => {
   const { itemId } = req.params;
   const { quantity } = req.body;
 
@@ -99,12 +107,13 @@ router.put('/update/:itemId', userOrGuestRequired, async (req, res) => {
 
     res.status(200).json({ message: 'Cart updated' });
   } catch (err) {
+    console.error(err);
     res.status(500).json({ error: 'Server error' });
   }
 });
 
 // Remove Item from Cart
-router.delete('/remove/:itemId', userOrGuestRequired, async (req, res) => {
+router.delete('/remove/:itemId', [verifyToken, userRequired], async (req, res) => {
   const { itemId } = req.params;
 
   try {
@@ -117,12 +126,13 @@ router.delete('/remove/:itemId', userOrGuestRequired, async (req, res) => {
 
     res.status(200).json({ message: 'Item removed from cart' });
   } catch (err) {
+    console.error(err);
     res.status(500).json({ error: 'Server error' });
   }
 });
 
 // Cart Summary
-router.get('/summary', userOrGuestRequired, async (req, res) => {
+router.get('/summary', [verifyToken, userRequired], async (req, res) => {
   try {
     const cartIdentifier = getCartIdentifier(req);
     const cartItems = await CartItem.find(cartIdentifier);
@@ -148,12 +158,13 @@ router.get('/summary', userOrGuestRequired, async (req, res) => {
       total: parseFloat(total.toFixed(2)),
     });
   } catch (err) {
+    console.error(err);
     res.status(500).json({ error: 'Server error' });
   }
 });
 
 // Apply Discount Code
-router.post('/apply-discount', userOrGuestRequired, async (req, res) => {
+router.post('/apply-discount', [verifyToken, userRequired], async (req, res) => {
   const { code } = req.body;
 
   if (!code) {
@@ -183,7 +194,8 @@ router.post('/apply-discount', userOrGuestRequired, async (req, res) => {
     const taxes = (subtotal - discountAmount) * TAX_RATE;
     const total = (subtotal - discountAmount) + taxes + SHIPPING_FEE;
 
-    req.session.discountCode = code;
+    // Store discount code in cart (optional: you might want to store this differently)
+    req.user.discountCode = code;
 
     res.status(200).json({
       subtotal: parseFloat(subtotal.toFixed(2)),
@@ -195,12 +207,13 @@ router.post('/apply-discount', userOrGuestRequired, async (req, res) => {
       discountPercentage: discount.discountPercentage,
     });
   } catch (err) {
+    console.error(err);
     res.status(500).json({ error: 'Server error' });
   }
 });
 
 // Checkout Process
-router.post('/checkout', userOrGuestRequired, userRequired, async (req, res) => {
+router.post('/checkout', [verifyToken, userRequired], async (req, res) => {
   const { shippingAddress, paymentDetails } = req.body;
 
   if (!shippingAddress || !paymentDetails) {
@@ -219,8 +232,8 @@ router.post('/checkout', userOrGuestRequired, userRequired, async (req, res) => 
     const subtotal = cartItems.reduce((sum, item) => sum + item.price * item.quantity, 0);
     let discountAmount = 0;
 
-    if (req.session.discountCode) {
-      const discount = await DiscountCode.findOne({ code: req.session.discountCode });
+    if (req.user.discountCode) {
+      const discount = await DiscountCode.findOne({ code: req.user.discountCode });
       if (discount && discount.timesUsed < discount.usageLimit) {
         discountAmount = (discount.discountPercentage / 100) * subtotal;
         discount.timesUsed += 1;
@@ -246,17 +259,18 @@ router.post('/checkout', userOrGuestRequired, userRequired, async (req, res) => 
     // Clear cart
     await CartItem.deleteMany(cartIdentifier);
 
-    // Clear session discount
-    delete req.session.discountCode;
+    // Clear discount
+    delete req.user.discountCode;
 
     res.status(201).json({ message: 'Checkout successful', orderId: savedOrder._id.toString() });
   } catch (err) {
+    console.error(err);
     res.status(500).json({ error: 'Server error' });
   }
 });
 
 // Admin: Create Discount Code
-router.post('/admin/discount', adminRequired, async (req, res) => {
+router.post('/admin/discount', [verifyToken, adminRequired], async (req, res) => {
   const { code, discount_percentage, usageLimit = 10 } = req.body;
 
   if (!code || !discount_percentage) {
@@ -282,6 +296,7 @@ router.post('/admin/discount', adminRequired, async (req, res) => {
 
     res.status(201).json({ message: 'Discount code created', code });
   } catch (err) {
+    console.error(err);
     res.status(500).json({ error: 'Server error' });
   }
 });
