@@ -1,7 +1,6 @@
 const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
-const session = require('express-session');
 const dotenv = require('dotenv');
 const userRoutes = require('./routes/userRoutes');
 
@@ -27,8 +26,8 @@ mongoose.connect(process.env.MONGO_URI, {
 
 // Middleware
 const allowedOrigins = [
-    'https://149f-2401-d800-2820-2662-e85c-630b-971a-8bac.ngrok-free.app',
-    'https://d5d2-2401-d800-2820-2662-65e1-172b-8529-78fd.ngrok-free.app',
+    'https://62e0-171-250-182-137.ngrok-free.app',
+    'https://74fa-2402-800-62a9-bd95-5d7f-313e-f077-afe4.ngrok-free.app',
     'http://localhost:3000'
 ];
 
@@ -46,50 +45,11 @@ app.use(cors({
 }));
 app.use(express.json());
 
-// Basic logging
+// Log requests and Authorization header for debugging
 app.use((req, res, next) => {
     console.log(`Request: ${req.method} ${req.url}`);
-    console.log('Incoming cookies:', req.headers.cookie);
+    console.log('Authorization header:', req.headers.authorization);
     next();
-});
-
-// Session middleware
-app.use(session({
-    secret: process.env.SESSION_SECRET || 'your-secret-key',
-    resave: false,
-    saveUninitialized: true,
-    cookie: {
-        secure: true,
-        httpOnly: true,
-        sameSite: 'none',
-        domain: 'nodejs-final-ecommerce.onrender.com', // Explicitly set domain
-        maxAge: 24 * 60 * 60 * 1000 // 24 hours
-    }
-}));
-
-// Log session creation and force save
-app.use((req, res, next) => {
-    if (!req.session.test) {
-        req.session.test = 'Session test value';
-        req.session.save(err => {
-            if (err) {
-                console.error('Session save error:', err);
-            } else {
-                console.log('Session initialized and saved:', req.session);
-            }
-        });
-    }
-    next();
-});
-
-// Test route to verify session
-app.get('/test-session', (req, res) => {
-    console.log('Session in /test-session:', req.session);
-    if (req.session.test) {
-        res.status(200).json({ message: 'Session working', value: req.session.test });
-    } else {
-        res.status(400).json({ message: 'Session not found' });
-    }
 });
 
 // Routes
