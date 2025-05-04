@@ -1,86 +1,118 @@
-import React, { useState, useEffect } from 'react';
+import React, { createContext, useState, useEffect } from 'react';
+import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import axios from 'axios';
-import './App.css';
+import Products from './pages/Products';
+import ProductDetails from './pages/ProductDetails';
+import AdminDashboard from './pages/AdminDashboard';
+import Cart from './pages/Cart';
+import Register from './pages/Register';
+import Login from './pages/Login';
+
+// Create Auth Context
+export const AuthContext = createContext();
+
+// Configure Axios defaults
+axios.defaults.baseURL = 'https://nodejs-final-ecommerce.onrender.com/user';
+
+// Add token to axios headers
+axios.interceptors.request.use((config) => {
+    const token = localStorage.getItem('token');
+    if (token) {
+        config.headers.Authorization = `Bearer ${token}`;
+    }
+    return config;
+});
 
 function App() {
-    const [products, setProducts] = useState([]);
-    const [search, setSearch] = useState('');
-    const [category, setCategory] = useState('');
-    const [minPrice, setMinPrice] = useState('100');
-    const [maxPrice, setMaxPrice] = useState('2000');
+    const [user, setUser] = useState(null);
+    const [loading, setLoading] = useState(true);
 
-    // Remove fetchProducts from useEffect dependencies to avoid unnecessary calls
-    const fetchProducts = async () => {
+    // Check session (token) on app load
+    useEffect(() => {
+        const checkSession = async () => {
+            try {
+                const token = localStorage.getItem('token');
+                if (token) {
+                    const response = await axios.get('/session');
+                    if (response.data.user) {
+                        setUser(response.data.user);
+                    } else {
+                        localStorage.removeItem('token');
+                        setUser(null);
+                    }
+                } else {
+                    setUser(null);
+                }
+            } catch (err) {
+                console.error('Session check failed:', err.message);
+                localStorage.removeItem('token');
+                setUser(null);
+            } finally {
+                setLoading(false);
+            }
+        };
+        checkSession();
+    }, []);
+
+    // Login function
+    const login = async (email, password) => {
         try {
-            const params = {};
-            if (search) params.search = search;
-            if (category) params.category = category;
-            if (minPrice) params.minPrice = minPrice;
-            if (maxPrice) params.maxPrice = maxPrice;
-
-            const response = await axios.get('http://localhost:3001/api/products', { params });
-            setProducts(response.data);
-        } catch (error) {
-            console.error('Error fetching products:', error);
+            const loginUrl = email === 'admin@example.com' ? '/admin/login' : '/login';
+            const response = await axios.post(loginUrl, { email, password });
+            const { user, token } = response.data;
+            if (token) {
+                localStorage.setItem('token', token);
+                setUser(user);
+            }
+            return response.data;
+        } catch (err) {
+            throw err.response?.data || { message: 'Login failed' };
         }
     };
 
-    // Call fetchProducts on component mount only
-    useEffect(() => {
-        fetchProducts();
-    }, []); // Empty dependency array to run only on mount
+    // Logout function
+    const logout = async () => {
+        try {
+            await axios.post('/logout');
+            localStorage.removeItem('token');
+            setUser(null);
+        } catch (err) {
+            console.error('Logout failed:', err.message);
+        }
+    };
 
-    // Handle search button click
-    const handleSearch = () => {
-        fetchProducts();
+    // Protected Route Component
+    const ProtectedRoute = ({ children, adminOnly }) => {
+        if (loading) return <div>Loading...</div>;
+        if (!user) return <Navigate to="/login" replace />;
+        if (adminOnly && (user.email !== 'admin@example.com' && user.role !== 'admin')) {
+            return <Navigate to="/" replace />;
+        }
+        return children;
     };
 
     return (
-        <div className="App">
-            <h1>Product Catalog</h1>
-            <div>
-                <input
-                    type="text"
-                    placeholder="Search..."
-                    value={search}
-                    onChange={(e) => setSearch(e.target.value)}
-                />
-                <input
-                    type="text"
-                    placeholder="Category"
-                    value={category}
-                    onChange={(e) => setCategory(e.target.value)}
-                />
-                <input
-                    type="number"
-                    placeholder="Min Price"
-                    value={minPrice}
-                    onChange={(e) => setMinPrice(e.target.value)}
-                />
-                <input
-                    type="number"
-                    placeholder="Max Price"
-                    value={maxPrice}
-                    onChange={(e) => setMaxPrice(e.target.value)}
-                />
-                <button onClick={handleSearch}>Search</button>
-            </div>
-            <div>
-                {products.length > 0 ? (
-                    products.map((product) => (
-                        <div key={product._id} className="product">
-                            <h3>{product.name}</h3>
-                            <p>{product.description}</p>
-                            <p>Price: ${product.price}</p>
-                            <p>Category: {product.category}</p>
-                            <p>Stock: {product.stock}</p>
-                        </div>
-                    ))
-                ) : (
-                    <p>No products found.</p>
-                )}
-            </div>
-        </div>
+        <AuthContext.Provider value={{ user, login, logout }}>
+            <Router>
+                <Routes>
+                    <Route path="/products" element={<Products />} />
+                    <Route path="/products/:id" element={<ProductDetails />} />
+                    <Route path="/admin/dashboard" element={
+                        <ProtectedRoute adminOnly={true}>
+                            <AdminDashboard />
+                        </ProtectedRoute>
+                    } />
+                    <Route path="/cart" element={
+                        <ProtectedRoute>
+                            <Cart />
+                        </ProtectedRoute>
+                    } />
+                    <Route path="/register" element={<Register />} />
+                    <Route path="/login" element={<Login />} />
+                    <Route path="/" element={<Products />} />
+                </Routes>
+            </Router>
+        </AuthContext.Provider>
     );
 }
 
