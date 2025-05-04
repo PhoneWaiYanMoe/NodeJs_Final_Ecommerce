@@ -31,11 +31,26 @@ const allowedOrigins = [
     'http://localhost:3000'
 ];
 
+// Explicitly handle OPTIONS requests for CORS preflight
+app.use((req, res, next) => {
+    if (req.method === 'OPTIONS') {
+        console.log('Handling OPTIONS request for:', req.url);
+        res.header('Access-Control-Allow-Origin', allowedOrigins.includes(req.headers.origin) ? req.headers.origin : '');
+        res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+        res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+        res.header('Access-Control-Allow-Credentials', 'true');
+        return res.status(200).json({});
+    }
+    next();
+});
+
 app.use(cors({
     origin: (origin, callback) => {
+        console.log('CORS check - Origin:', origin);
         if (!origin || allowedOrigins.includes(origin)) {
             callback(null, true);
         } else {
+            console.log('CORS rejected - Origin not allowed:', origin);
             callback(new Error('Not allowed by CORS'));
         }
     },
