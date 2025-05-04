@@ -16,14 +16,14 @@ const HOST = '0.0.0.0';
 const server = createServer(app);
 const io = new Server(server, {
     cors: {
-        origin: 'https://62e0-171-250-182-137.ngrok-free.app', // Allow UI Service running locally
+        origin: 'https://frontend-u30c.onrender.com', // Allow UI Service running locally
         methods: ['GET', 'POST']
     }
 });
 global.io = io;
 
 app.use(cors({
-    origin: 'https://62e0-171-250-182-137.ngrok-free.app' // Allow UI Service running locally
+    origin: 'https://frontend-u30c.onrender.com' // Allow UI Service running locally
 }));
 app.use(express.json());
 
