@@ -26,7 +26,7 @@ mongoose.connect(process.env.MONGO_URI, {
 
 // Middleware
 const allowedOrigins = [
-    'https://a46f-2402-800-62a9-bd95-5d7f-313e-f077-afe4.ngrok-free.ap',
+    'https://a46f-2402-800-62a9-bd95-5d7f-313e-f077-afe4.ngrok-free.app',
     'https://74fa-2402-800-62a9-bd95-5d7f-313e-f077-afe4.ngrok-free.app',
     'http://localhost:3000'
 ];
