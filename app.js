@@ -14,7 +14,7 @@ const app = express();
 
 // Middleware
 app.use(cors({
-    origin: '*', // Allow requests from any origin for now
+    origin: 'https://frontend-u30c.onrender.com/', // Allow requests from any origin for now
     credentials: true // Allow cookies/sessions
 }));
 app.use(express.json());
