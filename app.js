@@ -27,7 +27,7 @@ mongoose.connect(process.env.MONGO_URI, {
 // Middleware
 const allowedOrigins = [
     'https://a46f-2402-800-62a9-bd95-5d7f-313e-f077-afe4.ngrok-free.app',
-    'https://74fa-2402-800-62a9-bd95-5d7f-313e-f077-afe4.ngrok-free.app',
+    'https://frontend-u30c.onrender.com',
     'http://localhost:3000'
 ];
 
