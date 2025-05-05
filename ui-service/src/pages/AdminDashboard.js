@@ -36,7 +36,7 @@ const AdminDashboard = () => {
   const [categoryError, setCategoryError] = useState('');
 
   const PRODUCT_API_URL = 'https://product-management-soyo.onrender.com';
-  const ACCOUNT_API_URL = 'https://accountmanagerservice.onrender.com';
+  const ACCOUNT_API_URL = 'https://nodejs-final-ecommerce.onrender.com';
 
   // Verify admin role and initialize token on mount
   useEffect(() => {
