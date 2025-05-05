@@ -132,6 +132,26 @@ const Products = () => {
                     }}>
                         Hello {user ? user.name : 'Guest'}
                     </span>
+                    {user && (
+                        <Link to="/cart">
+                            <button
+                                style={{
+                                    padding: '10px 20px',
+                                    backgroundColor: '#D4AF37',
+                                    color: '#000000',
+                                    border: 'none',
+                                    borderRadius: '5px',
+                                    fontFamily: "'Roboto', sans-serif",
+                                    cursor: 'pointer',
+                                    transition: 'background-color 0.3s'
+                                }}
+                                onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#E0E0E0')}
+                                onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = '#D4AF37')}
+                            >
+                                Cart
+                            </button>
+                        </Link>
+                    )}
                     <button
                         onClick={handleAuthAction}
                         style={{
