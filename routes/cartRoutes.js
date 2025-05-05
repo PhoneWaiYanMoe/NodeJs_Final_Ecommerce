@@ -301,4 +301,73 @@ router.post('/admin/discount', [verifyToken, adminRequired], async (req, res) =>
   }
 });
 
+// Admin: List All Discount Codes with Details
+router.get('/admin/discounts', [verifyToken, adminRequired], async (req, res) => {
+  try {
+    const discounts = await DiscountCode.find().lean();
+
+    const discountDetails = await Promise.all(discounts.map(async (discount) => {
+      const ordersWithDiscount = await Order.find({ discountApplied: { $gt: 0 } }).lean();
+      const appliedOrders = ordersWithDiscount.filter(order => {
+        return order.discountApplied > 0 && req.user.discountCode === discount.code;
+      }).map(order => ({
+        orderId: order._id.toString(),
+        totalPrice: order.totalPrice,
+        createdAt: order.createdAt,
+      }));
+
+      return {
+        code: discount.code,
+        discountPercentage: discount.discountPercentage,
+        usageLimit: discount.usageLimit,
+        timesUsed: discount.timesUsed,
+        createdAt: discount.createdAt,
+        appliedOrders,
+      };
+    }));
+
+    res.status(200).json(discountDetails);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// Admin: Get Detailed Order Information for a Specific Discount Code
+router.get('/admin/discount/:code/orders', [verifyToken, adminRequired], async (req, res) => {
+  const { code } = req.params;
+
+  try {
+    const discount = await DiscountCode.findOne({ code }).lean();
+    if (!discount) {
+      return res.status(404).json({ error: 'Discount code not found' });
+    }
+
+    const orders = await Order.find({ discountApplied: { $gt: 0 } }).lean();
+    const relevantOrders = orders.filter(order => order.discountApplied > 0).map(order => ({
+      orderId: order._id.toString(),
+      userId: order.userId,
+      totalPrice: order.totalPrice,
+      taxes: order.taxes,
+      shippingFee: order.shippingFee,
+      discountApplied: order.discountApplied,
+      shippingAddress: order.shippingAddress,
+      paymentDetails: order.paymentDetails,
+      createdAt: order.createdAt,
+    }));
+
+    res.status(200).json({
+      code: discount.code,
+      discountPercentage: discount.discountPercentage,
+      usageLimit: discount.usageLimit,
+      timesUsed: discount.timesUsed,
+      createdAt: discount.createdAt,
+      orders: relevantOrders,
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
 module.exports = router;
