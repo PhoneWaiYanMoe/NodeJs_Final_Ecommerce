@@ -761,94 +761,94 @@ const AdminDashboard = () => {
         </div>
 
         {/* User List */}
-        <div
-          style={{
-            backgroundColor: '#1A1A1A',
-            padding: '30px',
-            borderRadius: '10px',
-            boxShadow: '0 4px 10px rgba(0, 0, 0, 0.5)',
-            marginBottom: '40px'
-          }}
-        >
-          <h2
-            style={{
-              fontSize: '24px',
-              color: '#D4AF37',
-              marginBottom: '20px'
-            }}
-          >
-            User List
-          </h2>
-          {users.length === 0 ? (
-            <p style={{ color: '#E0E0E0' }}>No users available.</p>
-          ) : (
-            <table
-              style={{
-                width: '100%',
-                borderCollapse: 'collapse',
-                color: '#FFFFFF',
-                fontFamily: '"Roboto", sans-serif'
-              }}
-            >
-              <thead>
-                <tr style={{ borderBottom: '1px solid #D4AF37' }}>
-                  <th style={{ padding: '10px', textAlign: 'left' }}>Email</th>
-                  <th style={{ padding: '10px', textAlign: 'left' }}>Name</th>
-                  <th style={{ padding: '10px', textAlign: 'left' }}>Role</th>
-                  <th style={{ padding: '10px', textAlign: 'left' }}>Created At</th>
-                  <th style={{ padding: '10px', textAlign: 'left' }}>Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {users.map(user => (
-                  <tr key={user.id} style={{ borderBottom: '1px solid #333333' }}>
-                    <td style={{ padding: '10px' }}>{user.email}</td>
-                    <td style={{ padding: '10px' }}>{user.name}</td>
-                    <td style={{ padding: '10px' }}>{user.role}</td>
-                    <td style={{ padding: '10px' }}>
-                      {user.createdAt ? new Date(user.createdAt).toLocaleString() : 'N/A'}
-                    </td>
-                    <td style={{ padding: '10px' }}>
-                      <button
-                        onClick={() => handleEditUser(user)}
-                        style={{
-                          padding: '5px 10px',
-                          backgroundColor: '#D4AF37',
-                          color: '#000000',
-                          border: 'none',
-                          borderRadius: '5px',
-                          marginRight: '10px',
-                          cursor: 'pointer',
-                          transition: 'background-color 0.3s'
-                        }}
-                        onMouseEnter={e => (e.currentTarget.style.backgroundColor = '#E0E0E0')}
-                        onMouseLeave={e => (e.currentTarget.style.backgroundColor = '#D4AF37')}
-                      >
-                        Edit
-                      </button>
-                      <button
-                        onClick={() => handleDeleteUser(user.id)}
-                        style={{
-                          padding: '5px 10px',
-                          backgroundColor: '#FF5555',
-                          color: '#FFFFFF',
-                          border: 'none',
-                          borderRadius: '5px',
-                          cursor: 'pointer',
-                          transition: 'background-color 0.3s'
-                        }}
-                        onMouseEnter={e => (e.currentTarget.style.backgroundColor = '#FF7777')}
-                        onMouseLeave={e => (e.currentTarget.style.backgroundColor = '#FF5555')}
-                      >
-                        Delete
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          )}
-        </div>
+<div
+  style={{
+    backgroundColor: '#1A1A1A',
+    padding: '30px',
+    borderRadius: '10px',
+    boxShadow: '0 4px 10px rgba(0, 0, 0, 0.5)',
+    marginBottom: '40px'
+  }}
+>
+  <h2
+    style={{
+      fontSize: '24px',
+      color: '#D4AF37',
+      marginBottom: '20px'
+    }}
+  >
+    User List
+  </h2>
+  {users.length === 0 ? (
+    <p style={{ color: '#E0E0E0' }}>No users available.</p>
+  ) : (
+    <table
+      style={{
+        width: '100%',
+        borderCollapse: 'collapse',
+        color: '#FFFFFF',
+        fontFamily: '"Roboto", sans-serif'
+      }}
+    >
+      <thead>
+        <tr style={{ borderBottom: '1px solid #D4AF37' }}>
+          <th style={{ padding: '10px', textAlign: 'left' }}>Email</th>
+          <th style={{ padding: '10px', textAlign: 'left' }}>Name</th>
+          <th style={{ padding: '10px', textAlign: 'left' }}>Role</th>
+          <th style={{ padding: '10px', textAlign: 'left' }}>Created At</th>
+          <th style={{ padding: '10px', textAlign: 'left' }}>Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        {users.map(user => (
+          <tr key={user._id} style={{ borderBottom: '1px solid #333333' }}>
+            <td style={{ padding: '10px' }}>{user.email}</td>
+            <td style={{ padding: '10px' }}>{user.name}</td>
+            <td style={{ padding: '10px' }}>{user.role}</td>
+            <td style={{ padding: '10px' }}>
+              {user.createdAt ? new Date(user.createdAt).toLocaleString() : 'N/A'}
+            </td>
+            <td style={{ padding: '10px' }}>
+              <button
+                onClick={() => handleEditUser(user)}
+                style={{
+                  padding: '5px 10px',
+                  backgroundColor: '#D4AF37',
+                  color: '#000000',
+                  border: 'none',
+                  borderRadius: '5px',
+                  marginRight: '10px',
+                  cursor: 'pointer',
+                  transition: 'background-color 0.3s'
+                }}
+                onMouseEnter={e => (e.currentTarget.style.backgroundColor = '#E0E0E0')}
+                onMouseLeave={e => (e.currentTarget.style.backgroundColor = '#D4AF37')}
+              >
+                Edit
+              </button>
+              <button
+                onClick={() => handleDeleteUser(user._id)}
+                style={{
+                  padding: '5px 10px',
+                  backgroundColor: '#FF5555',
+                  color: '#FFFFFF',
+                  border: 'none',
+                  borderRadius: '5px',
+                  cursor: 'pointer',
+                  transition: 'background-color 0.3s'
+                }}
+                onMouseEnter={e => (e.currentTarget.style.backgroundColor = '#FF7777')}
+                onMouseLeave={e => (e.currentTarget.style.backgroundColor = '#FF5555')}
+              >
+                Delete
+              </button>
+            </td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  )}
+</div>
 
         {/* Product Form */}
         <div
