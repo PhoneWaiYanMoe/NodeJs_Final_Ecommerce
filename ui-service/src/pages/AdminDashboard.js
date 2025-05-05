@@ -9,6 +9,8 @@ const AdminDashboard = () => {
   const [products, setProducts] = useState([]);
   const [categories, setCategories] = useState([]);
   const [users, setUsers] = useState([]);
+  const [discounts, setDiscounts] = useState([]);
+  const [selectedDiscountOrders, setSelectedDiscountOrders] = useState(null);
   const [formData, setFormData] = useState({
     _id: null,
     name: '',
@@ -34,9 +36,11 @@ const AdminDashboard = () => {
   const [error, setError] = useState('');
   const [productError, setProductError] = useState('');
   const [categoryError, setCategoryError] = useState('');
+  const [discountError, setDiscountError] = useState('');
 
   const PRODUCT_API_URL = 'https://product-management-soyo.onrender.com';
   const ACCOUNT_API_URL = 'https://nodejs-final-ecommerce.onrender.com';
+  const CART_API_URL = 'https://nodejs-final-ecommerce-1.onrender.com';
 
   // Verify admin role and initialize token on mount
   useEffect(() => {
@@ -44,7 +48,6 @@ const AdminDashboard = () => {
       navigate('/login');
       return;
     }
-    // Ensure token is stored after login
     const token = localStorage.getItem('token');
     if (token && !axios.defaults.headers.Authorization) {
       axios.defaults.headers.Authorization = `Bearer ${token}`;
@@ -57,34 +60,19 @@ const AdminDashboard = () => {
     const fetchCategories = async () => {
       try {
         const token = localStorage.getItem('token');
-        if (!token) {
-          throw new Error('No JWT token found in localStorage');
-        }
-        axios.defaults.headers.Authorization = `Bearer ${token}`; // Ensure header is set
-
-        console.log('Fetching categories with token:', token);
+        if (!token) throw new Error('No JWT token found in localStorage');
+        axios.defaults.headers.Authorization = `Bearer ${token}`;
 
         const response = await axios.get(`${PRODUCT_API_URL}/api/categories`);
-
         if (isMounted) {
-          console.log('Fetch categories response:', response.data);
           setCategories(Array.isArray(response.data) ? response.data : []);
           setCategoryError('');
         }
       } catch (err) {
         if (isMounted) {
-          console.error('Error fetching categories:', {
-            message: err.message,
-            response: err.response ? {
-              status: err.response.status,
-              data: err.response.data,
-              headers: err.response.headers
-            } : 'No response data'
-          });
           setCategories([]);
-          setCategoryError('Failed to fetch categories. This is likely due to a CORS issue with the product management backend. Please update the backend to allow requests from this origin.');
+          setCategoryError('Failed to fetch categories. This is likely due to a CORS issue with the product management backend.');
           if (err.response?.status === 401) {
-            console.log('Unauthorized access, logging out...');
             await logout();
             navigate('/login');
           }
@@ -101,36 +89,21 @@ const AdminDashboard = () => {
     const fetchProducts = async () => {
       try {
         const token = localStorage.getItem('token');
-        if (!token) {
-          throw new Error('No JWT token found in localStorage');
-        }
-        axios.defaults.headers.Authorization = `Bearer ${token}`; // Ensure header is set
-
-        console.log('Fetching products with token:', token);
+        if (!token) throw new Error('No JWT token found in localStorage');
+        axios.defaults.headers.Authorization = `Bearer ${token}`;
 
         const response = await axios.get(`${PRODUCT_API_URL}/api/products`, {
           params: { limit: 100 }
         });
-
         if (isMounted) {
-          console.log('Fetch products response:', response.data);
           setProducts(response.data.products || []);
           setProductError('');
         }
       } catch (err) {
         if (isMounted) {
-          console.error('Error fetching products:', {
-            message: err.message,
-            response: err.response ? {
-              status: err.response.status,
-              data: err.response.data,
-              headers: err.response.headers
-            } : 'No response data'
-          });
           setProducts([]);
-          setProductError('Failed to fetch products. This is likely due to a CORS issue with the product management backend. Please update the backend to allow requests from this origin.');
+          setProductError('Failed to fetch products. This is likely due to a CORS issue with the product management backend.');
           if (err.response?.status === 401) {
-            console.log('Unauthorized access, logging out...');
             await logout();
             navigate('/login');
           }
@@ -147,38 +120,21 @@ const AdminDashboard = () => {
     const fetchUsers = async () => {
       try {
         const token = localStorage.getItem('token');
-        if (!token) {
-          throw new Error('No JWT token found in localStorage');
-        }
-        axios.defaults.headers.Authorization = `Bearer ${token}`; // Ensure header is set
-
-        console.log('Fetching users with token:', token);
+        if (!token) throw new Error('No JWT token found in localStorage');
+        axios.defaults.headers.Authorization = `Bearer ${token}`;
 
         const response = await axios.get(`${ACCOUNT_API_URL}/user/admin/users`);
-
         if (isMounted) {
-          console.log('Fetch users response:', response.data);
-
           if (!Array.isArray(response.data)) {
             throw new Error('Unexpected response format: response.data is not an array');
           }
-
           setUsers(response.data);
           setError('');
         }
       } catch (err) {
         if (isMounted) {
-          console.error('Error fetching users:', {
-            message: err.message,
-            response: err.response ? {
-              status: err.response.status,
-              data: err.response.data,
-              headers: err.response.headers
-            } : 'No response data'
-          });
           setError(`Failed to fetch users: ${err.message}${err.response?.data?.message ? ` - ${err.response.data.message}` : ''}`);
           if (err.response?.status === 401) {
-            console.log('Unauthorized access, logging out...');
             await logout();
             navigate('/login');
           }
@@ -186,6 +142,35 @@ const AdminDashboard = () => {
       }
     };
     if (user) fetchUsers();
+    return () => { isMounted = false; };
+  }, [user, navigate, logout]);
+
+  // Fetch discounts
+  useEffect(() => {
+    let isMounted = true;
+    const fetchDiscounts = async () => {
+      try {
+        const token = localStorage.getItem('token');
+        if (!token) throw new Error('No JWT token found in localStorage');
+        axios.defaults.headers.Authorization = `Bearer ${token}`;
+
+        const response = await axios.get(`${CART_API_URL}/cart/admin/discounts`);
+        if (isMounted) {
+          setDiscounts(Array.isArray(response.data) ? response.data : []);
+          setDiscountError('');
+        }
+      } catch (err) {
+        if (isMounted) {
+          setDiscounts([]);
+          setDiscountError('Failed to fetch discount codes. Please check the backend CORS settings.');
+          if (err.response?.status === 401) {
+            await logout();
+            navigate('/login');
+          }
+        }
+      }
+    };
+    if (user) fetchDiscounts();
     return () => { isMounted = false; };
   }, [user, navigate, logout]);
 
@@ -208,10 +193,8 @@ const AdminDashboard = () => {
     e.preventDefault();
     try {
       const token = localStorage.getItem('token');
-      if (!token) {
-        throw new Error('No JWT token found in localStorage');
-      }
-      axios.defaults.headers.Authorization = `Bearer ${token}`; // Ensure header is set
+      if (!token) throw new Error('No JWT token found in localStorage');
+      axios.defaults.headers.Authorization = `Bearer ${token}`;
 
       const productData = {
         name: formData.name,
@@ -226,8 +209,6 @@ const AdminDashboard = () => {
         tags: formData.tags.split(',').map(tag => tag.trim())
       };
 
-      console.log(`Sending ${formData._id ? 'PUT' : 'POST'} request to ${PRODUCT_API_URL}/api/products with data:`, productData);
-
       if (formData._id) {
         await axios.put(`${PRODUCT_API_URL}/api/products/${formData._id}`, productData);
       } else {
@@ -237,8 +218,6 @@ const AdminDashboard = () => {
       const response = await axios.get(`${PRODUCT_API_URL}/api/products`, {
         params: { limit: 100 }
       });
-
-      console.log('Updated products list:', response.data);
 
       setProducts(response.data.products || []);
       setFormData({
@@ -254,17 +233,8 @@ const AdminDashboard = () => {
       setError('');
       setProductError('');
     } catch (err) {
-      console.error('Error saving product:', {
-        message: err.message,
-        response: err.response ? {
-          status: err.response.status,
-          data: err.response.data,
-          headers: err.response.headers
-        } : 'No response data'
-      });
       setError(`Failed to save product: ${err.message}. Please check the input format.`);
       if (err.response?.status === 401) {
-        console.log('Unauthorized access, logging out...');
         await logout();
         navigate('/login');
       }
@@ -287,28 +257,14 @@ const AdminDashboard = () => {
   const handleDeleteProduct = async (id) => {
     try {
       const token = localStorage.getItem('token');
-      if (!token) {
-        throw new Error('No JWT token found in localStorage');
-      }
-      axios.defaults.headers.Authorization = `Bearer ${token}`; // Ensure header is set
-
-      console.log(`Deleting product with ID ${id}`);
+      if (!token) throw new Error('No JWT token found in localStorage');
+      axios.defaults.headers.Authorization = `Bearer ${token}`;
 
       await axios.delete(`${PRODUCT_API_URL}/api/products/${id}`);
-
       setProducts(products.filter(product => product._id !== id));
     } catch (err) {
-      console.error('Error deleting product:', {
-        message: err.message,
-        response: err.response ? {
-          status: err.response.status,
-          data: err.response.data,
-          headers: err.response.headers
-        } : 'No response data'
-      });
       setError(`Failed to delete product: ${err.message}`);
       if (err.response?.status === 401) {
-        console.log('Unauthorized access, logging out...');
         await logout();
         navigate('/login');
       }
@@ -319,22 +275,18 @@ const AdminDashboard = () => {
     e.preventDefault();
     try {
       const token = localStorage.getItem('token');
-      if (!token) {
-        throw new Error('No JWT token found in localStorage');
-      }
-      axios.defaults.headers.Authorization = `Bearer ${token}`; // Ensure header is set
+      if (!token) throw new Error('No JWT token found in localStorage');
+      axios.defaults.headers.Authorization = `Bearer ${token}`;
 
-      console.log('Creating discount with data:', {
+      await axios.post(`${CART_API_URL}/cart/admin/discount`, {
         code: discountForm.code,
         discount_percentage: Number(discountForm.discount_percentage),
         usageLimit: Number(discountForm.usageLimit)
       });
 
-      await axios.post('https://cartandcheckout.onrender.com/cart/admin/discount', {
-        code: discountForm.code,
-        discount_percentage: Number(discountForm.discount_percentage),
-        usageLimit: Number(discountForm.usageLimit)
-      });
+      // Refresh discount list
+      const response = await axios.get(`${CART_API_URL}/cart/admin/discounts`);
+      setDiscounts(Array.isArray(response.data) ? response.data : []);
 
       setDiscountForm({
         code: '',
@@ -344,17 +296,25 @@ const AdminDashboard = () => {
       setError('');
       alert('Discount code created successfully!');
     } catch (err) {
-      console.error('Error creating discount code:', {
-        message: err.message,
-        response: err.response ? {
-          status: err.response.status,
-          data: err.response.data,
-          headers: err.response.headers
-        } : 'No response data'
-      });
       setError(`Failed to create discount code: ${err.message}${err.response?.data?.error ? ` - ${err.response.data.error}` : ''}`);
       if (err.response?.status === 401) {
-        console.log('Unauthorized access, logging out...');
+        await logout();
+        navigate('/login');
+      }
+    }
+  };
+
+  const handleViewDiscountOrders = async (code) => {
+    try {
+      const token = localStorage.getItem('token');
+      if (!token) throw new Error('No JWT token found in localStorage');
+      axios.defaults.headers.Authorization = `Bearer ${token}`;
+
+      const response = await axios.get(`${CART_API_URL}/cart/admin/discount/${code}/orders`);
+      setSelectedDiscountOrders(response.data);
+    } catch (err) {
+      setDiscountError(`Failed to fetch orders for discount code: ${err.message}`);
+      if (err.response?.status === 401) {
         await logout();
         navigate('/login');
       }
@@ -365,10 +325,8 @@ const AdminDashboard = () => {
     e.preventDefault();
     try {
       const token = localStorage.getItem('token');
-      if (!token) {
-        throw new Error('No JWT token found in localStorage');
-      }
-      axios.defaults.headers.Authorization = `Bearer ${token}`; // Ensure header is set
+      if (!token) throw new Error('No JWT token found in localStorage');
+      axios.defaults.headers.Authorization = `Bearer ${token}`;
 
       const userData = {
         email: userForm.email,
@@ -380,13 +338,8 @@ const AdminDashboard = () => {
       const url = userForm._id ? `${ACCOUNT_API_URL}/user/admin/users/${userForm._id}` : `${ACCOUNT_API_URL}/user/admin/users`;
       const method = userForm._id ? 'put' : 'post';
 
-      console.log(`Sending ${method.toUpperCase()} request to ${url} with data:`, userData);
-
       await axios[method](url, userData);
-
       const response = await axios.get(`${ACCOUNT_API_URL}/user/admin/users`);
-
-      console.log('Updated users list:', response.data);
 
       setUsers(response.data || []);
       setUserForm({
@@ -398,17 +351,8 @@ const AdminDashboard = () => {
       });
       setError('');
     } catch (err) {
-      console.error('Error saving user:', {
-        message: err.message,
-        response: err.response ? {
-          status: err.response.status,
-          data: err.response.data,
-          headers: err.response.headers
-        } : 'No response data'
-      });
       setError(`Failed to save user: ${err.message}${err.response?.data?.message ? ` - ${err.response.data.message}` : ''}`);
       if (err.response?.status === 401) {
-        console.log('Unauthorized access, logging out...');
         await logout();
         navigate('/login');
       }
@@ -428,37 +372,21 @@ const AdminDashboard = () => {
   const handleDeleteUser = async (id) => {
     try {
       const token = localStorage.getItem('token');
-      if (!token) {
-        throw new Error('No JWT token found in localStorage');
-      }
-      axios.defaults.headers.Authorization = `Bearer ${token}`; // Ensure header is set
-
-      console.log(`Deleting user with ID ${id}`);
+      if (!token) throw new Error('No JWT token found in localStorage');
+      axios.defaults.headers.Authorization = `Bearer ${token}`;
 
       await axios.delete(`${ACCOUNT_API_URL}/user/admin/users/${id}`);
-
       setUsers(users.filter(user => user.id !== id));
     } catch (err) {
-      console.error('Error deleting user:', {
-        message: err.message,
-        response: err.response ? {
-          status: err.response.status,
-          data: err.response.data,
-          headers: err.response.headers
-        } : 'No response data'
-      });
       setError(`Failed to delete user: ${err.message}`);
       if (err.response?.status === 401) {
-        console.log('Unauthorized access, logging out...');
         await logout();
         navigate('/login');
       }
     }
   };
 
-  if (!user) {
-    return null;
-  }
+  if (!user) return null;
 
   return (
     <div
@@ -648,6 +576,182 @@ const AdminDashboard = () => {
           </div>
         </div>
 
+        {/* Discount List */}
+        <div
+          style={{
+            backgroundColor: '#1A1A1A',
+            padding: '30px',
+            borderRadius: '10px',
+            boxShadow: '0 4px 10px rgba(0, 0, 0, 0.5)',
+            marginBottom: '40px'
+          }}
+        >
+          <h2
+            style={{
+              fontSize: '24px',
+              color: '#D4AF37',
+              marginBottom: '20px'
+            }}
+          >
+            Discount Code List
+          </h2>
+          {discountError && (
+            <p
+              style={{
+                color: '#FF5555',
+                marginBottom: '15px'
+              }}
+            >
+              {discountError}
+            </p>
+          )}
+          {discounts.length === 0 && !discountError ? (
+            <p style={{ color: '#E0E0E0' }}>No discount codes available.</p>
+          ) : (
+            <table
+              style={{
+                width: '100%',
+                borderCollapse: 'collapse',
+                color: '#FFFFFF',
+                fontFamily: '"Roboto", sans-serif'
+              }}
+            >
+              <thead>
+                <tr style={{ borderBottom: '1px solid #D4AF37' }}>
+                  <th style={{ padding: '10px', textAlign: 'left' }}>Code</th>
+                  <th style={{ padding: '10px', textAlign: 'left' }}>Discount %</th>
+                  <th style={{ padding: '10px', textAlign: 'left' }}>Usage</th>
+                  <th style={{ padding: '10px', textAlign: 'left' }}>Created At</th>
+                  <th style={{ padding: '10px', textAlign: 'left' }}>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {discounts.map(discount => (
+                  <tr key={discount.code} style={{ borderBottom: '1px solid #333333' }}>
+                    <td style={{ padding: '10px' }}>{discount.code}</td>
+                    <td style={{ padding: '10px' }}>{discount.discountPercentage}%</td>
+                    <td style={{ padding: '10px' }}>{discount.timesUsed}/{discount.usageLimit}</td>
+                    <td style={{ padding: '10px' }}>
+                      {discount.createdAt ? new Date(discount.createdAt).toLocaleString() : 'N/A'}
+                    </td>
+                    <td style={{ padding: '10px' }}>
+                      <button
+                        onClick={() => handleViewDiscountOrders(discount.code)}
+                        style={{
+                          padding: '5px 10px',
+                          backgroundColor: '#D4AF37',
+                          color: '#000000',
+                          border: 'none',
+                          borderRadius: '5px',
+                          cursor: 'pointer',
+                          transition: 'background-color 0.3s'
+                        }}
+                        onMouseEnter={e => (e.currentTarget.style.backgroundColor = '#E0E0E0')}
+                        onMouseLeave={e => (e.currentTarget.style.backgroundColor = '#D4AF37')}
+                      >
+                        View Orders
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </div>
+
+        {/* Discount Orders Modal */}
+        {selectedDiscountOrders && (
+          <div
+            style={{
+              position: 'fixed',
+              top: 0,
+              left: 0,
+              width: '100%',
+              height: '100%',
+              backgroundColor: 'rgba(0, 0, 0, 0.8)',
+              display: 'flex',
+              justifyContent: 'center',
+              alignItems: 'center',
+              zIndex: 1000
+            }}
+          >
+            <div
+              style={{
+                backgroundColor: '#1A1A1A',
+                padding: '30px',
+                borderRadius: '10px',
+                maxWidth: '800px',
+                width: '90%',
+                maxHeight: '80%',
+                overflowY: 'auto',
+                boxShadow: '0 4px 10px rgba(0, 0, 0, 0.5)'
+              }}
+            >
+              <h2
+                style={{
+                  fontSize: '24px',
+                  color: '#D4AF37',
+                  marginBottom: '20px'
+                }}
+              >
+                Orders for Discount Code: {selectedDiscountOrders.code}
+              </h2>
+              {selectedDiscountOrders.orders.length === 0 ? (
+                <p style={{ color: '#E0E0E0' }}>No orders found for this discount code.</p>
+              ) : (
+                <table
+                  style={{
+                    width: '100%',
+                    borderCollapse: 'collapse',
+                    color: '#FFFFFF',
+                    fontFamily: '"Roboto", sans-serif'
+                  }}
+                >
+                  <thead>
+                    <tr style={{ borderBottom: '1px solid #D4AF37' }}>
+                      <th style={{ padding: '10px', textAlign: 'left' }}>Order ID</th>
+                      <th style={{ padding: '10px', textAlign: 'left' }}>User ID</th>
+                      <th style={{ padding: '10px', textAlign: 'left' }}>Total Price</th>
+                      <th style={{ padding: '10px', textAlign: 'left' }}>Discount Applied</th>
+                      <th style={{ padding: '10px', textAlign: 'left' }}>Created At</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {selectedDiscountOrders.orders.map(order => (
+                      <tr key={order.orderId} style={{ borderBottom: '1px solid #333333' }}>
+                        <td style={{ padding: '10px' }}>{order.orderId}</td>
+                        <td style={{ padding: '10px' }}>{order.userId}</td>
+                        <td style={{ padding: '10px' }}>${order.totalPrice.toFixed(2)}</td>
+                        <td style={{ padding: '10px' }}>${order.discountApplied.toFixed(2)}</td>
+                        <td style={{ padding: '10px' }}>
+                          {order.createdAt ? new Date(order.createdAt).toLocaleString() : 'N/A'}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+              <button
+                onClick={() => setSelectedDiscountOrders(null)}
+                style={{
+                  marginTop: '20px',
+                  padding: '10px 20px',
+                  backgroundColor: '#D4AF37',
+                  color: '#000000',
+                  border: 'none',
+                  borderRadius: '5px',
+                  cursor: 'pointer',
+                  transition: 'background-color 0.3s'
+                }}
+                onMouseEnter={e => (e.currentTarget.style.backgroundColor = '#E0E0E0')}
+                onMouseLeave={e => (e.currentTarget.style.backgroundColor = '#D4AF37')}
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        )}
+
         {/* Manage Users */}
         <div
           style={{
@@ -815,7 +919,7 @@ const AdminDashboard = () => {
                     <td style={{ padding: '10px' }}>{user.name}</td>
                     <td style={{ padding: '10px' }}>{user.role}</td>
                     <td style={{ padding: '10px' }}>
-                      {new Date(user.createdAt).toLocaleString()}
+                      {user.createdAt ? new Date(user.createdAt).toLocaleString() : 'N/A'}
                     </td>
                     <td style={{ padding: '10px' }}>
                       <button
