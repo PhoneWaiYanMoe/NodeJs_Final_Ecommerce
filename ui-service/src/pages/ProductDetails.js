@@ -1,15 +1,22 @@
-import React, { useState, useEffect } from 'react';
-import { useParams } from 'react-router-dom';
+import React, { useState, useEffect, useContext } from 'react';
+import { useParams, useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import io from 'socket.io-client';
+import { AuthContext } from '../App';
 
 const ProductDetails = () => {
     const { id } = useParams();
+    const navigate = useNavigate();
+    const { user } = useContext(AuthContext);
     const [product, setProduct] = useState(null);
     const [reviews, setReviews] = useState([]);
     const [newReview, setNewReview] = useState({ comment: '', rating: '' });
+    const [selectedVariant, setSelectedVariant] = useState(null);
+    const [quantity, setQuantity] = useState(1);
+    const [cartMessage, setCartMessage] = useState('');
 
     const API_URL = 'https://product-management-soyo.onrender.com';
+    const CART_API_URL = 'https://nodejs-final-ecommerce-1.onrender.com';
 
     useEffect(() => {
         const fetchProduct = async () => {
@@ -37,8 +44,8 @@ const ProductDetails = () => {
         e.preventDefault();
         try {
             await axios.post(`${API_URL}/api/products/${id}/review`, {
-                userId: null,
-                userName: 'Anonymous',
+                userId: user ? user.id : null,
+                userName: user ? user.name : 'Anonymous',
                 comment: newReview.comment,
                 rating: Number(newReview.rating)
             });
@@ -48,15 +55,58 @@ const ProductDetails = () => {
         }
     };
 
-    if (!product) return <div style={{
-        backgroundColor: '#000000',
-        color: '#FFFFFF',
-        minHeight: '100vh',
-        display: 'flex',
-        justifyContent: 'center',
-        alignItems: 'center',
-        fontFamily: "'Playfair Display', serif"
-    }}>Loading...</div>;
+    const handleAddToCart = async () => {
+        if (!user) {
+            navigate('/login');
+            return;
+        }
+        if (!selectedVariant) {
+            setCartMessage('Please select a variant.');
+            return;
+        }
+
+        const variant = product.variants.find(v => v.name === selectedVariant);
+        const price = variant.price;
+
+        try {
+            const token = localStorage.getItem('token');
+            if (!token) throw new Error('No token found');
+
+            await axios.post(
+                `${CART_API_URL}/cart/add`,
+                {
+                    product_id: product._id,
+                    quantity,
+                    price
+                },
+                {
+                    headers: {
+                        Authorization: `Bearer ${token}`
+                    }
+                }
+            );
+
+            setCartMessage('Item added to cart successfully!');
+            setTimeout(() => setCartMessage(''), 3000);
+        } catch (error) {
+            console.error('Error adding to cart:', error);
+            setCartMessage('Failed to add item to cart.');
+        }
+    };
+
+    if (!product) return (
+        <div style={{
+            backgroundColor: '#000000',
+            color: '#FFFFFF',
+            minHeight: '100vh',
+            display: 'flex',
+            justifyContent: 'center',
+            alignItems: 'center',
+            fontFamily: "'Playfair Display', serif"
+        }}>
+            Loading...
+        </div>
+    );
 
     return (
         <div style={{
@@ -169,6 +219,79 @@ const ProductDetails = () => {
                         </li>
                     ))}
                 </ul>
+                <div style={{ marginBottom: '20px' }}>
+                    <select
+                        value={selectedVariant || ''}
+                        onChange={(e) => setSelectedVariant(e.target.value)}
+                        style={{
+                            padding: '10px',
+                            backgroundColor: '#E0E0E0',
+                            border: 'none',
+                            borderRadius: '5px',
+                            color: '#000000',
+                            fontFamily: "'Roboto', sans-serif",
+                            marginRight: '10px'
+                        }}
+                    >
+                        <option value="" disabled>Select Variant</option>
+                        {product.variants.map((variant, index) => (
+                            <option key={index} value={variant.name}>
+                                {variant.name} - ${variant.price} (Stock: {variant.stock})
+                            </option>
+                        ))}
+                    </select>
+                    <input
+                        type="number"
+                        min="1"
+                        value={quantity}
+                        onChange={(e) => setQuantity(Number(e.target.value))}
+                        style={{
+                            width: '60px',
+                            padding: '10px',
+                            backgroundColor: '#E0E0E0',
+                            border: 'none',
+                            borderRadius: '5px',
+                            color: '#000000',
+                            fontFamily: "'Roboto', sans-serif",
+                            marginRight: '10px'
+                        }}
+                    />
+                    <button
+                        onClick={handleAddToCart}
+                        disabled={!selectedVariant}
+                        style={{
+                            padding: '10px 20px',
+                            backgroundColor: !selectedVariant ? '#666666' : '#D4AF37',
+                            color: '#000000',
+                            border: 'none',
+                            borderRadius: '5px',
+                            fontFamily: "'Roboto', sans-serif",
+                            cursor: !selectedVariant ? 'not-allowed' : 'pointer',
+                            transition: 'background-color 0.3s'
+                        }}
+                        onMouseEnter={(e) => {
+                            if (selectedVariant) {
+                                e.currentTarget.style.backgroundColor = '#E0E0E0';
+                            }
+                        }}
+                        onMouseLeave={(e) => {
+                            if (selectedVariant) {
+                                e.currentTarget.style.backgroundColor = '#D4AF37';
+                            }
+                        }}
+                    >
+                        Add to Cart
+                    </button>
+                    {cartMessage && (
+                        <p style={{
+                            fontSize: '14px',
+                            color: cartMessage.includes('Failed') ? '#FF5555' : '#D4AF37',
+                            marginTop: '10px'
+                        }}>
+                            {cartMessage}
+                        </p>
+                    )}
+                </div>
                 <p style={{
                     fontSize: '16px',
                     color: '#E0E0E0',
