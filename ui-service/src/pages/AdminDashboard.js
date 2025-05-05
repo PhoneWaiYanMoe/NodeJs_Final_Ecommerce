@@ -154,7 +154,7 @@ const AdminDashboard = () => {
         if (!token) throw new Error('No JWT token found in localStorage');
         axios.defaults.headers.Authorization = `Bearer ${token}`;
 
-        const response = await axios.get(`${CART_API_URL}/cart/admin/discounts`);
+        const response = await axios.get(`${CART_API_URL}/cart/admin/discount`);
         if (isMounted) {
           setDiscounts(Array.isArray(response.data) ? response.data : []);
           setDiscountError('');
@@ -285,7 +285,7 @@ const AdminDashboard = () => {
       });
 
       // Refresh discount list
-      const response = await axios.get(`${CART_API_URL}/cart/admin/discounts`);
+      const response = await axios.get(`${CART_API_URL}/cart/admin/discount`);
       setDiscounts(Array.isArray(response.data) ? response.data : []);
 
       setDiscountForm({
