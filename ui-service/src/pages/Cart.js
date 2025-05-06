@@ -310,7 +310,7 @@ const Cart = () => {
                             color: '#000000',
                             border: 'none',
                             borderRadius: '5px',
-                            fontFamily: "'Roboto', sans-serif',
+                            fontFamily: "'Roboto', sans-serif'",
                             cursor: 'pointer',
                             transition: 'background-color 0.3s'
                         }}
