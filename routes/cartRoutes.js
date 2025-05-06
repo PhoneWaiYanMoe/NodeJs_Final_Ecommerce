@@ -203,11 +203,13 @@ router.post('/apply-discount', [verifyToken, userRequired], async (req, res) => 
       return res.status(400).json({ error: 'Cart is empty' });
     }
 
-    // Save the discount code to all cart items
-    await CartItem.updateMany(
-      cartIdentifier,
-      { $set: { discountCode: code } }
-    );
+    // Increment the usage of the discount code
+    discount.timesUsed += 1;
+    await discount.save();
+
+    // Store the discount code in req.user (simulating session storage)
+    req.user.discountCode = code;
+    req.user.discountPercentage = discount.discountPercentage; // Store the percentage too
 
     const subtotal = cartItems.reduce((sum, item) => sum + item.price * item.quantity, 0);
     const discountAmount = (discount.discountPercentage / 100) * subtotal;
@@ -247,14 +249,11 @@ router.post('/checkout', [verifyToken, userRequired], async (req, res) => {
     // Calculate totals
     const subtotal = cartItems.reduce((sum, item) => sum + item.price * item.quantity, 0);
     let discountAmount = 0;
-    let discountCode = cartItems[0]?.discountCode;
 
-    if (discountCode) {
-      const discount = await DiscountCode.findOne({ code: discountCode });
-      if (discount && discount.timesUsed < discount.usageLimit) {
+    if (req.user.discountCode) {
+      const discount = await DiscountCode.findOne({ code: req.user.discountCode });
+      if (discount && discount.timesUsed <= discount.usageLimit) {
         discountAmount = (discount.discountPercentage / 100) * subtotal;
-        discount.timesUsed += 1;
-        await discount.save();
       }
     }
 
@@ -273,8 +272,12 @@ router.post('/checkout', [verifyToken, userRequired], async (req, res) => {
     });
     const savedOrder = await order.save();
 
-    // Clear cart and discount code
+    // Clear cart
     await CartItem.deleteMany(cartIdentifier);
+
+    // Clear discount
+    delete req.user.discountCode;
+    delete req.user.discountPercentage;
 
     res.status(201).json({ message: 'Checkout successful', orderId: savedOrder._id.toString() });
   } catch (err) {
