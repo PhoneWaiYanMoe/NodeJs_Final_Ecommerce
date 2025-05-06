@@ -9,6 +9,8 @@ import Register from './pages/Register';
 import Login from './pages/Login';
 import Checkout from './pages/Checkout';
 import SetupPassword from './pages/SetupPassword';
+import { ToastContainer } from 'react-toastify';
+import 'react-toastify/dist/ReactToastify.css';
 
 // Create Auth Context
 export const AuthContext = createContext();
@@ -125,6 +127,7 @@ function App() {
           <Route path="*" element={<div>404 Not Found</div>} />
         </Routes>
       </Router>
+      <ToastContainer />
     </AuthContext.Provider>
   );
 }
