@@ -377,6 +377,19 @@ export const getBestSellers = async (req, res) => {
       .json({ message: "Error fetching best sellers", error: error.message });
   }
 };
+// In productController.js
+export const getNewProducts = async (req, res) => {
+  const { limit = 4 } = req.query;
+  try {
+    const products = await Product.find()
+      .sort({ createdAt: -1 })
+      .limit(Number(limit));
+    res.status(200).json({ products });
+  } catch (error) {
+    res.status(500).json({ message: "Error fetching new products", error: error.message });
+  }
+};
+
 
 // GET /api/categories - Fetch all categories
 export const getCategories = async (req, res) => {

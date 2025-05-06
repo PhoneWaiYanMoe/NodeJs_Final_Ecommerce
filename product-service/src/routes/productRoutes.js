@@ -11,7 +11,8 @@ import {
     updateStock,
     getBestSellers,
     getCategories,
-    updateInventory
+    updateInventory,
+    getNewProducts
 } from '../controllers/productController.js';
 
 const router = express.Router();
@@ -24,7 +25,7 @@ router.get('/:id', getProductById);
 router.get('/:id/reviews', getReviews);
 router.post('/:id/review', addReview);
 router.post('/update-stock', updateStock);
-
+router.get('/new', getNewProducts);
 // Admin-only routes (protected with authenticateAdmin)
 router.post('/', authenticateAdmin, createProduct);
 router.put('/:id', authenticateAdmin, updateProduct);
