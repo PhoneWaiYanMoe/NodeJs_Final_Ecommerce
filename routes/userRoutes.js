@@ -96,6 +96,8 @@ router.get('/admin/users', verifyToken, adminSessionRequired, async (req, res) =
       email: user.email,
       name: user.name,
       role: user.role,
+      shippingAddress: user.shippingAddress,
+      shippingAddressCollection: user.shippingAddressCollection,
     })));
   } catch (err) {
     res.status(500).json({ message: 'Server error' });
@@ -103,7 +105,7 @@ router.get('/admin/users', verifyToken, adminSessionRequired, async (req, res) =
 });
 
 router.post('/admin/users', verifyToken, adminSessionRequired, async (req, res) => {
-  const { email, password, name, role = 'user' } = req.body;
+  const { email, password, name, role = 'user', shippingAddress } = req.body;
 
   if (!email || !password) {
     return res.status(400).json({ message: 'Missing email or password' });
@@ -116,10 +118,34 @@ router.post('/admin/users', verifyToken, adminSessionRequired, async (req, res) 
     }
 
     const hashedPassword = await bcrypt.hash(password, 10);
-    const user = new User({ email, password: hashedPassword, name, role });
+    const user = new User({
+      email,
+      password: hashedPassword,
+      name,
+      role,
+      shippingAddress: shippingAddress || {
+        street: '',
+        city: '',
+        state: '',
+        zip: '',
+        country: '',
+      },
+      shippingAddressCollection: [],
+    });
     const savedUser = await user.save();
 
-    res.status(201).json({ message: 'User created', id: savedUser._id.toString() });
+    res.status(201).json({
+      message: 'User created',
+      id: savedUser._id.toString(),
+      user: {
+        id: savedUser._id.toString(),
+        email: savedUser.email,
+        name: savedUser.name,
+        role: savedUser.role,
+        shippingAddress: savedUser.shippingAddress,
+        shippingAddressCollection: savedUser.shippingAddressCollection,
+      },
+    });
   } catch (err) {
     res.status(500).json({ message: 'Server error' });
   }
@@ -127,7 +153,7 @@ router.post('/admin/users', verifyToken, adminSessionRequired, async (req, res) 
 
 router.put('/admin/users/:userId', verifyToken, adminSessionRequired, async (req, res) => {
   const { userId } = req.params;
-  const { email, password, name, role } = req.body;
+  const { email, password, name, role, shippingAddress, shippingAddressCollection } = req.body;
 
   try {
     const user = await User.findById(userId);
@@ -141,9 +167,25 @@ router.put('/admin/users/:userId', verifyToken, adminSessionRequired, async (req
     }
     user.name = name !== undefined ? name : user.name;
     user.role = role || user.role;
+    if (shippingAddress) {
+      user.shippingAddress = shippingAddress;
+    }
+    if (shippingAddressCollection) {
+      user.shippingAddressCollection = shippingAddressCollection;
+    }
 
     await user.save();
-    res.status(200).json({ message: 'User updated' });
+    res.status(200).json({
+      message: 'User updated',
+      user: {
+        id: user._id.toString(),
+        email: user.email,
+        name: user.name,
+        role: user.role,
+        shippingAddress: user.shippingAddress,
+        shippingAddressCollection: user.shippingAddressCollection,
+      },
+    });
   } catch (err) {
     res.status(500).json({ message: 'Server error' });
   }
@@ -178,7 +220,6 @@ router.post('/register', async (req, res) => {
       return res.status(400).json({ message: 'Email already exists' });
     }
 
-    // Generate and hash a temporary password
     const temporaryPassword = generateTemporaryPassword();
     const hashedPassword = await bcrypt.hash(temporaryPassword, 10);
 
@@ -187,11 +228,11 @@ router.post('/register', async (req, res) => {
       password: hashedPassword,
       name,
       shippingAddress,
+      shippingAddressCollection: [],
       role: 'user',
     });
     const savedUser = await user.save();
 
-    // Send temporary password via email
     await transporter.sendMail({
       from: process.env.EMAIL_USER,
       to: email,
@@ -212,6 +253,8 @@ router.post('/register', async (req, res) => {
         email: savedUser.email,
         name: savedUser.name,
         role: savedUser.role,
+        shippingAddress: savedUser.shippingAddress,
+        shippingAddressCollection: savedUser.shippingAddressCollection,
       },
       token,
     });
@@ -262,6 +305,8 @@ router.post('/login', async (req, res) => {
         email: user.email,
         name: user.name,
         role: user.role,
+        shippingAddress: user.shippingAddress,
+        shippingAddressCollection: user.shippingAddressCollection,
       },
       token,
     });
@@ -291,6 +336,8 @@ router.post('/media-login', async (req, res) => {
         id: user._id.toString(),
         email: user.email,
         role: user.role,
+        shippingAddress: user.shippingAddress,
+        shippingAddressCollection: user.shippingAddressCollection,
       },
       token,
     });
@@ -323,10 +370,50 @@ router.get('/session', verifyToken, async (req, res) => {
         email: user.email,
         name: user.name,
         role: user.role,
+        shippingAddress: user.shippingAddress,
+        shippingAddressCollection: user.shippingAddressCollection,
       },
     });
   } catch (err) {
     res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// Route for users to update their own profile
+router.put('/profile', verifyToken, userSessionRequired, async (req, res) => {
+  const { name, password, shippingAddress, shippingAddressCollection } = req.body;
+
+  try {
+    const user = await User.findById(req.user.id);
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    user.name = name || user.name;
+    if (password) {
+      user.password = await bcrypt.hash(password, 10);
+    }
+    if (shippingAddress) {
+      user.shippingAddress = shippingAddress;
+    }
+    if (shippingAddressCollection) {
+      user.shippingAddressCollection = shippingAddressCollection;
+    }
+
+    await user.save();
+    res.status(200).json({
+      message: 'Profile updated successfully',
+      user: {
+        id: user._id.toString(),
+        email: user.email,
+        name: user.name,
+        role: user.role,
+        shippingAddress: user.shippingAddress,
+        shippingAddressCollection: user.shippingAddressCollection,
+      },
+    });
+  } catch (err) {
+    res.status(500).json({ message: 'Server error', details: err.message });
   }
 });
 
