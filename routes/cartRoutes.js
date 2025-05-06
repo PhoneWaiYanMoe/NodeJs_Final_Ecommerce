@@ -142,8 +142,21 @@ router.get('/summary', [verifyToken, userRequired], async (req, res) => {
     }
 
     const subtotal = cartItems.reduce((sum, item) => sum + item.price * item.quantity, 0);
-    const taxes = subtotal * TAX_RATE;
-    const total = subtotal + taxes + SHIPPING_FEE;
+    let discountAmount = 0;
+    let appliedDiscountCode = null;
+
+    // Check if a discount code is applied (assuming all items have the same discount code)
+    const discountCode = cartItems[0]?.discountCode;
+    if (discountCode) {
+      const discount = await DiscountCode.findOne({ code: discountCode });
+      if (discount && discount.timesUsed < discount.usageLimit) {
+        discountAmount = (discount.discountPercentage / 100) * subtotal;
+        appliedDiscountCode = discountCode;
+      }
+    }
+
+    const taxes = (subtotal - discountAmount) * TAX_RATE;
+    const total = (subtotal - discountAmount) + taxes + SHIPPING_FEE;
 
     res.status(200).json({
       items: cartItems.map(item => ({
@@ -153,16 +166,17 @@ router.get('/summary', [verifyToken, userRequired], async (req, res) => {
         price: item.price,
       })),
       subtotal: parseFloat(subtotal.toFixed(2)),
+      discountApplied: parseFloat(discountAmount.toFixed(2)),
       taxes: parseFloat(taxes.toFixed(2)),
       shippingFee: SHIPPING_FEE,
       total: parseFloat(total.toFixed(2)),
+      discountCode: appliedDiscountCode,
     });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Server error' });
   }
 });
-
 // Apply Discount Code
 router.post('/apply-discount', [verifyToken, userRequired], async (req, res) => {
   const { code } = req.body;
@@ -189,13 +203,16 @@ router.post('/apply-discount', [verifyToken, userRequired], async (req, res) => 
       return res.status(400).json({ error: 'Cart is empty' });
     }
 
+    // Save the discount code to all cart items
+    await CartItem.updateMany(
+      cartIdentifier,
+      { $set: { discountCode: code } }
+    );
+
     const subtotal = cartItems.reduce((sum, item) => sum + item.price * item.quantity, 0);
     const discountAmount = (discount.discountPercentage / 100) * subtotal;
     const taxes = (subtotal - discountAmount) * TAX_RATE;
     const total = (subtotal - discountAmount) + taxes + SHIPPING_FEE;
-
-    // Store discount code in cart (optional: you might want to store this differently)
-    req.user.discountCode = code;
 
     res.status(200).json({
       subtotal: parseFloat(subtotal.toFixed(2)),
@@ -211,7 +228,6 @@ router.post('/apply-discount', [verifyToken, userRequired], async (req, res) => 
     res.status(500).json({ error: 'Server error' });
   }
 });
-
 // Checkout Process
 router.post('/checkout', [verifyToken, userRequired], async (req, res) => {
   const { shippingAddress, paymentDetails } = req.body;
@@ -231,9 +247,10 @@ router.post('/checkout', [verifyToken, userRequired], async (req, res) => {
     // Calculate totals
     const subtotal = cartItems.reduce((sum, item) => sum + item.price * item.quantity, 0);
     let discountAmount = 0;
+    let discountCode = cartItems[0]?.discountCode;
 
-    if (req.user.discountCode) {
-      const discount = await DiscountCode.findOne({ code: req.user.discountCode });
+    if (discountCode) {
+      const discount = await DiscountCode.findOne({ code: discountCode });
       if (discount && discount.timesUsed < discount.usageLimit) {
         discountAmount = (discount.discountPercentage / 100) * subtotal;
         discount.timesUsed += 1;
@@ -256,11 +273,8 @@ router.post('/checkout', [verifyToken, userRequired], async (req, res) => {
     });
     const savedOrder = await order.save();
 
-    // Clear cart
+    // Clear cart and discount code
     await CartItem.deleteMany(cartIdentifier);
-
-    // Clear discount
-    delete req.user.discountCode;
 
     res.status(201).json({ message: 'Checkout successful', orderId: savedOrder._id.toString() });
   } catch (err) {
@@ -268,7 +282,6 @@ router.post('/checkout', [verifyToken, userRequired], async (req, res) => {
     res.status(500).json({ error: 'Server error' });
   }
 });
-
 // Admin: Create Discount Code
 router.post('/admin/discount', [verifyToken, adminRequired], async (req, res) => {
   const { code, discount_percentage, usageLimit = 10 } = req.body;
