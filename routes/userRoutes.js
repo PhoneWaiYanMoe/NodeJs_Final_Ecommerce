@@ -58,7 +58,7 @@ const generateTemporaryPassword = () => {
   return crypto.randomBytes(8).toString('hex'); // 16-character hex string
 };
 
-// Admin Routes (unchanged)
+// Admin Routes
 router.post('/admin/login', async (req, res) => {
   const { email, password } = req.body;
 
