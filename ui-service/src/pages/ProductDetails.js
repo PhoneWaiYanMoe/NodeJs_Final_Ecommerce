@@ -3,7 +3,6 @@ import { useParams, useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import io from 'socket.io-client';
 import { AuthContext } from '../App';
-import { toast } from 'react-toastify';
 
 // Star Rating Component
 const StarRating = ({ value, onChange, readOnly = false }) => {
@@ -90,74 +89,29 @@ const ProductDetails = () => {
         
         try {
             const token = localStorage.getItem('token');
-            const config = token ? {
-                headers: {
-                    'Authorization': `Bearer ${token}`,
-                    'Content-Type': 'application/json'
-                }
-            } : {
-                headers: {
-                    'Content-Type': 'application/json'
-                }
-            };
+            const headers = token ? { Authorization: `Bearer ${token}` } : {};
             
             const reviewPayload = {
+                userId: user ? user.id : null,
                 userName: user ? user.name : 'Anonymous',
                 comment: newReview.comment,
                 rating: Number(newReview.rating)
             };
             
-            const response = await axios.post(
-                `${API_URL}/api/products/${id}/review`,
-                reviewPayload,
-                config
-            );
+            await axios.post(`${API_URL}/api/products/${id}/review`, reviewPayload, { headers });
             
-            // Update reviews with the server response
-            setReviews(prevReviews => [...prevReviews, response.data]);
+            // Add the review to the local state for immediate feedback
+            const newReviewData = {
+                ...reviewPayload,
+                createdAt: new Date().toISOString()
+            };
             
-            // Reset form
+            setReviews([...reviews, newReviewData]);
             setNewReview({ comment: '', rating: 0 });
             setReviewError('');
-            
-            // Show success message
-            toast.success('Review submitted successfully!');
-            
         } catch (error) {
             console.error('Error submitting review:', error);
-            
-            if (error.response?.status === 401 && !user) {
-                // Try submitting as anonymous if authentication fails
-                try {
-                    const anonymousPayload = {
-                        userName: 'Anonymous',
-                        comment: newReview.comment,
-                        rating: Number(newReview.rating)
-                    };
-                    
-                    const response = await axios.post(
-                        `${API_URL}/api/products/${id}/review`,
-                        anonymousPayload,
-                        { headers: { 'Content-Type': 'application/json' } }
-                    );
-                    
-                    setReviews(prevReviews => [...prevReviews, response.data]);
-                    setNewReview({ comment: '', rating: 0 });
-                    setReviewError('');
-                    toast.success('Review submitted anonymously!');
-                    
-                } catch (retryError) {
-                    console.error('Error submitting anonymous review:', retryError);
-                    setReviewError('Failed to submit review. Please try again later.');
-                    toast.error('Failed to submit review');
-                }
-            } else {
-                setReviewError(
-                    error.response?.data?.message || 
-                    'Failed to submit review. Please try again.'
-                );
-                toast.error('Failed to submit review');
-            }
+            setReviewError('Failed to submit review. Please try again.');
         }
     };
 
