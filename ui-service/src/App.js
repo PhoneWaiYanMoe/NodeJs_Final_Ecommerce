@@ -1,6 +1,7 @@
 import React, { createContext, useState, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import axios from 'axios';
+import LandingPage from './pages/LandingPage';
 import Products from './pages/Products';
 import ProductDetails from './pages/ProductDetails';
 import AdminDashboard from './pages/AdminDashboard';
@@ -98,6 +99,7 @@ function App() {
     <AuthContext.Provider value={{ user, setUser, login, logout }}>
       <Router>
         <Routes>
+          <Route path="/" element={<LandingPage />} />
           <Route path="/products" element={<Products />} />
           <Route path="/products/:id" element={<ProductDetails />} />
           <Route path="/admin/dashboard" element={
@@ -127,7 +129,6 @@ function App() {
               <Profile />
             </ProtectedRoute>
           } />
-          <Route path="/" element={<Products />} />
           <Route path="*" element={<div>404 Not Found</div>} />
         </Routes>
       </Router>
