@@ -8,7 +8,7 @@ import Cart from './pages/Cart';
 import Register from './pages/Register';
 import Login from './pages/Login';
 import Checkout from './pages/Checkout';
-import SetupPassword from './pages/setupPassword';
+import SetupPassword from './pages/SetupPassword';
 
 // Create Auth Context
 export const AuthContext = createContext();
