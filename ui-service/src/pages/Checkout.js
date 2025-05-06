@@ -6,6 +6,13 @@ import { AuthContext } from '../App';
 const Checkout = () => {
     const { user, logout } = useContext(AuthContext);
     const navigate = useNavigate();
+    const [shippingAddress, setShippingAddress] = useState({
+        street: '',
+        city: '',
+        state: '',
+        zip: '',
+        country: ''
+    });
     const [paymentDetails, setPaymentDetails] = useState({
         cardNumber: '',
         expiryDate: '',
@@ -21,12 +28,21 @@ const Checkout = () => {
         }
     }, [user, navigate]);
 
+    const handleShippingChange = (e) => {
+        const { name, value } = e.target;
+        setShippingAddress({ ...shippingAddress, [name]: value });
+    };
+
     const handlePaymentChange = (e) => {
         const { name, value } = e.target;
         setPaymentDetails({ ...paymentDetails, [name]: value });
     };
 
     const handleCheckout = async () => {
+        if (!shippingAddress.street || !shippingAddress.city || !shippingAddress.state || !shippingAddress.zip || !shippingAddress.country) {
+            setMessage('Please fill in all shipping address fields.');
+            return;
+        }
         if (!paymentDetails.cardNumber || !paymentDetails.expiryDate || !paymentDetails.cvv) {
             setMessage('Please fill in all payment details.');
             return;
@@ -39,6 +55,7 @@ const Checkout = () => {
             const response = await axios.post(
                 `${CART_API_URL}/checkout`,
                 {
+                    shippingAddress,
                     paymentDetails
                 },
                 {
@@ -198,6 +215,106 @@ const Checkout = () => {
                     maxWidth: '600px',
                     margin: '0 auto'
                 }}>
+                    {/* Shipping Address */}
+                    <div style={{
+                        backgroundColor: '#1A1A1A',
+                        padding: '20px',
+                        borderRadius: '10px'
+                    }}>
+                        <h3 style={{
+                            fontSize: '24px',
+                            color: '#D4AF37',
+                            marginBottom: '15px'
+                        }}>
+                            Shipping Address
+                        </h3>
+                        <input
+                            type="text"
+                            name="street"
+                            placeholder="Street Address"
+                            value={shippingAddress.street}
+                            onChange={handleShippingChange}
+                            style={{
+                                width: '100%',
+                                padding: '10px',
+                                backgroundColor: '#E0E0E0',
+                                border: 'none',
+                                borderRadius: '5px',
+                                color: '#000000',
+                                fontFamily: "'Roboto', sans-serif",
+                                marginBottom: '10px'
+                            }}
+                        />
+                        <input
+                            type="text"
+                            name="city"
+                            placeholder="City"
+                            value={shippingAddress.city}
+                            onChange={handleShippingChange}
+                            style={{
+                                width: '100%',
+                                padding: '10px',
+                                backgroundColor: '#E0E0E0',
+                                border: 'none',
+                                borderRadius: '5px',
+                                color: '#000000',
+                                fontFamily: "'Roboto', sans-serif",
+                                marginBottom: '10px'
+                            }}
+                        />
+                        <input
+                            type="text"
+                            name="state"
+                            placeholder="State"
+                            value={shippingAddress.state}
+                            onChange={handleShippingChange}
+                            style={{
+                                width: '100%',
+                                padding: '10px',
+                                backgroundColor: '#E0E0E0',
+                                border: 'none',
+                                borderRadius: '5px',
+                                color: '#000000',
+                                fontFamily: "'Roboto', sans-serif",
+                                marginBottom: '10px'
+                            }}
+                        />
+                        <input
+                            type="text"
+                            name="zip"
+                            placeholder="ZIP Code"
+                            value={shippingAddress.zip}
+                            onChange={handleShippingChange}
+                            style={{
+                                width: '100%',
+                                padding: '10px',
+                                backgroundColor: '#E0E0E0',
+                                border: 'none',
+                                borderRadius: '5px',
+                                color: '#000000',
+                                fontFamily: "'Roboto', sans-serif",
+                                marginBottom: '10px'
+                            }}
+                        />
+                        <input
+                            type="text"
+                            name="country"
+                            placeholder="Country"
+                            value={shippingAddress.country}
+                            onChange={handleShippingChange}
+                            style={{
+                                width: '100%',
+                                padding: '10px',
+                                backgroundColor: '#E0E0E0',
+                                border: 'none',
+                                borderRadius: '5px',
+                                color: '#000000',
+                                fontFamily: "'Roboto', sans-serif",
+                                marginBottom: '10px'
+                            }}
+                        />
+                    </div>
+
                     {/* Payment Details */}
                     <div style={{
                         backgroundColor: '#1A1A1A',
