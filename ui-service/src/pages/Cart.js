@@ -22,21 +22,25 @@ const Cart = () => {
 
   const fetchCartSummary = async () => {
     try {
-      const token = localStorage.getItem("token");
-      if (!token) throw new Error("No token found");
-
+      const token = localStorage.getItem('token');
+      if (!token) throw new Error('No token found');
+  
       const response = await axios.get(`${CART_API_URL}/summary`, {
         headers: {
           Authorization: `Bearer ${token}`,
         },
       });
-      setCartSummary(response.data);
+  
+      if (response.data.message === 'Cart is empty') {
+        setCartSummary({ items: [] });
+      } else {
+        setCartSummary(response.data);
+      }
     } catch (error) {
-      console.error("Error fetching cart summary:", error);
-      setMessage("Failed to load cart. Please try again.");
+      console.error('Error fetching cart summary:', error);
+      setMessage('Failed to load cart. Please try again.');
     }
   };
-
   const handleAddToCart = async () => {
     try {
       const token = localStorage.getItem("token");
@@ -97,27 +101,35 @@ const Cart = () => {
 
   const handleApplyDiscount = async () => {
     try {
-      const token = localStorage.getItem("token");
-      if (!token) throw new Error("No token found");
-
-      await axios.post(
+      const token = localStorage.getItem('token');
+      if (!token) throw new Error('No token found');
+  
+      const response = await axios.post(
         `${CART_API_URL}/apply-discount`,
         { code: discountCode },
         { headers: { Authorization: `Bearer ${token}` } }
       );
-
-      fetchCartSummary();
-      setMessage("Discount applied successfully!");
-      setTimeout(() => setMessage(""), 3000);
-      setDiscountCode("");
+  
+      // Update cartSummary with the response data
+      setCartSummary({
+        ...cartSummary,
+        subtotal: response.data.subtotal,
+        discountApplied: response.data.discountApplied,
+        taxes: response.data.taxes,
+        shippingFee: response.data.shippingFee,
+        total: response.data.total,
+        discountCode: response.data.discountCode,
+        discountPercentage: response.data.discountPercentage,
+      });
+  
+      setMessage('Discount applied successfully!');
+      setTimeout(() => setMessage(''), 3000);
+      setDiscountCode('');
     } catch (error) {
-      console.error("Error applying discount:", error);
-      setMessage(
-        error.response?.data?.message || "Invalid or expired discount code."
-      );
+      console.error('Error applying discount:', error);
+      setMessage(error.response?.data?.error || 'Invalid or expired discount code.');
     }
   };
-
   const handleAuthAction = async () => {
     if (user) {
       await logout();
