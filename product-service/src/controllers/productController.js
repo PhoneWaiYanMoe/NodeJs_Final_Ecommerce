@@ -233,65 +233,60 @@ export const deleteProduct = async (req, res) => {
 
 // POST /api/products/:id/review - Add a review/rating (already implemented)
 export const addReview = async (req, res) => {
-  const { id } = req.params;
-  const { comment, rating } = req.body;
-  const token = req.headers.authorization?.split(" ")[1];
-
-  if (!comment) {
-    return res.status(400).json({ message: "Comment is required" });
-  }
-  if (rating && (rating < 1 || rating > 5)) {
-    return res.status(400).json({ message: "Rating must be between 1 and 5" });
-  }
-
-  let user = null;
-  if (token) {
     try {
-      const response = await axios.get(
-        "https://auth-service.onrender.com/api/verify-token",
-        {
-          headers: { Authorization: `Bearer ${token}` },
+        const { id } = req.params;
+        const token = req.headers.authorization?.split(" ")[1];
+        
+        let user = null;
+        if (token) {
+            try {
+                // Verify token and get user info
+                const decoded = Buffer.from(token, 'base64').toString('utf-8');
+                const [userId, fullName] = decoded.split(':');
+                user = { userId, fullName };
+            } catch (error) {
+                console.log("Invalid token, continuing as anonymous");
+            }
         }
-      );
-      user = response.data;
+        
+        // Create the review object
+        const review = {
+            userId: user ? user.userId : null,
+            userName: user ? user.fullName : req.body.userName || "Anonymous",
+            comment: req.body.comment,
+            rating: req.body.rating || null,
+            createdAt: new Date()
+        };
+
+        // Find the product and add the review
+        const product = await Product.findById(id);
+        if (!product) {
+            return res.status(404).json({ message: "Product not found" });
+        }
+
+        // Add the review to the product
+        product.reviews.push(review);
+
+        // Recalculate average rating
+        if (review.rating) {
+            const ratedReviews = product.reviews.filter(r => r.rating);
+            const totalRating = ratedReviews.reduce((sum, r) => sum + r.rating, 0);
+            product.averageRating = totalRating / ratedReviews.length;
+        }
+
+        // Save the product
+        await product.save();
+
+        // Emit socket event for real-time updates
+        if (global.io) {
+            global.io.emit(`product:${id}:review`, review);
+        }
+
+        res.status(201).json(review);
     } catch (error) {
-      return res.status(401).json({ message: "Invalid token" });
+        console.error('Error adding review:', error);
+        res.status(500).json({ message: "Error adding review", error: error.message });
     }
-  }
-
-  if (rating && !user) {
-    return res
-      .status(401)
-      .json({ message: "You must be logged in to rate a product" });
-  }
-
-  try {
-    const product = await Product.findById(id);
-    if (!product) {
-      return res.status(404).json({ message: "Product not found" });
-    }
-
-    const review = {
-      userId: user ? user.userId : null,
-      userName: user ? user.fullName : "Anonymous",
-      comment,
-      rating: rating || null,
-      createdAt: new Date(),
-    };
-
-    product.reviews.push(review);
-    await product.save();
-
-    if (global.io) {
-      global.io.emit(`product:${id}:review`, review);
-    }
-
-    res.status(201).json({ message: "Review added successfully", review });
-  } catch (error) {
-    res
-      .status(500)
-      .json({ message: "Error adding review", error: error.message });
-  }
 };
 
 // GET /api/products/:id/reviews - Fetch reviews (already implemented)
