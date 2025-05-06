@@ -23,7 +23,7 @@ const Products = () => {
   const location = useLocation();
 
   useEffect(() => {
-    // Parse query parameters from URL
+    // Parse query parameters from URL on mount and navigation
     const searchParams = new URLSearchParams(location.search);
     const categoryFromUrl = searchParams.get('category');
     const pageFromUrl = parseInt(searchParams.get('page'), 10) || 1;
@@ -34,47 +34,48 @@ const Products = () => {
     }));
     setCurrentPage(pageFromUrl);
 
+    // Fetch categories
     const fetchCategories = async () => {
       try {
         const response = await axios.get(`${API_URL}/categories`);
-        if (Array.isArray(response.data)) {
-          setCategories(response.data);
-        } else {
-          console.error('Categories response is not an array:', response.data);
-          setCategories([]);
-        }
+        setCategories(Array.isArray(response.data) ? response.data : []);
       } catch (error) {
         console.error('Error fetching categories:', error);
         setCategories([]);
       }
     };
     fetchCategories();
-  }, [location.search]);
+
+    // Fetch products on initial load or filter change
+    fetchProducts();
+  }, [location.search]); // Trigger on URL change
+
+  const fetchProducts = async () => {
+    try {
+      const params = {
+        page: currentPage,
+        limit: 5,
+        sortBy: sort.sortBy,
+        order: sort.order,
+        ...filters,
+      };
+      const response = await axios.get(`${API_URL}`, { params });
+      setProducts(response.data.products || []);
+      setTotalPages(response.data.totalPages || 1);
+    } catch (error) {
+      console.error('Error fetching products:', error);
+      setProducts([]);
+    }
+  };
 
   useEffect(() => {
-    const fetchProducts = async () => {
-      try {
-        const params = {
-          page: currentPage,
-          limit: 5,
-          sortBy: sort.sortBy,
-          order: sort.order,
-          ...filters,
-        };
-        const response = await axios.get(`${API_URL}`, { params });
-        setProducts(response.data.products || []);
-        setTotalPages(response.data.totalPages || 1);
-      } catch (error) {
-        console.error('Error fetching products:', error);
-        setProducts([]);
-      }
-    };
+    // Refetch products when page, filters, or sort changes
     fetchProducts();
   }, [currentPage, filters, sort]);
 
   const handleFilterChange = (e) => {
     const { name, value } = e.target;
-    setFilters({ ...filters, [name]: value });
+    setFilters((prev) => ({ ...prev, [name]: value }));
     setCurrentPage(1); // Reset to first page on filter change
     updateUrl();
   };
@@ -115,7 +116,6 @@ const Products = () => {
       minHeight: '100vh',
       fontFamily: "'Playfair Display', serif",
     }}>
-      {/* Header */}
       <header style={{
         backgroundColor: '#000000',
         padding: '20px 40px',
@@ -202,7 +202,6 @@ const Products = () => {
         </div>
       </header>
 
-      {/* Main Content */}
       <main style={{ padding: '40px' }}>
         <h1 style={{
           fontSize: '36px',
@@ -214,7 +213,6 @@ const Products = () => {
           Product Catalog
         </h1>
 
-        {/* Filters */}
         <div style={{
           display: 'flex',
           flexWrap: 'wrap',
@@ -269,15 +267,11 @@ const Products = () => {
             }}
           >
             <option value="">All Categories</option>
-            {categories.length > 0 ? (
-              categories.map((category) => (
-                <option key={category._id} value={category.name}>
-                  {category.name}
-                </option>
-              ))
-            ) : (
-              <option disabled>No categories available</option>
-            )}
+            {categories.map((category) => (
+              <option key={category} value={category}>
+                {category}
+              </option>
+            ))}
           </select>
           <input
             type="number"
@@ -313,7 +307,6 @@ const Products = () => {
           />
         </div>
 
-        {/* Sorting */}
         <div style={{
           display: 'flex',
           justifyContent: 'center',
@@ -328,6 +321,7 @@ const Products = () => {
           </label>
           <select
             onChange={handleSortChange}
+            value={`${sort.sortBy}:${sort.order}`}
             style={{
               padding: '10px',
               backgroundColor: '#E0E0E0',
@@ -345,7 +339,6 @@ const Products = () => {
           </select>
         </div>
 
-        {/* Product List */}
         <div style={{
           display: 'grid',
           gridTemplateColumns: 'repeat(auto-fill, minmax(250px, 1fr))',
@@ -356,7 +349,7 @@ const Products = () => {
             <div
               key={product._id}
               style={{
-                backgroundColor: '#FFFFFF',
+                backgroundColor: '#1A1A1A',
                 borderRadius: '10px',
                 overflow: 'hidden',
                 boxShadow: '0 4px 10px rgba(0, 0, 0, 0.3)',
@@ -379,7 +372,7 @@ const Products = () => {
                 <h3 style={{
                   fontSize: '20px',
                   fontWeight: 'bold',
-                  color: '#000000',
+                  color: '#FFFFFF',
                   marginBottom: '10px',
                 }}>
                   {product.name}
@@ -435,7 +428,6 @@ const Products = () => {
           ))}
         </div>
 
-        {/* Pagination */}
         <div style={{
           display: 'flex',
           justifyContent: 'center',
@@ -453,7 +445,7 @@ const Products = () => {
                 border: 'none',
                 borderRadius: '5px',
                 cursor: 'pointer',
-                fontFamily: "'Roboto', sans-serif'",
+                fontFamily: "'Roboto', sans-serif",
                 transition: 'background-color 0.3s',
               }}
               onMouseEnter={(e) => {
