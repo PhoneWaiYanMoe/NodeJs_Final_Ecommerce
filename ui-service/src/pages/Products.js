@@ -126,12 +126,19 @@ const Products = () => {
                     </div>
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
-                    <span style={{
-                        fontSize: '16px',
-                        color: '#D4AF37'
-                    }}>
-                        Hello {user ? user.name : 'Guest'}
-                    </span>
+                    <Link to="/profile" style={{ textDecoration: 'none' }}>
+                        <span style={{
+                            fontSize: '16px',
+                            color: '#D4AF37',
+                            cursor: 'pointer',
+                            transition: 'color 0.3s',
+                        }}
+                        onMouseEnter={(e) => (e.currentTarget.style.color = '#E0E0E0')}
+                        onMouseLeave={(e) => (e.currentTarget.style.color = '#D4AF37')}
+                        >
+                            Hello, {user ? user.name : 'Guest'}
+                        </span>
+                    </Link>
                     {user && (
                         <Link to="/cart">
                             <button

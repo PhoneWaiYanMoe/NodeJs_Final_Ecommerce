@@ -9,6 +9,7 @@ import Register from './pages/Register';
 import Login from './pages/Login';
 import Checkout from './pages/Checkout';
 import SetupPassword from './pages/SetupPassword';
+import Profile from './pages/Profile';
 
 // Create Auth Context
 export const AuthContext = createContext();
@@ -94,7 +95,7 @@ function App() {
   };
 
   return (
-    <AuthContext.Provider value={{ user, login, logout }}>
+    <AuthContext.Provider value={{ user, setUser, login, logout }}>
       <Router>
         <Routes>
           <Route path="/products" element={<Products />} />
@@ -119,6 +120,11 @@ function App() {
           <Route path="/setup-password" element={
             <ProtectedRoute>
               <SetupPassword />
+            </ProtectedRoute>
+          } />
+          <Route path="/profile" element={
+            <ProtectedRoute>
+              <Profile />
             </ProtectedRoute>
           } />
           <Route path="/" element={<Products />} />
