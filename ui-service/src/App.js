@@ -7,6 +7,7 @@ import AdminDashboard from './pages/AdminDashboard';
 import Cart from './pages/Cart';
 import Register from './pages/Register';
 import Login from './pages/Login';
+import Checkout from './pages/Checkout';
 
 // Create Auth Context
 export const AuthContext = createContext();
