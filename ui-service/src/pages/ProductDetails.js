@@ -4,16 +4,49 @@ import axios from 'axios';
 import io from 'socket.io-client';
 import { AuthContext } from '../App';
 
+// Star Rating Component
+const StarRating = ({ value, onChange, readOnly = false }) => {
+  const [hover, setHover] = useState(0);
+  
+  return (
+    <div style={{ display: 'inline-flex', alignItems: 'center' }}>
+      {[...Array(5)].map((_, index) => {
+        const ratingValue = index + 1;
+        return (
+          <span
+            key={index}
+            style={{
+              cursor: readOnly ? 'default' : 'pointer',
+              color: ratingValue <= (hover || value) ? '#D4AF37' : '#444444',
+              fontSize: '24px',
+              marginRight: '5px'
+            }}
+            onClick={() => !readOnly && onChange(ratingValue)}
+            onMouseEnter={() => !readOnly && setHover(ratingValue)}
+            onMouseLeave={() => !readOnly && setHover(0)}
+          >
+            ★
+          </span>
+        );
+      })}
+      {!readOnly && <span style={{ marginLeft: '10px', color: '#E0E0E0' }}>
+        {hover || value || ''}
+      </span>}
+    </div>
+  );
+};
+
 const ProductDetails = () => {
     const { id } = useParams();
     const navigate = useNavigate();
     const { user } = useContext(AuthContext);
     const [product, setProduct] = useState(null);
     const [reviews, setReviews] = useState([]);
-    const [newReview, setNewReview] = useState({ comment: '', rating: '' });
+    const [newReview, setNewReview] = useState({ comment: '', rating: 0 });
     const [selectedVariant, setSelectedVariant] = useState(null);
     const [quantity, setQuantity] = useState(1);
     const [cartMessage, setCartMessage] = useState('');
+    const [reviewError, setReviewError] = useState('');
 
     const API_URL = 'https://product-management-soyo.onrender.com';
     const CART_API_URL = 'https://nodejs-final-ecommerce-1.onrender.com';
@@ -42,16 +75,43 @@ const ProductDetails = () => {
 
     const handleReviewSubmit = async (e) => {
         e.preventDefault();
+        setReviewError('');
+        
+        if (!newReview.comment) {
+            setReviewError('Please enter a comment.');
+            return;
+        }
+        
+        if (!newReview.rating) {
+            setReviewError('Please select a rating.');
+            return;
+        }
+        
         try {
-            await axios.post(`${API_URL}/api/products/${id}/review`, {
+            const token = localStorage.getItem('token');
+            const headers = token ? { Authorization: `Bearer ${token}` } : {};
+            
+            const reviewPayload = {
                 userId: user ? user.id : null,
                 userName: user ? user.name : 'Anonymous',
                 comment: newReview.comment,
                 rating: Number(newReview.rating)
-            });
-            setNewReview({ comment: '', rating: '' });
+            };
+            
+            await axios.post(`${API_URL}/api/products/${id}/review`, reviewPayload, { headers });
+            
+            // Add the review to the local state for immediate feedback
+            const newReviewData = {
+                ...reviewPayload,
+                createdAt: new Date().toISOString()
+            };
+            
+            setReviews([...reviews, newReviewData]);
+            setNewReview({ comment: '', rating: 0 });
+            setReviewError('');
         } catch (error) {
             console.error('Error submitting review:', error);
+            setReviewError('Failed to submit review. Please try again.');
         }
     };
 
@@ -92,6 +152,11 @@ const ProductDetails = () => {
             console.error('Error adding to cart:', error);
             setCartMessage('Failed to add item to cart.');
         }
+    };
+
+    // Helper function to render ratings as stars
+    const renderStarRating = (rating) => {
+        return <StarRating value={parseInt(rating)} readOnly={true} />;
     };
 
     if (!product) return (
@@ -299,13 +364,18 @@ const ProductDetails = () => {
                 }}>
                     Category: {product.category || 'None'}
                 </p>
-                <p style={{
+                <div style={{
                     fontSize: '16px',
                     color: '#E0E0E0',
-                    marginBottom: '10px'
+                    marginBottom: '10px',
+                    display: 'flex',
+                    alignItems: 'center'
                 }}>
-                    Average Rating: {product.averageRating || 'No reviews'}
-                </p>
+                    <span style={{ marginRight: '10px' }}>Average Rating:</span>
+                    {product.averageRating ? 
+                        renderStarRating(product.averageRating) : 
+                        'No reviews'}
+                </div>
                 <p style={{
                     fontSize: '16px',
                     color: '#E0E0E0',
@@ -332,13 +402,21 @@ const ProductDetails = () => {
                                 borderRadius: '10px',
                                 marginBottom: '10px'
                             }}>
-                                <p style={{
-                                    fontSize: '16px',
-                                    color: '#D4AF37',
+                                <div style={{
+                                    display: 'flex',
+                                    justifyContent: 'space-between',
+                                    alignItems: 'center',
                                     marginBottom: '5px'
                                 }}>
-                                    <strong>{review.userName}</strong> (Rating: {review.rating || 'N/A'})
-                                </p>
+                                    <p style={{
+                                        fontSize: '16px',
+                                        color: '#D4AF37',
+                                        margin: 0
+                                    }}>
+                                        <strong>{review.userName}</strong>
+                                    </p>
+                                    {renderStarRating(review.rating || 0)}
+                                </div>
                                 <p style={{
                                     fontSize: '14px',
                                     color: '#FFFFFF',
@@ -370,8 +448,30 @@ const ProductDetails = () => {
                     borderRadius: '10px',
                     maxWidth: '500px'
                 }}>
+                    {reviewError && (
+                        <p style={{
+                            color: '#FF5555',
+                            marginBottom: '10px'
+                        }}>
+                            {reviewError}
+                        </p>
+                    )}
+                    <div style={{ marginBottom: '15px' }}>
+                        <label style={{
+                            display: 'block',
+                            fontSize: '16px',
+                            color: '#D4AF37',
+                            marginBottom: '5px'
+                        }}>
+                            Your Rating:
+                        </label>
+                        <StarRating 
+                            value={newReview.rating} 
+                            onChange={(value) => setNewReview({...newReview, rating: value})} 
+                        />
+                    </div>
                     <textarea
-                        placeholder="Comment"
+                        placeholder="Write your review here..."
                         value={newReview.comment}
                         onChange={(e) => setNewReview({ ...newReview, comment: e.target.value })}
                         style={{
@@ -383,27 +483,8 @@ const ProductDetails = () => {
                             borderRadius: '5px',
                             color: '#000000',
                             fontFamily: "'Roboto', sans-serif",
-                            marginBottom: '10px',
+                            marginBottom: '15px',
                             resize: 'none'
-                        }}
-                        required
-                    />
-                    <input
-                        type="number"
-                        placeholder="Rating (1-5)"
-                        min="1"
-                        max="5"
-                        value={newReview.rating}
-                        onChange={(e) => setNewReview({ ...newReview, rating: e.target.value })}
-                        style={{
-                            width: '100%',
-                            padding: '10px',
-                            backgroundColor: '#E0E0E0',
-                            border: 'none',
-                            borderRadius: '5px',
-                            color: '#000000',
-                            fontFamily: "'Roboto', sans-serif",
-                            marginBottom: '10px'
                         }}
                     />
                     <button
