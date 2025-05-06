@@ -1,126 +1,137 @@
-import React, { createContext, useState, useEffect } from 'react';
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
-import axios from 'axios';
-import Products from './pages/Products';
-import ProductDetails from './pages/ProductDetails';
-import AdminDashboard from './pages/AdminDashboard';
-import Cart from './pages/Cart';
-import Register from './pages/Register';
-import Login from './pages/Login';
-import Checkout from './pages/Checkout'; // Imported but not used—let's fix that
+import React, { useState, useContext } from 'react';
+import { useNavigate, Link } from 'react-router-dom';
+import { AuthContext } from '../App';
 
-// Create Auth Context
-export const AuthContext = createContext();
+const Login = () => {
+  const [formData, setFormData] = useState({ email: '', password: '' });
+  const [error, setError] = useState('');
+  const navigate = useNavigate();
+  const { login } = useContext(AuthContext);
 
-// Configure Axios defaults
-axios.defaults.baseURL = 'https://nodejs-final-ecommerce.onrender.com/user';
+  const handleInputChange = (e) => {
+    const { name, value } = e.target;
+    setFormData({ ...formData, [name]: value });
+  };
 
-// Add token to axios headers
-axios.interceptors.request.use((config) => {
-    const token = localStorage.getItem('token');
-    if (token) {
-        config.headers.Authorization = `Bearer ${token}`;
+  const handleLogin = async (e) => {
+    e.preventDefault();
+    try {
+      await login(formData.email, formData.password);
+      navigate('/products');
+    } catch (error) {
+      console.error('Error logging in:', error);
+      setError(error.message || 'Invalid credentials. Please try again.');
     }
-    return config;
-});
+  };
 
-function App() {
-    const [user, setUser] = useState(null);
-    const [loading, setLoading] = useState(true);
+  return (
+    <div
+      style={{
+        backgroundColor: '#000000',
+        color: '#FFFFFF',
+        minHeight: '100vh',
+        fontFamily: "'Playfair Display', serif",
+        display: 'flex',
+        justifyContent: 'center',
+        alignItems: 'center',
+      }}
+    >
+      <div
+        style={{
+          backgroundColor: '#1A1A1A',
+          padding: '40px',
+          borderRadius: '10px',
+          width: '400px',
+          boxShadow: '0 4px 10px rgba(0, 0, 0, 0.5)',
+        }}
+      >
+        <h2
+          style={{
+            fontSize: '24px',
+            color: '#D4AF37',
+            textAlign: 'center',
+            marginBottom: '20px',
+          }}
+        >
+          Login
+        </h2>
+        {error && (
+          <p
+            style={{
+              color: '#FF5555',
+              textAlign: 'center',
+              marginBottom: '15px',
+            }}
+          >
+            {error}
+          </p>
+        )}
+        <div>
+          <input
+            type="email"
+            name="email"
+            placeholder="Email"
+            value={formData.email}
+            onChange={handleInputChange}
+            style={{
+              width: '100%',
+              padding: '10px',
+              marginBottom: '15px',
+              backgroundColor: '#E0E0E0',
+              border: 'none',
+              borderRadius: '5px',
+              color: '#000000',
+              fontFamily: "'Roboto', sans-serif",
+            }}
+          />
+          <input
+            type="password"
+            name="password"
+            placeholder="Password"
+            value={formData.password}
+            onChange={handleInputChange}
+            style={{
+              width: '100%',
+              padding: '10px',
+              marginBottom: '20px',
+              backgroundColor: '#E0E0E0',
+              border: 'none',
+              borderRadius: '5px',
+              color: '#000000',
+              fontFamily: "'Roboto', sans-serif",
+            }}
+          />
+          <button
+            onClick={handleLogin}
+            style={{
+              width: '100%',
+              padding: '10px',
+              backgroundColor: '#D4AF37',
+              color: '#000000',
+              border: 'none',
+              borderRadius: '5px',
+              fontFamily: "'Roboto', sans-serif",
+              cursor: 'pointer',
+              transition: 'background-color 0.3s',
+            }}
+            onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#E0E0E0')}
+            onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = '#D4AF37')}
+          >
+            Login
+          </button>
+          <p
+            style={{
+              textAlign: 'center',
+              marginTop: '15px',
+              color: '#E0E0E0',
+            }}
+          >
+            Don’t have an account? <Link to="/register" style={{ color: '#D4AF37' }}>Register</Link>
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+};
 
-    // Check session (token) on app load
-    useEffect(() => {
-        const checkSession = async () => {
-            try {
-                const token = localStorage.getItem('token');
-                if (token) {
-                    const response = await axios.get('/session');
-                    if (response.data.user) {
-                        setUser(response.data.user);
-                    } else {
-                        localStorage.removeItem('token');
-                        setUser(null);
-                    }
-                } else {
-                    setUser(null);
-                }
-            } catch (err) {
-                console.error('Session check failed:', err.message);
-                localStorage.removeItem('token');
-                setUser(null);
-            } finally {
-                setLoading(false);
-            }
-        };
-        checkSession();
-    }, []);
-
-    // Login function
-    const login = async (email, password) => {
-        try {
-            const loginUrl = email === 'admin@example.com' ? '/admin/login' : '/login';
-            const response = await axios.post(loginUrl, { email, password });
-            const { user, token } = response.data;
-            if (token) {
-                localStorage.setItem('token', token);
-                setUser(user);
-            }
-            return response.data;
-        } catch (err) {
-            throw err.response?.data || { message: 'Login failed' };
-        }
-    };
-
-    // Logout function
-    const logout = async () => {
-        try {
-            await axios.post('/logout');
-            localStorage.removeItem('token');
-            setUser(null);
-        } catch (err) {
-            console.error('Logout failed:', err.message);
-        }
-    };
-
-    // Protected Route Component
-    const ProtectedRoute = ({ children, adminOnly }) => {
-        if (loading) return <div>Loading...</div>;
-        if (!user) return <Navigate to="/login" replace />;
-        if (adminOnly && (user.email !== 'admin@example.com' && user.role !== 'admin')) {
-            return <Navigate to="/" replace />;
-        }
-        return children;
-    };
-
-    return (
-        <AuthContext.Provider value={{ user, login, logout }}>
-            <Router>
-                <Routes>
-                    <Route path="/products" element={<Products />} />
-                    <Route path="/products/:id" element={<ProductDetails />} />
-                    <Route path="/admin/dashboard" element={
-                        <ProtectedRoute adminOnly={true}>
-                            <AdminDashboard />
-                        </ProtectedRoute>
-                    } />
-                    <Route path="/cart" element={
-                        <ProtectedRoute>
-                            <Cart />
-                        </ProtectedRoute>
-                    } />
-                    <Route path="/checkout" element={ // Add this route
-                        <ProtectedRoute>
-                            <Checkout />
-                        </ProtectedRoute>
-                    } />
-                    <Route path="/register" element={<Register />} />
-                    <Route path="/login" element={<Login />} />
-                    <Route path="/" element={<Products />} />
-                    <Route path="*" element={<div>404 Not Found</div>} /> {/* Optional: Catch-all route for debugging */}
-                </Routes>
-            </Router>
-        </AuthContext.Provider>
-    );
-}
-
-export default App;
+export default Login;
