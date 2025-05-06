@@ -1,183 +1,127 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useContext } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import axios from 'axios';
+import { AuthContext } from '../App';
 
 const Cart = () => {
+    const { user, logout } = useContext(AuthContext);
     const navigate = useNavigate();
     const [cartSummary, setCartSummary] = useState(null);
     const [discountCode, setDiscountCode] = useState('');
-    const [checkoutData, setCheckoutData] = useState({
-        shippingAddress: '123 Main St, City, Country',
-        paymentDetails: 'Credit Card: **** **** **** 1234'
-    });
-    const [error, setError] = useState('');
+    const [message, setMessage] = useState('');
 
     const CART_API_URL = 'https://nodejs-final-ecommerce-1.onrender.com/cart';
-    const ACCOUNT_API_URL = 'https://nodejs-final-ecommerce.onrender.com/user'; // Replace with actual ngrok URL
 
-    // Fetch cart summary
     useEffect(() => {
-        const fetchCartSummary = async () => {
-            try {
-                const response = await axios.get(`${CART_API_URL}/summary`, {
-                    headers: {
-                        'ngrok-skip-browser-warning': 'true'
-                    }
-                });
-                setCartSummary(response.data);
-            } catch (error) {
-                console.error('Error fetching cart summary:', error);
-                setError('Failed to load cart.');
-            }
-        };
-        fetchCartSummary();
-    }, []);
-
-    // Add item to cart
-    const handleAddToCart = async () => {
-        try {
-            const productId = '507f1f77bcf86cd799439011'; // Replace with a real product ID from product-service
-            const quantity = 1;
-            const price = 10.0; // Should fetch from product-service
-
-            await axios.post(`${CART_API_URL}/add`, {
-                product_id: productId,
-                quantity,
-                price
-            }, {
-                headers: {
-                    'ngrok-skip-browser-warning': 'true'
-                }
-            });
-
-            // Refresh cart summary
-            const response = await axios.get(`${CART_API_URL}/summary`, {
-                headers: {
-                    'ngrok-skip-browser-warning': 'true'
-                }
-            });
-            setCartSummary(response.data);
-        } catch (error) {
-            console.error('Error adding to cart:', error);
-            setError('Failed to add item to cart.');
-        }
-    };
-
-    // Update item quantity
-    const handleUpdateQuantity = async (itemId, newQuantity) => {
-        try {
-            await axios.put(`${CART_API_URL}/update/${itemId}`, {
-                quantity: newQuantity
-            }, {
-                headers: {
-                    'ngrok-skip-browser-warning': 'true'
-                }
-            });
-
-            // Refresh cart summary
-            const response = await axios.get(`${CART_API_URL}/summary`, {
-                headers: {
-                    'ngrok-skip-browser-warning': 'true'
-                }
-            });
-            setCartSummary(response.data);
-        } catch (error) {
-            console.error('Error updating quantity:', error);
-            setError('Failed to update quantity.');
-        }
-    };
-
-    // Remove item from cart
-    const handleRemoveItem = async (itemId) => {
-        try {
-            await axios.delete(`${CART_API_URL}/remove/${itemId}`, {
-                headers: {
-                    'ngrok-skip-browser-warning': 'true'
-                }
-            });
-
-            // Refresh cart summary
-            const response = await axios.get(`${CART_API_URL}/summary`, {
-                headers: {
-                    'ngrok-skip-browser-warning': 'true'
-                }
-            });
-            setCartSummary(response.data);
-        } catch (error) {
-            console.error('Error removing item:', error);
-            setError('Failed to remove item.');
-        }
-    };
-
-    // Apply discount code
-    const handleApplyDiscount = async () => {
-        try {
-            await axios.post(`${CART_API_URL}/apply-discount`, {
-                code: discountCode
-            }, {
-                headers: {
-                    'ngrok-skip-browser-warning': 'true'
-                }
-            });
-
-            // Refresh cart summary
-            const response = await axios.get(`${CART_API_URL}/summary`, {
-                headers: {
-                    'ngrok-skip-browser-warning': 'true'
-                }
-            });
-            setCartSummary(response.data);
-            setError('');
-        } catch (error) {
-            console.error('Error applying discount:', error);
-            setError(error.response?.data?.message || 'Invalid or expired discount code.');
-        }
-    };
-
-    // Handle checkout
-    const handleCheckout = async () => {
-        const user = JSON.parse(localStorage.getItem('user'));
         if (!user) {
             navigate('/login');
             return;
         }
+        fetchCartSummary();
+    }, [user, navigate]);
 
+    const fetchCartSummary = async () => {
         try {
-            // Simulate payment (hardcoded success for now)
-            const paymentSuccess = true;
-            if (!paymentSuccess) {
-                throw new Error('Payment failed');
-            }
+            const token = localStorage.getItem('token');
+            if (!token) throw new Error('No token found');
 
-            await axios.post(`${CART_API_URL}/checkout`, checkoutData, {
+            const response = await axios.get(`${CART_API_URL}/summary`, {
                 headers: {
-                    'ngrok-skip-browser-warning': 'true'
+                    Authorization: `Bearer ${token}`
                 }
             });
-
-            // Clear cart and redirect
-            setCartSummary(null);
-            alert('Checkout successful! Order management will be implemented in the next step.');
-            navigate('/products');
+            setCartSummary(response.data);
         } catch (error) {
-            console.error('Error during checkout:', error);
-            setError(error.response?.data?.message || 'Checkout failed. Please try again.');
+            console.error('Error fetching cart summary:', error);
+            setMessage('Failed to load cart. Please try again.');
         }
     };
 
-    // Handle logout
-    const handleLogout = async () => {
+    const handleAddToCart = async () => {
         try {
-            await axios.post(`${ACCOUNT_API_URL}/logout`, {}, {
-                headers: {
-                    'ngrok-skip-browser-warning': 'true'
-                }
-            });
-            localStorage.removeItem('user');
-            navigate('/login');
+            const token = localStorage.getItem('token');
+            if (!token) throw new Error('No token found');
+
+            const productId = '507f1f77bcf86cd799439011'; // Replace with dynamic product ID from Products.js
+            const quantity = 1;
+            const price = 10.0; // Should be fetched dynamically from product-service
+
+            await axios.post(
+                `${CART_API_URL}/add`,
+                { product_id: productId, quantity, price },
+                { headers: { Authorization: `Bearer ${token}` } }
+            );
+
+            fetchCartSummary();
         } catch (error) {
-            console.error('Error logging out:', error);
-            setError('Failed to logout.');
+            console.error('Error adding to cart:', error);
+            setMessage('Failed to add item to cart.');
+        }
+    };
+
+    const handleUpdateQuantity = async (itemId, newQuantity) => {
+        try {
+            const token = localStorage.getItem('token');
+            if (!token) throw new Error('No token found');
+
+            await axios.put(
+                `${CART_API_URL}/update/${itemId}`,
+                { quantity: newQuantity },
+                { headers: { Authorization: `Bearer ${token}` } }
+            );
+
+            fetchCartSummary();
+        } catch (error) {
+            console.error('Error updating quantity:', error);
+            setMessage('Failed to update quantity.');
+        }
+    };
+
+    const handleRemoveItem = async (itemId) => {
+        try {
+            const token = localStorage.getItem('token');
+            if (!token) throw new Error('No token found');
+
+            await axios.delete(`${CART_API_URL}/remove/${itemId}`, {
+                headers: { Authorization: `Bearer ${token}` }
+            });
+
+            fetchCartSummary();
+            setMessage('Item removed from cart.');
+            setTimeout(() => setMessage(''), 3000);
+        } catch (error) {
+            console.error('Error removing item:', error);
+            setMessage('Failed to remove item.');
+        }
+    };
+
+    const handleApplyDiscount = async () => {
+        try {
+            const token = localStorage.getItem('token');
+            if (!token) throw new Error('No token found');
+
+            await axios.post(
+                `${CART_API_URL}/apply-discount`,
+                { code: discountCode },
+                { headers: { Authorization: `Bearer ${token}` } }
+            );
+
+            fetchCartSummary();
+            setMessage('Discount applied successfully!');
+            setTimeout(() => setMessage(''), 3000);
+            setDiscountCode('');
+        } catch (error) {
+            console.error('Error applying discount:', error);
+            setMessage(error.response?.data?.message || 'Invalid or expired discount code.');
+        }
+    };
+
+    const handleAuthAction = async () => {
+        if (user) {
+            await logout();
+            navigate('/login');
+        } else {
+            navigate('/login');
         }
     };
 
@@ -186,8 +130,7 @@ const Cart = () => {
             backgroundColor: '#000000',
             color: '#FFFFFF',
             minHeight: '100vh',
-            fontFamily: "'Playfair Display', serif",
-            padding: '20px'
+            fontFamily: "'Playfair Display', serif"
         }}>
             {/* Header */}
             <header style={{
@@ -200,7 +143,7 @@ const Cart = () => {
             }}>
                 <div style={{ display: 'flex', alignItems: 'center' }}>
                     <img
-                        src="/logo_placeholder.png"
+                        src="/logo.png"
                         alt="LuxeLane Logo"
                         style={{ width: '50px', height: '50px', marginRight: '15px' }}
                     />
@@ -222,21 +165,12 @@ const Cart = () => {
                         </p>
                     </div>
                 </div>
-                <div>
-                    <Link to="/products" style={{
-                        padding: '10px 20px',
-                        backgroundColor: '#D4AF37',
-                        color: '#000000',
-                        borderRadius: '5px',
-                        textDecoration: 'none',
-                        fontFamily: "'Roboto', sans-serif",
-                        marginRight: '10px'
-                    }}>
-                        Back to Products
-                    </Link>
-                    {localStorage.getItem('user') ? (
+                <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
+                    <span style={{ fontSize: '16px', color: '#D4AF37' }}>
+                        Hello {user ? user.name : 'Guest'}
+                    </span>
+                    <Link to="/">
                         <button
-                            onClick={handleLogout}
                             style={{
                                 padding: '10px 20px',
                                 backgroundColor: '#D4AF37',
@@ -250,20 +184,26 @@ const Cart = () => {
                             onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#E0E0E0')}
                             onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = '#D4AF37')}
                         >
-                            Logout
+                            Back to Products
                         </button>
-                    ) : (
-                        <Link to="/login" style={{
+                    </Link>
+                    <button
+                        onClick={handleAuthAction}
+                        style={{
                             padding: '10px 20px',
                             backgroundColor: '#D4AF37',
                             color: '#000000',
+                            border: 'none',
                             borderRadius: '5px',
-                            textDecoration: 'none',
-                            fontFamily: "'Roboto', sans-serif"
-                        }}>
-                            Login
-                        </Link>
-                    )}
+                            fontFamily: "'Roboto', sans-serif",
+                            cursor: 'pointer',
+                            transition: 'background-color 0.3s'
+                        }}
+                        onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#E0E0E0')}
+                        onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = '#D4AF37')}
+                    >
+                        {user ? 'Logout' : 'Login'}
+                    </button>
                 </div>
             </header>
 
@@ -279,17 +219,17 @@ const Cart = () => {
                     Your Cart
                 </h1>
 
-                {error && (
+                {message && (
                     <p style={{
-                        color: '#FF5555',
+                        fontSize: '16px',
+                        color: message.includes('Failed') ? '#FF5555' : '#D4AF37',
                         textAlign: 'center',
                         marginBottom: '20px'
                     }}>
-                        {error}
+                        {message}
                     </p>
                 )}
 
-                {/* Cart Items */}
                 <div style={{
                     backgroundColor: '#1A1A1A',
                     padding: '30px',
@@ -297,7 +237,9 @@ const Cart = () => {
                     marginBottom: '30px'
                 }}>
                     {!cartSummary || !cartSummary.items || cartSummary.items.length === 0 ? (
-                        <p style={{ color: '#E0E0E0' }}>Your cart is empty.</p>
+                        <p style={{ color: '#E0E0E0', textAlign: 'center' }}>
+                            Your cart is empty. <Link to="/" style={{ color: '#D4AF37' }}>Continue shopping</Link>.
+                        </p>
                     ) : (
                         <table style={{
                             width: '100%',
@@ -334,7 +276,7 @@ const Cart = () => {
                                                 }}
                                             />
                                         </td>
-                                        <td style={{ padding: '10px' }}>${item.price}</td>
+                                        <td style={{ padding: '10px' }}>${item.price.toFixed(2)}</td>
                                         <td style={{ padding: '10px' }}>${(item.price * item.quantity).toFixed(2)}</td>
                                         <td style={{ padding: '10px' }}>
                                             <button
@@ -368,7 +310,7 @@ const Cart = () => {
                             color: '#000000',
                             border: 'none',
                             borderRadius: '5px',
-                            fontFamily: "'Roboto', sans-serif",
+                            fontFamily: "'Roboto', sans-serif',
                             cursor: 'pointer',
                             transition: 'background-color 0.3s'
                         }}
@@ -379,7 +321,6 @@ const Cart = () => {
                     </button>
                 </div>
 
-                {/* Discount Code and Checkout */}
                 {cartSummary && cartSummary.items && cartSummary.items.length > 0 && (
                     <div style={{
                         backgroundColor: '#1A1A1A',
@@ -422,25 +363,13 @@ const Cart = () => {
                                 Apply
                             </button>
                         </div>
-                        <p style={{
-                            fontSize: '16px',
-                            color: '#E0E0E0',
-                            marginBottom: '15px'
-                        }}>
+                        <p style={{ fontSize: '16px', color: '#E0E0E0', marginBottom: '15px' }}>
                             Subtotal: ${cartSummary.subtotal?.toFixed(2) || '0.00'}
                         </p>
-                        <p style={{
-                            fontSize: '16px',
-                            color: '#E0E0E0',
-                            marginBottom: '15px'
-                        }}>
+                        <p style={{ fontSize: '16px', color: '#E0E0E0', marginBottom: '15px' }}>
                             Taxes: ${cartSummary.taxes?.toFixed(2) || '0.00'}
                         </p>
-                        <p style={{
-                            fontSize: '16px',
-                            color: '#E0E0E0',
-                            marginBottom: '15px'
-                        }}>
+                        <p style={{ fontSize: '16px', color: '#E0E0E0', marginBottom: '15px' }}>
                             Shipping Fee: ${cartSummary.shippingFee?.toFixed(2) || '0.00'}
                         </p>
                         <p style={{
@@ -451,56 +380,25 @@ const Cart = () => {
                         }}>
                             Total: ${cartSummary.total?.toFixed(2) || '0.00'}
                         </p>
-                        <input
-                            type="text"
-                            placeholder="Shipping Address"
-                            value={checkoutData.shippingAddress}
-                            onChange={(e) => setCheckoutData({ ...checkoutData, shippingAddress: e.target.value })}
-                            style={{
-                                width: '100%',
-                                padding: '10px',
-                                marginBottom: '15px',
-                                backgroundColor: '#E0E0E0',
-                                border: 'none',
-                                borderRadius: '5px',
-                                color: '#000000',
-                                fontFamily: "'Roboto', sans-serif"
-                            }}
-                        />
-                        <input
-                            type="text"
-                            placeholder="Payment Details"
-                            value={checkoutData.paymentDetails}
-                            onChange={(e) => setCheckoutData({ ...checkoutData, paymentDetails: e.target.value })}
-                            style={{
-                                width: '100%',
-                                padding: '10px',
-                                marginBottom: '20px',
-                                backgroundColor: '#E0E0E0',
-                                border: 'none',
-                                borderRadius: '5px',
-                                color: '#000000',
-                                fontFamily: "'Roboto', sans-serif"
-                            }}
-                        />
-                        <button
-                            onClick={handleCheckout}
-                            style={{
-                                width: '100%',
-                                padding: '10px',
-                                backgroundColor: '#D4AF37',
-                                color: '#000000',
-                                border: 'none',
-                                borderRadius: '5px',
-                                fontFamily: "'Roboto', sans-serif",
-                                cursor: 'pointer',
-                                transition: 'background-color 0.3s'
-                            }}
-                            onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#E0E0E0')}
-                            onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = '#D4AF37')}
-                        >
-                            Checkout
-                        </button>
+                        <Link to="/checkout">
+                            <button
+                                style={{
+                                    width: '100%',
+                                    padding: '10px',
+                                    backgroundColor: '#D4AF37',
+                                    color: '#000000',
+                                    border: 'none',
+                                    borderRadius: '5px',
+                                    fontFamily: "'Roboto', sans-serif",
+                                    cursor: 'pointer',
+                                    transition: 'background-color 0.3s'
+                                }}
+                                onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#E0E0E0')}
+                                onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = '#D4AF37')}
+                            >
+                                Proceed to Checkout
+                            </button>
+                        </Link>
                     </div>
                 )}
             </main>
