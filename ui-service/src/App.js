@@ -7,7 +7,7 @@ import AdminDashboard from './pages/AdminDashboard';
 import Cart from './pages/Cart';
 import Register from './pages/Register';
 import Login from './pages/Login';
-import Checkout from './pages/Checkout';
+import Checkout from './pages/Checkout'; // Imported but not used—let's fix that
 
 // Create Auth Context
 export const AuthContext = createContext();
@@ -108,9 +108,15 @@ function App() {
                             <Cart />
                         </ProtectedRoute>
                     } />
+                    <Route path="/checkout" element={ // Add this route
+                        <ProtectedRoute>
+                            <Checkout />
+                        </ProtectedRoute>
+                    } />
                     <Route path="/register" element={<Register />} />
                     <Route path="/login" element={<Login />} />
                     <Route path="/" element={<Products />} />
+                    <Route path="*" element={<div>404 Not Found</div>} /> {/* Optional: Catch-all route for debugging */}
                 </Routes>
             </Router>
         </AuthContext.Provider>
