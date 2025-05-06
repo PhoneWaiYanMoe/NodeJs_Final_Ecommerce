@@ -16,8 +16,14 @@ const Login = () => {
   const handleLogin = async (e) => {
     e.preventDefault();
     try {
-      await login(formData.email, formData.password);
-      navigate('/products');
+      const response = await login(formData.email, formData.password);
+      const user = response.user;
+      // Redirect based on role
+      if (user.role === 'admin') {
+        navigate('/admin/dashboard');
+      } else {
+        navigate('/products');
+      }
     } catch (error) {
       console.error('Error logging in:', error);
       setError(error.message || 'Invalid credentials. Please try again.');
