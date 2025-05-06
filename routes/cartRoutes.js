@@ -5,6 +5,7 @@ const jwt = require('jsonwebtoken');
 const CartItem = require('../models/CartItem');
 const Order = require('../models/Order');
 const DiscountCode = require('../models/DiscountCode');
+const User = require('../models/User');
 
 // Constants
 const TAX_RATE = 0.1; // 10% tax
@@ -142,21 +143,8 @@ router.get('/summary', [verifyToken, userRequired], async (req, res) => {
     }
 
     const subtotal = cartItems.reduce((sum, item) => sum + item.price * item.quantity, 0);
-    let discountAmount = 0;
-    let appliedDiscountCode = null;
-
-    // Check if a discount code is applied (assuming all items have the same discount code)
-    const discountCode = cartItems[0]?.discountCode;
-    if (discountCode) {
-      const discount = await DiscountCode.findOne({ code: discountCode });
-      if (discount && discount.timesUsed < discount.usageLimit) {
-        discountAmount = (discount.discountPercentage / 100) * subtotal;
-        appliedDiscountCode = discountCode;
-      }
-    }
-
-    const taxes = (subtotal - discountAmount) * TAX_RATE;
-    const total = (subtotal - discountAmount) + taxes + SHIPPING_FEE;
+    const taxes = subtotal * TAX_RATE;
+    const total = subtotal + taxes + SHIPPING_FEE;
 
     res.status(200).json({
       items: cartItems.map(item => ({
@@ -166,17 +154,16 @@ router.get('/summary', [verifyToken, userRequired], async (req, res) => {
         price: item.price,
       })),
       subtotal: parseFloat(subtotal.toFixed(2)),
-      discountApplied: parseFloat(discountAmount.toFixed(2)),
       taxes: parseFloat(taxes.toFixed(2)),
       shippingFee: SHIPPING_FEE,
       total: parseFloat(total.toFixed(2)),
-      discountCode: appliedDiscountCode,
     });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Server error' });
   }
 });
+
 // Apply Discount Code
 router.post('/apply-discount', [verifyToken, userRequired], async (req, res) => {
   const { code } = req.body;
@@ -203,18 +190,13 @@ router.post('/apply-discount', [verifyToken, userRequired], async (req, res) => 
       return res.status(400).json({ error: 'Cart is empty' });
     }
 
-    // Increment the usage of the discount code
-    discount.timesUsed += 1;
-    await discount.save();
-
-    // Store the discount code in req.user (simulating session storage)
-    req.user.discountCode = code;
-    req.user.discountPercentage = discount.discountPercentage; // Store the percentage too
-
     const subtotal = cartItems.reduce((sum, item) => sum + item.price * item.quantity, 0);
     const discountAmount = (discount.discountPercentage / 100) * subtotal;
     const taxes = (subtotal - discountAmount) * TAX_RATE;
     const total = (subtotal - discountAmount) + taxes + SHIPPING_FEE;
+
+    // Store discount code in the request object for use in checkout
+    req.user.discountCode = code;
 
     res.status(200).json({
       subtotal: parseFloat(subtotal.toFixed(2)),
@@ -230,15 +212,22 @@ router.post('/apply-discount', [verifyToken, userRequired], async (req, res) => 
     res.status(500).json({ error: 'Server error' });
   }
 });
+
 // Checkout Process
 router.post('/checkout', [verifyToken, userRequired], async (req, res) => {
-  const { shippingAddress, paymentDetails } = req.body;
+  const { paymentDetails } = req.body;
 
-  if (!shippingAddress || !paymentDetails) {
-    return res.status(400).json({ error: 'Missing shippingAddress or paymentDetails' });
+  if (!paymentDetails) {
+    return res.status(400).json({ error: 'Missing paymentDetails' });
   }
 
   try {
+    // Fetch user to get shipping address
+    const user = await User.findById(req.user.id);
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
     const cartIdentifier = getCartIdentifier(req);
     const cartItems = await CartItem.find(cartIdentifier);
 
@@ -246,14 +235,25 @@ router.post('/checkout', [verifyToken, userRequired], async (req, res) => {
       return res.status(400).json({ error: 'Cart is empty' });
     }
 
+    // Map cart items to order items
+    const orderItems = cartItems.map(item => ({
+      productId: item.productId,
+      quantity: item.quantity,
+      price: item.price
+    }));
+
     // Calculate totals
     const subtotal = cartItems.reduce((sum, item) => sum + item.price * item.quantity, 0);
     let discountAmount = 0;
+    let appliedDiscountCode = null;
 
     if (req.user.discountCode) {
       const discount = await DiscountCode.findOne({ code: req.user.discountCode });
-      if (discount && discount.timesUsed <= discount.usageLimit) {
+      if (discount && discount.timesUsed < discount.usageLimit) {
         discountAmount = (discount.discountPercentage / 100) * subtotal;
+        discount.timesUsed += 1;
+        await discount.save();
+        appliedDiscountCode = discount.code;
       }
     }
 
@@ -262,12 +262,15 @@ router.post('/checkout', [verifyToken, userRequired], async (req, res) => {
 
     // Create order
     const order = new Order({
-      ...cartIdentifier,
+      userId: req.user.id,
+      items: orderItems,
       totalPrice: total,
       taxes,
       shippingFee: SHIPPING_FEE,
       discountApplied: discountAmount,
-      shippingAddress,
+      discountCode: appliedDiscountCode,
+      statusHistory: [{ status: 'ordered', updatedAt: new Date() }],
+      shippingAddress: user.shippingAddress,
       paymentDetails,
     });
     const savedOrder = await order.save();
@@ -277,14 +280,14 @@ router.post('/checkout', [verifyToken, userRequired], async (req, res) => {
 
     // Clear discount
     delete req.user.discountCode;
-    delete req.user.discountPercentage;
 
     res.status(201).json({ message: 'Checkout successful', orderId: savedOrder._id.toString() });
   } catch (err) {
     console.error(err);
-    res.status(500).json({ error: 'Server error' });
+    res.status(500).json({ error: 'Server error', details: err.message });
   }
 });
+
 // Admin: Create Discount Code
 router.post('/admin/discount', [verifyToken, adminRequired], async (req, res) => {
   const { code, discount_percentage, usageLimit = 10 } = req.body;
@@ -323,10 +326,8 @@ router.get('/admin/discounts', [verifyToken, adminRequired], async (req, res) =>
     const discounts = await DiscountCode.find().lean();
 
     const discountDetails = await Promise.all(discounts.map(async (discount) => {
-      const ordersWithDiscount = await Order.find({ discountApplied: { $gt: 0 } }).lean();
-      const appliedOrders = ordersWithDiscount.filter(order => {
-        return order.discountApplied > 0 && req.user.discountCode === discount.code;
-      }).map(order => ({
+      const ordersWithDiscount = await Order.find({ discountCode: discount.code }).lean();
+      const appliedOrders = ordersWithDiscount.map(order => ({
         orderId: order._id.toString(),
         totalPrice: order.totalPrice,
         createdAt: order.createdAt,
@@ -359,8 +360,8 @@ router.get('/admin/discount/:code/orders', [verifyToken, adminRequired], async (
       return res.status(404).json({ error: 'Discount code not found' });
     }
 
-    const orders = await Order.find({ discountApplied: { $gt: 0 } }).lean();
-    const relevantOrders = orders.filter(order => order.discountApplied > 0).map(order => ({
+    const orders = await Order.find({ discountCode: code }).lean();
+    const relevantOrders = orders.map(order => ({
       orderId: order._id.toString(),
       userId: order.userId,
       totalPrice: order.totalPrice,
