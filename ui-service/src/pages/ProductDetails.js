@@ -47,6 +47,7 @@ const ProductDetails = () => {
     const [quantity, setQuantity] = useState(1);
     const [cartMessage, setCartMessage] = useState('');
     const [reviewError, setReviewError] = useState('');
+    const [reviewSuccess, setReviewSuccess] = useState('');
 
     const API_URL = 'https://product-management-soyo.onrender.com';
     const CART_API_URL = 'https://nodejs-final-ecommerce-1.onrender.com';
@@ -76,6 +77,7 @@ const ProductDetails = () => {
     const handleReviewSubmit = async (e) => {
         e.preventDefault();
         setReviewError('');
+        setReviewSuccess('');
         
         if (!newReview.comment) {
             setReviewError('Please enter a comment.');
@@ -113,49 +115,71 @@ const ProductDetails = () => {
             );
             
             // Update reviews with the server response
-            setReviews(prevReviews => [...prevReviews, response.data]);
+            if (response.data && response.data.review) {
+                setReviews([...reviews, response.data.review]);
+            } else {
+                // If the response format is different, create a review object from our payload
+                const newReviewObj = {
+                    ...reviewPayload,
+                    createdAt: new Date().toISOString()
+                };
+                setReviews([...reviews, newReviewObj]);
+            }
             
             // Reset form
             setNewReview({ comment: '', rating: 0 });
-            setReviewError('');
+            setReviewSuccess('Review submitted successfully!');
             
-            // Show success message
-            toast.success('Review submitted successfully!');
+            // Clear success message after 3 seconds
+            setTimeout(() => {
+                setReviewSuccess('');
+            }, 3000);
             
         } catch (error) {
             console.error('Error submitting review:', error);
             
-            if (error.response?.status === 401 && !user) {
-                // Try submitting as anonymous if authentication fails
-                try {
-                    const anonymousPayload = {
-                        userName: 'Anonymous',
-                        comment: newReview.comment,
-                        rating: Number(newReview.rating)
-                    };
-                    
-                    const response = await axios.post(
-                        `${API_URL}/api/products/${id}/review`,
-                        anonymousPayload,
-                        { headers: { 'Content-Type': 'application/json' } }
-                    );
-                    
-                    setReviews(prevReviews => [...prevReviews, response.data]);
-                    setNewReview({ comment: '', rating: 0 });
-                    setReviewError('');
-                    toast.success('Review submitted anonymously!');
-                    
-                } catch (retryError) {
-                    console.error('Error submitting anonymous review:', retryError);
-                    setReviewError('Failed to submit review. Please try again later.');
-                    toast.error('Failed to submit review');
+            if (error.response?.status === 401) {
+                // Handle unauthorized error - likely not logged in
+                setReviewError('You need to be logged in to submit a rated review. You can still submit comments anonymously.');
+                
+                // Try to submit as anonymous if there's no token
+                if (!localStorage.getItem('token')) {
+                    try {
+                        const anonymousReview = {
+                            userName: 'Anonymous',
+                            comment: newReview.comment,
+                            rating: null
+                        };
+                        
+                        await axios.post(
+                            `${API_URL}/api/products/${id}/review`, 
+                            anonymousReview,
+                            { headers: { 'Content-Type': 'application/json' }}
+                        );
+                        
+                        // Update UI with anonymous review
+                        const anonReviewObj = {
+                            ...anonymousReview,
+                            createdAt: new Date().toISOString()
+                        };
+                        
+                        setReviews([...reviews, anonReviewObj]);
+                        setNewReview({ comment: '', rating: 0 });
+                        setReviewError('');
+                        setReviewSuccess('Anonymous review submitted successfully!');
+                        
+                        // Clear success message after 3 seconds
+                        setTimeout(() => {
+                            setReviewSuccess('');
+                        }, 3000);
+                        
+                    } catch (retryError) {
+                        console.error('Error submitting anonymous review:', retryError);
+                        setReviewError('Failed to submit review. Please try again later.');
+                    }
                 }
             } else {
-                setReviewError(
-                    error.response?.data?.message || 
-                    'Failed to submit review. Please try again.'
-                );
-                toast.error('Failed to submit review');
+                setReviewError('Failed to submit review. Please try again.');
             }
         }
     };
@@ -499,6 +523,14 @@ const ProductDetails = () => {
                             marginBottom: '10px'
                         }}>
                             {reviewError}
+                        </p>
+                    )}
+                    {reviewSuccess && (
+                        <p style={{
+                            color: '#D4AF37',
+                            marginBottom: '10px'
+                        }}>
+                            {reviewSuccess}
                         </p>
                     )}
                     <div style={{ marginBottom: '15px' }}>
