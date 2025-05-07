@@ -237,7 +237,7 @@ router.post('/register', async (req, res) => {
       from: process.env.EMAIL_USER,
       to: email,
       subject: 'Your Temporary Password for LuxeLane',
-      text: `Your temporary password is: ${temporaryPassword}. Please log in and set a new password at /setup-password.`,
+      text: `Your temporary password is: ${temporaryPassword}.`,
     });
 
     const token = jwt.sign(
