@@ -146,17 +146,14 @@ router.get('/summary', [verifyToken, userRequired], async (req, res) => {
     let appliedDiscountCode = null;
     let discountPercentage = 0;
 
-    if (req.user.discountCode) {
-      const discount = await DiscountCode.findOne({ code: req.user.discountCode });
+    // Check if a discount code is provided in the query
+    const { discountCode } = req.query;
+    if (discountCode) {
+      const discount = await DiscountCode.findOne({ code: discountCode });
       if (discount && discount.timesUsed < discount.usageLimit) {
         discountAmount = (discount.discountPercentage / 100) * subtotal;
         appliedDiscountCode = discount.code;
         discountPercentage = discount.discountPercentage;
-      }
-      else {
-        // Clear invalid or expired discount code
-        delete req.user.discountCode;
-        delete req.user.discountPercentage;
       }
     }
 
@@ -184,7 +181,6 @@ router.get('/summary', [verifyToken, userRequired], async (req, res) => {
   }
 });
 
-// Apply Discount Code
 router.post('/apply-discount', [verifyToken, userRequired], async (req, res) => {
   const { code } = req.body;
 
@@ -209,13 +205,11 @@ router.post('/apply-discount', [verifyToken, userRequired], async (req, res) => 
     if (!cartItems.length) {
       return res.status(400).json({ error: 'Cart is empty' });
     }
+
     // Increment the usage of the discount code
     discount.timesUsed += 1;
     await discount.save();
-    // Store the discount code in req.user (simulating session storage)
-    req.user.discountCode = code;
-    req.user.discountPercentage = discount.discountPercentage; // Store the percentage too
-    
+
     const subtotal = cartItems.reduce((sum, item) => sum + item.price * item.quantity, 0);
     const discountAmount = (discount.discountPercentage / 100) * subtotal;
     const taxes = (subtotal - discountAmount) * TAX_RATE;
@@ -238,14 +232,14 @@ router.post('/apply-discount', [verifyToken, userRequired], async (req, res) => 
 
 // Checkout Process
 router.post('/checkout', [verifyToken, userRequired], async (req, res) => {
-  const { paymentDetails } = req.body;
+  const { paymentDetails, discountCode } = req.body;
 
   if (!paymentDetails) {
     return res.status(400).json({ error: 'Missing paymentDetails' });
   }
 
   try {
-    console.log(`Checkout - User ID: ${req.user.id}, Discount Code: ${req.user.discountCode}`);
+    console.log(`Checkout - User ID: ${req.user.id}, Discount Code: ${discountCode}`);
 
     const user = await User.findById(req.user.id);
     if (!user) {
@@ -262,22 +256,20 @@ router.post('/checkout', [verifyToken, userRequired], async (req, res) => {
     const orderItems = cartItems.map(item => ({
       productId: item.productId,
       quantity: item.quantity,
-      price: item.price
+      price: item.price,
     }));
 
     const subtotal = cartItems.reduce((sum, item) => sum + item.price * item.quantity, 0);
     let discountAmount = 0;
     let appliedDiscountCode = null;
 
-    if (req.user.discountCode) {
-      const discount = await DiscountCode.findOne({ code: req.user.discountCode });
+    if (discountCode) {
+      const discount = await DiscountCode.findOne({ code: discountCode });
       if (discount && discount.timesUsed < discount.usageLimit) {
         discountAmount = (discount.discountPercentage / 100) * subtotal;
+        appliedDiscountCode = discount.code;
         discount.timesUsed += 1;
         await discount.save();
-        appliedDiscountCode = discount.code;
-      } else {
-        delete req.user.discountCode;
       }
     }
 
@@ -299,7 +291,6 @@ router.post('/checkout', [verifyToken, userRequired], async (req, res) => {
     const savedOrder = await order.save();
 
     await CartItem.deleteMany(cartIdentifier);
-    delete req.user.discountCode;
 
     res.status(201).json({ message: 'Checkout successful', orderId: savedOrder._id.toString() });
   } catch (err) {
