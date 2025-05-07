@@ -143,8 +143,22 @@ router.get('/summary', [verifyToken, userRequired], async (req, res) => {
     }
 
     const subtotal = cartItems.reduce((sum, item) => sum + item.price * item.quantity, 0);
-    const taxes = subtotal * TAX_RATE;
-    const total = subtotal + taxes + SHIPPING_FEE;
+    let discountAmount = 0;
+    let appliedDiscountCode = null;
+    let discountPercentage = 0;
+
+    // Check if a discount code is applied
+    if (req.user.discountCode) {
+      const discount = await DiscountCode.findOne({ code: req.user.discountCode });
+      if (discount && discount.timesUsed < discount.usageLimit) {
+        discountAmount = (discount.discountPercentage / 100) * subtotal;
+        appliedDiscountCode = discount.code;
+        discountPercentage = discount.discountPercentage;
+      }
+    }
+
+    const taxes = (subtotal - discountAmount) * TAX_RATE;
+    const total = (subtotal - discountAmount) + taxes + SHIPPING_FEE;
 
     res.status(200).json({
       items: cartItems.map(item => ({
@@ -154,6 +168,9 @@ router.get('/summary', [verifyToken, userRequired], async (req, res) => {
         price: item.price,
       })),
       subtotal: parseFloat(subtotal.toFixed(2)),
+      discountApplied: parseFloat(discountAmount.toFixed(2)),
+      discountCode: appliedDiscountCode,
+      discountPercentage: discountPercentage,
       taxes: parseFloat(taxes.toFixed(2)),
       shippingFee: SHIPPING_FEE,
       total: parseFloat(total.toFixed(2)),
@@ -225,7 +242,7 @@ router.post('/checkout', [verifyToken, userRequired], async (req, res) => {
     // Fetch user to get shipping address
     const user = await User.findById(req.user.id);
     if (!user) {
-      return res.status(404).json({ error: 'User not found' });
+      return res.status(400).json({ error: 'User shipping address not found. Please update your profile in the user service.' });
     }
 
     const cartIdentifier = getCartIdentifier(req);
@@ -254,6 +271,9 @@ router.post('/checkout', [verifyToken, userRequired], async (req, res) => {
         discount.timesUsed += 1;
         await discount.save();
         appliedDiscountCode = discount.code;
+      } else {
+        // Clear discountCode if invalid or usage limit reached
+        delete req.user.discountCode;
       }
     }
 
