@@ -22,6 +22,7 @@ const Profile = () => {
   });
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  const [expandedAddressIndex, setExpandedAddressIndex] = useState(null);
   const navigate = useNavigate();
 
   // Initialize state only once on mount
@@ -220,6 +221,10 @@ const Profile = () => {
     }
   };
 
+  const toggleAddressDetails = (index) => {
+    setExpandedAddressIndex(expandedAddressIndex === index ? null : index);
+  };
+
   return (
     <div
       style={{
@@ -304,101 +309,117 @@ const Profile = () => {
               key={index}
               style={{
                 backgroundColor: '#2A2A2A',
-                padding: '15px',
+                padding: '10px',
                 borderRadius: '5px',
-                marginBottom: '15px',
+                marginBottom: '10px',
               }}
             >
-              <input
-                type="text"
-                name={`shippingAddressCollection.${index}.street`}
-                placeholder="Street"
-                value={address.street}
-                onChange={handleInputChange}
+              <div
+                onClick={() => toggleAddressDetails(index)}
                 style={{
-                  width: '100%',
+                  cursor: 'pointer',
                   padding: '10px',
-                  marginBottom: '10px',
-                  backgroundColor: '#E0E0E0',
-                  border: 'none',
+                  backgroundColor: '#333333',
                   borderRadius: '5px',
-                  color: '#000000',
-                  fontFamily: "'Roboto', sans-serif",
+                  marginBottom: '5px',
                 }}
-              />
-              <input
-                type="text"
-                name={`shippingAddressCollection.${index}.city`}
-                placeholder="City"
-                value={address.city}
-                onChange={handleInputChange}
-                style={{
-                  width: '100%',
-                  padding: '10px',
-                  marginBottom: '10px',
-                  backgroundColor: '#E0E0E0',
-                  border: 'none',
-                  borderRadius: '5px',
-                  color: '#000000',
-                  fontFamily: "'Roboto', sans-serif",
-                }}
-              />
-              <input
-                type="text"
-                name={`shippingAddressCollection.${index}.state`}
-                placeholder="State"
-                value={address.state}
-                onChange={handleInputChange}
-                style={{
-                  width: '100%',
-                  padding: '10px',
-                  marginBottom: '10px',
-                  backgroundColor: '#E0E0E0',
-                  border: 'none',
-                  borderRadius: '5px',
-                  color: '#000000',
-                  fontFamily: "'Roboto', sans-serif",
-                }}
-              />
-              <input
-                type="text"
-                name={`shippingAddressCollection.${index}.zip`}
-                placeholder="Zip Code"
-                value={address.zip}
-                onChange={handleInputChange}
-                style={{
-                  width: '100%',
-                  padding: '10px',
-                  marginBottom: '10px',
-                  backgroundColor: '#E0E0E0',
-                  border: 'none',
-                  borderRadius: '5px',
-                  color: '#000000',
-                  fontFamily: "'Roboto', sans-serif",
-                }}
-              />
-              <input
-                type="text"
-                name={`shippingAddressCollection.${index}.country`}
-                placeholder="Country"
-                value={address.country}
-                onChange={handleInputChange}
-                style={{
-                  width: '100%',
-                  padding: '10px',
-                  marginBottom: '10px',
-                  backgroundColor: '#E0E0E0',
-                  border: 'none',
-                  borderRadius: '5px',
-                  color: '#000000',
-                  fontFamily: "'Roboto', sans-serif",
-                }}
-              />
+              >
+                <strong>Address {index + 1}</strong>
+                {expandedAddressIndex === index && (
+                  <div style={{ marginTop: '10px', padding: '10px', backgroundColor: '#1A1A1A' }}>
+                    <input
+                      type="text"
+                      name={`shippingAddressCollection.${index}.street`}
+                      placeholder="Street"
+                      value={address.street}
+                      onChange={handleInputChange}
+                      style={{
+                        width: '100%',
+                        padding: '5px',
+                        marginBottom: '5px',
+                        backgroundColor: '#E0E0E0',
+                        border: 'none',
+                        borderRadius: '3px',
+                        color: '#000000',
+                        fontFamily: "'Roboto', sans-serif",
+                      }}
+                    />
+                    <input
+                      type="text"
+                      name={`shippingAddressCollection.${index}.city`}
+                      placeholder="City"
+                      value={address.city}
+                      onChange={handleInputChange}
+                      style={{
+                        width: '100%',
+                        padding: '5px',
+                        marginBottom: '5px',
+                        backgroundColor: '#E0E0E0',
+                        border: 'none',
+                        borderRadius: '3px',
+                        color: '#000000',
+                        fontFamily: "'Roboto', sans-serif",
+                      }}
+                    />
+                    <input
+                      type="text"
+                      name={`shippingAddressCollection.${index}.state`}
+                      placeholder="State"
+                      value={address.state}
+                      onChange={handleInputChange}
+                      style={{
+                        width: '100%',
+                        padding: '5px',
+                        marginBottom: '5px',
+                        backgroundColor: '#E0E0E0',
+                        border: 'none',
+                        borderRadius: '3px',
+                        color: '#000000',
+                        fontFamily: "'Roboto', sans-serif",
+                      }}
+                    />
+                    <input
+                      type="text"
+                      name={`shippingAddressCollection.${index}.zip`}
+                      placeholder="Zip Code"
+                      value={address.zip}
+                      onChange={handleInputChange}
+                      style={{
+                        width: '100%',
+                        padding: '5px',
+                        marginBottom: '5px',
+                        backgroundColor: '#E0E0E0',
+                        border: 'none',
+                        borderRadius: '3px',
+                        color: '#000000',
+                        fontFamily: "'Roboto', sans-serif",
+                      }}
+                    />
+                    <input
+                      type="text"
+                      name={`shippingAddressCollection.${index}.country`}
+                      placeholder="Country"
+                      value={address.country}
+                      onChange={handleInputChange}
+                      style={{
+                        width: '100%',
+                        padding: '5px',
+                        marginBottom: '5px',
+                        backgroundColor: '#E0E0E0',
+                        border: 'none',
+                        borderRadius: '3px',
+                        color: '#000000',
+                        fontFamily: "'Roboto', sans-serif",
+                      }}
+                    />
+                  </div>
+                )}
+              </div>
               <button
                 onClick={() => handleDeleteAddress(index)}
                 style={{
                   width: '100%',
-                  padding: '10px',
+                  padding: '8px',
                   backgroundColor: '#FF5555',
                   color: '#FFFFFF',
                   border: 'none',
@@ -406,7 +427,7 @@ const Profile = () => {
                   fontFamily: "'Roboto', sans-serif",
                   cursor: 'pointer',
                   transition: 'background-color 0.3s',
-                  marginBottom: '10px',
+                  marginBottom: '5px',
                 }}
                 onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#FF7777')}
                 onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = '#FF5555')}
@@ -417,7 +438,7 @@ const Profile = () => {
                 onClick={() => handleSetDefaultAddress(index)}
                 style={{
                   width: '100%',
-                  padding: '10px',
+                  padding: '8px',
                   backgroundColor: '#D4AF37',
                   color: '#000000',
                   border: 'none',
@@ -640,5 +661,5 @@ const Profile = () => {
     </div>
   );
 };
-//* Profile Component */
+
 export default Profile;
