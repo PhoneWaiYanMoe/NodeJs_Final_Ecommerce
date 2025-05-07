@@ -70,14 +70,14 @@ const Products = () => {
   const handleFilterChange = (e) => {
     const { name, value } = e.target;
     setFilters((prev) => ({ ...prev, [name]: value }));
-    setCurrentPage(1); // Reset to first page on filter change
+    setCurrentPage(1);
     setTimeout(() => updateUrl(1), 0);
   };
 
   const handleSortChange = (e) => {
     const [sortBy, order] = e.target.value.split(':');
     setSort({ sortBy, order });
-    setCurrentPage(1); // Reset to first page on sort change
+    setCurrentPage(1);
     setTimeout(() => updateUrl(1), 0);
   };
 
@@ -156,24 +156,44 @@ const Products = () => {
             </span>
           </Link>
           {user && (
-            <Link to="/cart">
-              <button
-                style={{
-                  padding: '10px 20px',
-                  backgroundColor: '#D4AF37',
-                  color: '#000000',
-                  border: 'none',
-                  borderRadius: '5px',
-                  fontFamily: "'Roboto', sans-serif",
-                  cursor: 'pointer',
-                  transition: 'background-color 0.3s',
-                }}
-                onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#E0E0E0')}
-                onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = '#D4AF37')}
-              >
-                Cart
-              </button>
-            </Link>
+            <>
+              <Link to="/cart">
+                <button
+                  style={{
+                    padding: '10px 20px',
+                    backgroundColor: '#D4AF37',
+                    color: '#000000',
+                    border: 'none',
+                    borderRadius: '5px',
+                    fontFamily: "'Roboto', sans-serif",
+                    cursor: 'pointer',
+                    transition: 'background-color 0.3s',
+                  }}
+                  onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#E0E0E0')}
+                  onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = '#D4AF37')}
+                >
+                  Cart
+                </button>
+              </Link>
+              <Link to="/orders">
+                <button
+                  style={{
+                    padding: '10px 20px',
+                    backgroundColor: '#D4AF37',
+                    color: '#000000',
+                    border: 'none',
+                    borderRadius: '5px',
+                    fontFamily: "'Roboto', sans-serif",
+                    cursor: 'pointer',
+                    transition: 'background-color 0.3s',
+                  }}
+                  onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#E0E0E0')}
+                  onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = '#D4AF37')}
+                >
+                  Order History
+                </button>
+              </Link>
+            </>
           )}
           <button
             onClick={handleAuthAction}
