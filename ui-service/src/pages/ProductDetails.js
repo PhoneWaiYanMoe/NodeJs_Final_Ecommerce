@@ -90,31 +90,21 @@ const ProductDetails = () => {
         }
         
         try {
-            // For rated reviews, ensure user is logged in
-            if (newReview.rating && !user) {
-                setReviewError('You need to be logged in to submit a rated review.');
-                return;
-            }
-            
             const token = localStorage.getItem('token');
+            
+            // Prepare the review payload
             const reviewPayload = {
                 userName: user ? user.name : 'Anonymous',
                 comment: newReview.comment,
                 rating: Number(newReview.rating) || null
             };
             
-            // When user is logged in, we need to include the token
-            const response = await axios({
-                method: 'post',
-                url: `${API_URL}/api/products/${id}/review`,
-                data: reviewPayload,
-                headers: token ? {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${token}`
-                } : {
-                    'Content-Type': 'application/json'
-                }
-            });
+            // Make request with axios defaults which should include the token
+            // This matches how other parts of the app handle authentication
+            const response = await axios.post(
+                `${API_URL}/api/products/${id}/review`,
+                reviewPayload
+            );
             
             // Update reviews with the server response
             if (response.data && response.data.review) {
@@ -155,8 +145,7 @@ const ProductDetails = () => {
                         
                         await axios.post(
                             `${API_URL}/api/products/${id}/review`, 
-                            anonymousReview,
-                            { headers: { 'Content-Type': 'application/json' }}
+                            anonymousReview
                         );
                         
                         // Update UI with anonymous review
