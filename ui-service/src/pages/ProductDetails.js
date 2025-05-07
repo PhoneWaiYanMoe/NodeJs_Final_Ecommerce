@@ -173,8 +173,6 @@ const ProductDetails = () => {
 
         const variant = product.variants.find(v => v.name === selectedVariant);
         const price = variant.price;
-        // Combine productId and variantName in the format "productId,variantName"
-        const combinedId = `${product._id},${selectedVariant}`;
 
         try {
             const token = localStorage.getItem('token');
@@ -183,7 +181,8 @@ const ProductDetails = () => {
             await axios.post(
                 `${CART_API_URL}/cart/add`,
                 {
-                    product_id: combinedId, // Send combined ID
+                    product_id: product._id, // Send only the productId
+                    variantName: selectedVariant, // Add variantName as a separate field
                     quantity,
                     price
                 },
@@ -198,7 +197,7 @@ const ProductDetails = () => {
             setTimeout(() => setCartMessage(''), 3000);
         } catch (error) {
             console.error('Error adding to cart:', error);
-            setCartMessage('Failed to add item to cart.');
+            setCartMessage('Failed to add item to cart. Please check the server response.');
         }
     };
 
@@ -375,7 +374,7 @@ const ProductDetails = () => {
                             color: '#000000',
                             border: 'none',
                             borderRadius: '5px',
-                            fontFamily: "'Roboto', sans-serif",
+                            fontFamily: "'Roboto', sans-serif',
                             cursor: !selectedVariant ? 'not-allowed' : 'pointer',
                             transition: 'background-color 0.3s'
                         }}
