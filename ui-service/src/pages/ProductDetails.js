@@ -374,7 +374,7 @@ const ProductDetails = () => {
                             color: '#000000',
                             border: 'none',
                             borderRadius: '5px',
-                            fontFamily: "'Roboto', sans-serif',
+                            fontFamily: "'Roboto', sans-serif'",
                             cursor: !selectedVariant ? 'not-allowed' : 'pointer',
                             transition: 'background-color 0.3s'
                         }}
