@@ -9,7 +9,6 @@ import Cart from './pages/Cart';
 import Register from './pages/Register';
 import Login from './pages/Login';
 import Checkout from './pages/Checkout';
-import SetupPassword from './pages/SetupPassword';
 import Profile from './pages/Profile';
 
 // Create Auth Context
@@ -119,11 +118,6 @@ function App() {
           } />
           <Route path="/register" element={<Register />} />
           <Route path="/login" element={<Login />} />
-          <Route path="/setup-password" element={
-            <ProtectedRoute>
-              <SetupPassword />
-            </ProtectedRoute>
-          } />
           <Route path="/profile" element={
             <ProtectedRoute>
               <Profile />
