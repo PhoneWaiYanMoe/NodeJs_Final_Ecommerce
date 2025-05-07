@@ -237,7 +237,7 @@ router.post('/register', async (req, res) => {
       from: process.env.EMAIL_USER,
       to: email,
       subject: 'Your Temporary Password for LuxeLane',
-      text: `Your temporary password is: ${temporaryPassword}.`,
+      text: `Your temporary password is: ${temporaryPassword}. Please log in with this password.`,
     });
 
     const token = jwt.sign(
@@ -263,26 +263,8 @@ router.post('/register', async (req, res) => {
   }
 });
 
-router.post('/setup-password', verifyToken, async (req, res) => {
-  const { password } = req.body;
-  if (!password) {
-    return res.status(400).json({ message: 'Password is required' });
-  }
 
-  try {
-    const user = await User.findById(req.user.id);
-    if (!user) {
-      return res.status(404).json({ message: 'User not found' });
-    }
 
-    user.password = await bcrypt.hash(password, 10);
-    await user.save();
-
-    res.status(200).json({ message: 'Password set successfully' });
-  } catch (err) {
-    res.status(500).json({ message: 'Server error', details: err.message });
-  }
-});
 
 router.post('/login', async (req, res) => {
   const { email, password } = req.body;
@@ -394,15 +376,19 @@ router.put('/profile', verifyToken, userSessionRequired, async (req, res) => {
       user.name = name;
     }
 
-    // Handle shipping address collection (append new addresses)
+    // Handle shipping address collection (append new addresses and remove duplicates)
     if (shippingAddressCollection && Array.isArray(shippingAddressCollection)) {
-      const newAddresses = shippingAddressCollection.filter(address => 
-        !user.shippingAddressCollection.some(existing => 
-          JSON.stringify(existing) === JSON.stringify(address)
+      const uniqueAddresses = shippingAddressCollection.filter(newAddr =>
+        !user.shippingAddressCollection.some(existingAddr =>
+          existingAddr.street === newAddr.street &&
+          existingAddr.city === newAddr.city &&
+          existingAddr.state === newAddr.state &&
+          existingAddr.zip === newAddr.zip &&
+          existingAddr.country === newAddr.country
         )
       );
-      if (newAddresses.length > 0) {
-        user.shippingAddressCollection = [...user.shippingAddressCollection, ...newAddresses];
+      if (uniqueAddresses.length > 0) {
+        user.shippingAddressCollection = [...user.shippingAddressCollection, ...uniqueAddresses];
       }
     }
 
