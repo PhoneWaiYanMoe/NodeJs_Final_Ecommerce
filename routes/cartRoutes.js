@@ -72,7 +72,7 @@ router.post('/add', [verifyToken, userRequired], async (req, res) => {
       cartItem = new CartItem({
         ...cartIdentifier,
         productId: product_id,
-        variantName, // Store variantName if provided
+        variantName,
         quantity,
         price,
       });
@@ -147,7 +147,6 @@ router.get('/summary', [verifyToken, userRequired], async (req, res) => {
     let appliedDiscountCode = null;
     let discountPercentage = 0;
 
-    // Check if a discount code is provided in the query
     const { discountCode } = req.query;
     if (discountCode) {
       const discount = await DiscountCode.findOne({ code: discountCode });
@@ -165,7 +164,7 @@ router.get('/summary', [verifyToken, userRequired], async (req, res) => {
       items: cartItems.map(item => ({
         id: item._id.toString(),
         productId: item.productId.toString(),
-        variantName: item.variantName || 'Default', // Include variantName in response
+        variantName: item.variantName || 'Default',
         quantity: item.quantity,
         price: item.price,
       })),
@@ -183,6 +182,7 @@ router.get('/summary', [verifyToken, userRequired], async (req, res) => {
   }
 });
 
+// Apply Discount Code
 router.post('/apply-discount', [verifyToken, userRequired], async (req, res) => {
   const { code } = req.body;
 
@@ -208,7 +208,6 @@ router.post('/apply-discount', [verifyToken, userRequired], async (req, res) => 
       return res.status(400).json({ error: 'Cart is empty' });
     }
 
-    // Increment the usage of the discount code
     discount.timesUsed += 1;
     await discount.save();
 
@@ -257,7 +256,7 @@ router.post('/checkout', [verifyToken, userRequired], async (req, res) => {
 
     const orderItems = cartItems.map(item => ({
       productId: item.productId,
-      variantName: item.variantName || 'Default', // Include variantName in order
+      variantName: item.variantName || 'Default',
       quantity: item.quantity,
       price: item.price,
     }));
@@ -299,6 +298,40 @@ router.post('/checkout', [verifyToken, userRequired], async (req, res) => {
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Server error', details: err.message });
+  }
+});
+
+// Fetch User's Order History
+router.get('/orders', [verifyToken, userRequired], async (req, res) => {
+  try {
+    const orders = await Order.find({ userId: req.user.id }).sort({ createdAt: -1 }).lean();
+    const formattedOrders = orders.map(order => ({
+      orderId: order._id.toString(),
+      items: order.items.map(item => ({
+        productId: item.productId.toString(),
+        variantName: item.variantName || 'Default',
+        quantity: item.quantity,
+        price: item.price,
+      })),
+      totalPrice: order.totalPrice,
+      taxes: order.taxes,
+      shippingFee: order.shippingFee,
+      discountApplied: order.discountApplied,
+      discountCode: order.discountCode,
+      statusHistory: order.statusHistory,
+      currentStatus: order.statusHistory[order.statusHistory.length - 1]?.status || 'ordered',
+      shippingAddress: order.shippingAddress,
+      paymentDetails: {
+        cardNumber: `**** **** **** ${order.paymentDetails.cardNumber.slice(-4)}`,
+        expiryDate: order.paymentDetails.expiryDate,
+      },
+      createdAt: order.createdAt,
+    }));
+
+    res.status(200).json(formattedOrders);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Server error' });
   }
 });
 
