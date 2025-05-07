@@ -394,20 +394,9 @@ router.put('/profile', verifyToken, userSessionRequired, async (req, res) => {
       user.name = name;
     }
 
-    // Handle shipping address collection (append new addresses and remove duplicates)
+    // Handle shipping address collection (replace with the full updated array)
     if (shippingAddressCollection && Array.isArray(shippingAddressCollection)) {
-      const uniqueAddresses = shippingAddressCollection.filter(newAddr =>
-        !user.shippingAddressCollection.some(existingAddr =>
-          existingAddr.street === newAddr.street &&
-          existingAddr.city === newAddr.city &&
-          existingAddr.state === newAddr.state &&
-          existingAddr.zip === newAddr.zip &&
-          existingAddr.country === newAddr.country
-        )
-      );
-      if (uniqueAddresses.length > 0) {
-        user.shippingAddressCollection = [...user.shippingAddressCollection, ...uniqueAddresses];
-      }
+      user.shippingAddressCollection = shippingAddressCollection;
     }
 
     // Handle setting default address
