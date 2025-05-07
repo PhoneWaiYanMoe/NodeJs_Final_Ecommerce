@@ -87,7 +87,6 @@ const ProductDetails = () => {
         try {
             const token = localStorage.getItem('token');
             
-            // For logged-in users with rating
             if (user && newReview.rating > 0) {
                 const reviewPayload = {
                     comment: newReview.comment,
@@ -106,9 +105,7 @@ const ProductDetails = () => {
                 );
                 
                 if (response.data && response.data.review) {
-                    // Use functional update to prevent stale state
                     setReviews(prevReviews => {
-                        // Check if review already exists to prevent duplicates
                         const exists = prevReviews.some(rev => 
                             rev.comment === response.data.review.comment && 
                             rev.createdAt === response.data.review.createdAt
@@ -120,7 +117,6 @@ const ProductDetails = () => {
                     setTimeout(() => setReviewSuccess(''), 3000);
                 }
             } else {
-                // For anonymous comments (no rating) or logged-in users without rating
                 const reviewPayload = {
                     comment: newReview.comment,
                     userName: user ? user.name : 'Anonymous'
@@ -137,7 +133,6 @@ const ProductDetails = () => {
                 );
                 
                 if (response.data && response.data.review) {
-                    // Use functional update to prevent stale state and check for duplicates
                     setReviews(prevReviews => {
                         const exists = prevReviews.some(rev => 
                             rev.comment === response.data.review.comment && 
@@ -156,7 +151,6 @@ const ProductDetails = () => {
             if (error.response?.status === 401) {
                 if (newReview.rating > 0) {
                     setReviewError('You need to be logged in to submit a rated review. You can still submit comments without rating.');
-                    // Clear the rating but keep the comment
                     setNewReview(prev => ({ ...prev, rating: 0 }));
                 } else {
                     setReviewError('Failed to submit review. Please try again.');
@@ -179,6 +173,8 @@ const ProductDetails = () => {
 
         const variant = product.variants.find(v => v.name === selectedVariant);
         const price = variant.price;
+        // Combine productId and variantName in the format "productId,variantName"
+        const combinedId = `${product._id},${selectedVariant}`;
 
         try {
             const token = localStorage.getItem('token');
@@ -187,7 +183,7 @@ const ProductDetails = () => {
             await axios.post(
                 `${CART_API_URL}/cart/add`,
                 {
-                    product_id: product._id,
+                    product_id: combinedId, // Send combined ID
                     quantity,
                     price
                 },
@@ -206,7 +202,6 @@ const ProductDetails = () => {
         }
     };
 
-    // Helper function to render ratings as stars
     const renderStarRating = (rating) => {
         return <StarRating value={parseInt(rating)} readOnly={true} />;
     };
@@ -232,7 +227,6 @@ const ProductDetails = () => {
             minHeight: '100vh',
             fontFamily: "'Playfair Display', serif"
         }}>
-            {/* Header */}
             <header style={{
                 backgroundColor: '#000000',
                 padding: '20px 40px',
@@ -267,7 +261,6 @@ const ProductDetails = () => {
                 </div>
             </header>
 
-            {/* Main Content */}
             <main style={{ padding: '40px' }}>
                 <h1 style={{
                     fontSize: '36px',
