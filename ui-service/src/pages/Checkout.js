@@ -80,8 +80,9 @@ const Checkout = () => {
 
       const updatePromises = cartSummary.items.map(async (item) => {
         try {
-          // Parse the combined productId,variantName string
-          const [productId, variantName] = item.productId.split(',');
+          // Use productId and variantName from the cart item
+          const productId = item.productId;
+          const variantName = item.variantName;
 
           // Update salesCount for the product
           await axios.patch(
@@ -134,9 +135,8 @@ const Checkout = () => {
   };
 
   // Function to format the productId(variantName) display
-  const formatProductDisplay = (productId) => {
-    const [id, variant] = productId.split(',');
-    return `${id} (${variant})`;
+  const formatProductDisplay = (item) => {
+    return `${item.productId} (${item.variantName})`;
   };
 
   return (
@@ -280,7 +280,6 @@ const Checkout = () => {
               }}>
                 Order Summary
               </h3>
-              {/* Display items in the order summary */}
               <table style={{
                 width: '100%',
                 borderCollapse: 'collapse',
@@ -308,7 +307,7 @@ const Checkout = () => {
                   {cartSummary.items.map((item, index) => (
                     <tr key={index} style={{ borderBottom: '1px solid #333333' }}>
                       <td style={{ padding: '10px' }}>
-                        {formatProductDisplay(item.productId)}
+                        {formatProductDisplay(item)}
                       </td>
                       <td style={{ padding: '10px' }}>
                         {item.quantity}
