@@ -20,28 +20,29 @@ const Cart = () => {
     fetchCartSummary();
   }, [user, navigate]);
 
-  const fetchCartSummary = async () => {
-    try {
-      const token = localStorage.getItem("token");
-      if (!token) throw new Error("No token found");
+ const fetchCartSummary = async () => {
+  try {
+    const token = localStorage.getItem("token");
+    if (!token) throw new Error("No token found");
 
-      const response = await axios.get(`${CART_API_URL}/summary`, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
+    const response = await axios.get(`${CART_API_URL}/summary`, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+      params: { discountCode }, // Send discount code with the request
+    });
 
-      if (response.data.message === "Cart is empty") {
-        setCartSummary({ items: [] });
-      } else {
-        setCartSummary(response.data);
-      }
-    } catch (error) {
-      console.error("Error fetching cart summary:", error);
-      setMessage("Failed to load cart. Please try again.");
+    if (response.data.message === "Cart is empty") {
+      setCartSummary({ items: [] });
+    } else {
+      setCartSummary(response.data);
     }
-  };
-
+  } catch (error) {
+    console.error("Error fetching cart summary:", error);
+    setMessage("Failed to load cart. Please try again.");
+  }
+};
+  
   const handleAddToCart = async () => {
     try {
       const token = localStorage.getItem("token");
@@ -100,26 +101,26 @@ const Cart = () => {
     }
   };
 
-  const handleApplyDiscount = async () => {
-    try {
-      const token = localStorage.getItem("token");
-      if (!token) throw new Error("No token found");
+ const handleApplyDiscount = async () => {
+  try {
+    const token = localStorage.getItem("token");
+    if (!token) throw new Error("No token found");
 
-      const response = await axios.post(
-        `${CART_API_URL}/apply-discount`,
-        { code: discountCode },
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
+    const response = await axios.post(
+      `${CART_API_URL}/apply-discount`,
+      { code: discountCode },
+      { headers: { Authorization: `Bearer ${token}` } }
+    );
 
-      await fetchCartSummary();
-      setMessage(`Discount applied successfully! (${discountCode})`);
-      setTimeout(() => setMessage(""), 3000);
-      setDiscountCode("");
-    } catch (error) {
-      console.error("Error applying discount:", error);
-      setMessage(error.response?.data?.error || "Invalid or expired discount code.");
-    }
-  };
+    await fetchCartSummary(); // Refresh summary with the applied discount
+    setMessage(`Discount applied successfully! (${discountCode})`);
+    setTimeout(() => setMessage(""), 3000);
+    setDiscountCode("");
+  } catch (error) {
+    console.error("Error applying discount:", error);
+    setMessage(error.response?.data?.error || "Invalid or expired discount code.");
+  }
+};
 
   const handleAuthAction = async () => {
     if (user) {
@@ -474,29 +475,26 @@ const Cart = () => {
             >
               Total: ${cartSummary.total?.toFixed(2) || "0.00"}
             </p>
-            <Link to="/checkout">
-              <button
-                style={{
-                  width: "100%",
-                  padding: "10px",
-                  backgroundColor: "#D4AF37",
-                  color: "#000000",
-                  border: "none",
-                  borderRadius: "5px",
-                  fontFamily: "'Roboto', sans-serif",
-                  cursor: "pointer",
-                  transition: "background-color 0.3s",
-                }}
-                onMouseEnter={(e) =>
-                  (e.currentTarget.style.backgroundColor = "#E0E0E0")
-                }
-                onMouseLeave={(e) =>
-                  (e.currentTarget.style.backgroundColor = "#D4AF37")
-                }
-              >
-                Proceed to Checkout
-              </button>
-            </Link>
+// Update the Link to pass discountCode
+<Link to="/checkout" state={{ cartSummary, discountCode: cartSummary.discountCode }}>
+  <button
+    style={{
+      width: "100%",
+      padding: "10px",
+      backgroundColor: "#D4AF37",
+      color: "#000000",
+      border: "none",
+      borderRadius: "5px",
+      fontFamily: "'Roboto', sans-serif",
+      cursor: "pointer",
+      transition: "background-color 0.3s",
+    }}
+    onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "#E0E0E0")}
+    onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "#D4AF37")}
+  >
+    Proceed to Checkout
+  </button>
+</Link>
           </div>
         )}
       </main>
