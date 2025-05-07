@@ -84,28 +84,25 @@ const ProductDetails = () => {
             return;
         }
         
-        if (!newReview.rating) {
-            setReviewError('Please select a rating.');
+        if (!user && newReview.rating) {
+            setReviewError('You need to be logged in to submit a rated review. You can still submit comments anonymously.');
             return;
         }
         
         try {
             const token = localStorage.getItem('token');
-            const config = token ? {
-                headers: {
-                    'Authorization': `Bearer ${token}`,
-                    'Content-Type': 'application/json'
-                }
-            } : {
-                headers: {
-                    'Content-Type': 'application/json'
-                }
+            const config = {
+                headers: { 'Content-Type': 'application/json' }
             };
+            
+            if (token) {
+                config.headers.Authorization = `Bearer ${token}`;
+            }
             
             const reviewPayload = {
                 userName: user ? user.name : 'Anonymous',
                 comment: newReview.comment,
-                rating: Number(newReview.rating)
+                rating: Number(newReview.rating) || null
             };
             
             const response = await axios.post(
