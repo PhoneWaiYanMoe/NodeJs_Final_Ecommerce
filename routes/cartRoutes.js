@@ -153,6 +153,11 @@ router.get('/summary', [verifyToken, userRequired], async (req, res) => {
         appliedDiscountCode = discount.code;
         discountPercentage = discount.discountPercentage;
       }
+      else {
+        // Clear invalid or expired discount code
+        delete req.user.discountCode;
+        delete req.user.discountPercentage;
+      }
     }
 
     const taxes = (subtotal - discountAmount) * TAX_RATE;
