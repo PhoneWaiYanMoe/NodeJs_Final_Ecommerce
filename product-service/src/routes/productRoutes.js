@@ -12,7 +12,8 @@ import {
     getBestSellers,
     getCategories,
     updateInventory,
-    getNewProducts
+    getNewProducts,
+    incrementSalesCount,
 } from '../controllers/productController.js';
 
 const router = express.Router();
