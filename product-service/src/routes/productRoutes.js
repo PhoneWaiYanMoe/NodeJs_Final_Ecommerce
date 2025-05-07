@@ -32,4 +32,7 @@ router.put('/:id', authenticateAdmin, updateProduct);
 router.delete('/:id', authenticateAdmin, deleteProduct);
 router.post('/:id/inventory', authenticateAdmin, updateInventory);
 
+// New route to increment salesCount
+router.patch('/:id/sales-count', incrementSalesCount);
+
 export default router;
