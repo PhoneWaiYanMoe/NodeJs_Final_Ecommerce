@@ -204,13 +204,17 @@ router.post('/apply-discount', [verifyToken, userRequired], async (req, res) => 
     if (!cartItems.length) {
       return res.status(400).json({ error: 'Cart is empty' });
     }
-
+    // Increment the usage of the discount code
+    discount.timesUsed += 1;
+    await discount.save();
+    // Store the discount code in req.user (simulating session storage)
+    req.user.discountCode = code;
+    req.user.discountPercentage = discount.discountPercentage; // Store the percentage too
+    
     const subtotal = cartItems.reduce((sum, item) => sum + item.price * item.quantity, 0);
     const discountAmount = (discount.discountPercentage / 100) * subtotal;
     const taxes = (subtotal - discountAmount) * TAX_RATE;
     const total = (subtotal - discountAmount) + taxes + SHIPPING_FEE;
-
-    req.user.discountCode = code;
 
     res.status(200).json({
       subtotal: parseFloat(subtotal.toFixed(2)),
