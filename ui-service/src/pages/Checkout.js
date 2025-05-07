@@ -23,7 +23,6 @@ const Checkout = () => {
       navigate('/login');
       return;
     }
-    // Use the cartSummary from location.state if available, otherwise fetch it
     if (!cartSummary || !cartSummary.items || cartSummary.items.length === 0) {
       fetchCartSummary();
     }
@@ -38,7 +37,7 @@ const Checkout = () => {
         headers: {
           Authorization: `Bearer ${token}`,
         },
-        params: { discountCode }, // Pass discountCode to apply it
+        params: { discountCode },
       });
 
       if (response.data.message === 'Cart is empty') {
@@ -73,43 +72,31 @@ const Checkout = () => {
       const token = localStorage.getItem('token');
       if (!token) throw new Error('No token found');
 
-      // Process the checkout with discountCode
       const checkoutResponse = await axios.post(
         `${CART_API_URL}/checkout`,
         { paymentDetails, discountCode },
         { headers: { Authorization: `Bearer ${token}` } }
       );
 
-      // After successful checkout, update salesCount and stock for each product
       const updatePromises = cartSummary.items.map(async (item) => {
         try {
-          // Update salesCount
+          // Parse the combined productId,variantName string
+          const [productId, variantName] = item.productId.split(',');
+
+          // Update salesCount for the product
           await axios.patch(
-            `${PRODUCTS_API_URL}/${item.productId}/sales-count`,
+            `${PRODUCTS_API_URL}/${productId}/sales-count`,
             { quantity: item.quantity },
             { headers: { Authorization: `Bearer ${token}` } }
           );
 
-          // Fetch the product to get its variants
-          const productResponse = await axios.get(`${PRODUCTS_API_URL}/${item.productId}`);
-          const product = productResponse.data;
-
-          // For simplicity, assume we're using the first variant (e.g., "Color: Black")
-          // If your cart supports selecting variants, you should include variantName in cart items
-          const variantName = product.variants[0]?.name || null;
-
-          if (!variantName) {
-            console.error(`No variants found for product ${item.productId}`);
-            return;
-          }
-
-          // Update stock using the existing update-stock endpoint
+          // Update stock for the specific variant
           await axios.post(
             `${PRODUCTS_API_URL}/update-stock`,
             {
               items: [
                 {
-                  productId: item.productId,
+                  productId: productId,
                   variantName: variantName,
                   quantity: item.quantity,
                 },
@@ -122,7 +109,6 @@ const Checkout = () => {
         }
       });
 
-      // Wait for all updates to complete
       await Promise.all(updatePromises);
 
       setMessage(`Checkout successful! Order ID: ${checkoutResponse.data.orderId}`);
@@ -145,6 +131,12 @@ const Checkout = () => {
     } else {
       navigate('/login');
     }
+  };
+
+  // Function to format the productId(variantName) display
+  const formatProductDisplay = (productId) => {
+    const [id, variant] = productId.split(',');
+    return `${id} (${variant})`;
   };
 
   return (
@@ -279,7 +271,7 @@ const Checkout = () => {
             <div style={{
               backgroundColor: '#1A1A1A',
               padding: '20px',
-              borderRadius: '10xpath: /cart/summarypx'
+              borderRadius: '10px'
             }}>
               <h3 style={{
                 fontSize: '24px',
@@ -288,6 +280,49 @@ const Checkout = () => {
               }}>
                 Order Summary
               </h3>
+              {/* Display items in the order summary */}
+              <table style={{
+                width: '100%',
+                borderCollapse: 'collapse',
+                color: '#FFFFFF',
+                fontFamily: "'Roboto', sans-serif",
+                marginBottom: '15px'
+              }}>
+                <thead>
+                  <tr style={{ borderBottom: '1px solid #D4AF37' }}>
+                    <th style={{ padding: '10px', textAlign: 'left' }}>
+                      Product ID (Variant)
+                    </th>
+                    <th style={{ padding: '10px', textAlign: 'left' }}>
+                      Quantity
+                    </th>
+                    <th style={{ padding: '10px', textAlign: 'left' }}>
+                      Price
+                    </th>
+                    <th style={{ padding: '10px', textAlign: 'left' }}>
+                      Total
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {cartSummary.items.map((item, index) => (
+                    <tr key={index} style={{ borderBottom: '1px solid #333333' }}>
+                      <td style={{ padding: '10px' }}>
+                        {formatProductDisplay(item.productId)}
+                      </td>
+                      <td style={{ padding: '10px' }}>
+                        {item.quantity}
+                      </td>
+                      <td style={{ padding: '10px' }}>
+                        ${item.price.toFixed(2)}
+                      </td>
+                      <td style={{ padding: '10px' }}>
+                        ${(item.price * item.quantity).toFixed(2)}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
               <p style={{ fontSize: '16px', color: '#E0E0E0', marginBottom: '15px' }}>
                 Subtotal: ${cartSummary.subtotal?.toFixed(2) || '0.00'}
               </p>
