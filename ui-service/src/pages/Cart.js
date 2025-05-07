@@ -132,9 +132,8 @@ const Cart = () => {
   };
 
   // Function to format the productId(variantName) display
-  const formatProductDisplay = (productId) => {
-    const [id, variant] = productId.split(',');
-    return `${id} (${variant})`;
+  const formatProductDisplay = (item) => {
+    return `${item.productId} (${item.variantName})`;
   };
 
   return (
@@ -308,7 +307,7 @@ const Cart = () => {
                     key={item.id}
                     style={{ borderBottom: "1px solid #333333" }}
                   >
-                    <td style={{ padding: "10px" }}>{formatProductDisplay(item.productId)}</td>
+                    <td style={{ padding: "10px" }}>{formatProductDisplay(item)}</td>
                     <td style={{ padding: "10px" }}>
                       <input
                         type="number"
