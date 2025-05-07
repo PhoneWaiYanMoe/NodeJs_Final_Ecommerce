@@ -91,8 +91,7 @@ const ProductDetails = () => {
             if (user && newReview.rating > 0) {
                 const reviewPayload = {
                     comment: newReview.comment,
-                    rating: Number(newReview.rating),
-                    userName: user.name
+                    rating: Number(newReview.rating)
                 };
                 
                 const response = await axios.post(
@@ -107,7 +106,15 @@ const ProductDetails = () => {
                 );
                 
                 if (response.data && response.data.review) {
-                    setReviews(prevReviews => [...prevReviews, response.data.review]);
+                    // Use functional update to prevent stale state
+                    setReviews(prevReviews => {
+                        // Check if review already exists to prevent duplicates
+                        const exists = prevReviews.some(rev => 
+                            rev.comment === response.data.review.comment && 
+                            rev.createdAt === response.data.review.createdAt
+                        );
+                        return exists ? prevReviews : [...prevReviews, response.data.review];
+                    });
                     setNewReview({ comment: '', rating: 0 });
                     setReviewSuccess('Review submitted successfully!');
                     setTimeout(() => setReviewSuccess(''), 3000);
@@ -116,8 +123,7 @@ const ProductDetails = () => {
                 // For anonymous comments (no rating) or logged-in users without rating
                 const reviewPayload = {
                     comment: newReview.comment,
-                    userName: user ? user.name : 'Anonymous',
-                    rating: null
+                    userName: user ? user.name : 'Anonymous'
                 };
                 
                 const response = await axios.post(
@@ -131,7 +137,14 @@ const ProductDetails = () => {
                 );
                 
                 if (response.data && response.data.review) {
-                    setReviews(prevReviews => [...prevReviews, response.data.review]);
+                    // Use functional update to prevent stale state and check for duplicates
+                    setReviews(prevReviews => {
+                        const exists = prevReviews.some(rev => 
+                            rev.comment === response.data.review.comment && 
+                            rev.createdAt === response.data.review.createdAt
+                        );
+                        return exists ? prevReviews : [...prevReviews, response.data.review];
+                    });
                     setNewReview({ comment: '', rating: 0 });
                     setReviewSuccess('Comment submitted successfully!');
                     setTimeout(() => setReviewSuccess(''), 3000);
@@ -140,8 +153,14 @@ const ProductDetails = () => {
         } catch (error) {
             console.error('Error submitting review:', error);
             
-            if (error.response?.status === 401 && newReview.rating > 0) {
-                setReviewError('You need to be logged in to submit a rated review. You can still submit comments without rating.');
+            if (error.response?.status === 401) {
+                if (newReview.rating > 0) {
+                    setReviewError('You need to be logged in to submit a rated review. You can still submit comments without rating.');
+                    // Clear the rating but keep the comment
+                    setNewReview(prev => ({ ...prev, rating: 0 }));
+                } else {
+                    setReviewError('Failed to submit review. Please try again.');
+                }
             } else {
                 setReviewError('Failed to submit review. Please try again.');
             }
