@@ -6,6 +6,7 @@ const orderSchema = new Schema({
   sessionId: { type: String, default: null },
   items: [{
     productId: { type: String, required: true },
+    variantName: { type: String, default: 'Default' }, // Add variantName field
     quantity: { type: Number, required: true },
     price: { type: Number, required: true }
   }],
