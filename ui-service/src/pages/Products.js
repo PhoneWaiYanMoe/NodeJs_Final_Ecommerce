@@ -18,6 +18,7 @@ const Products = () => {
   const [sort, setSort] = useState({ sortBy: 'name', order: 'asc' });
 
   const API_URL = 'https://product-management-soyo.onrender.com/api/products';
+  const CATEGORIES_API_URL = 'https://product-management-soyo.onrender.com/api/categories';
   const { user, logout } = useContext(AuthContext);
   const navigate = useNavigate();
   const location = useLocation();
@@ -34,11 +35,12 @@ const Products = () => {
     }));
     setCurrentPage(pageFromUrl);
 
-    // Fetch categories
+    // Fetch categories from the Category collection
     const fetchCategories = async () => {
       try {
-        const response = await axios.get(`${API_URL}/categories`);
-        setCategories(Array.isArray(response.data) ? response.data : []);
+        const response = await axios.get(CATEGORIES_API_URL);
+        const categoryNames = Array.isArray(response.data) ? response.data.map(category => category.name) : [];
+        setCategories(categoryNames);
       } catch (error) {
         console.error('Error fetching categories:', error);
         setCategories([]);

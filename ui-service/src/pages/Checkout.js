@@ -11,6 +11,7 @@ const Checkout = () => {
         expiryDate: '',
         cvv: ''
     });
+    const [cartSummary, setCartSummary] = useState(null);
     const [message, setMessage] = useState('');
 
     const CART_API_URL = 'https://nodejs-final-ecommerce-1.onrender.com/cart';
@@ -18,8 +19,33 @@ const Checkout = () => {
     useEffect(() => {
         if (!user) {
             navigate('/login');
+            return;
         }
+        fetchCartSummary();
     }, [user, navigate]);
+
+    const fetchCartSummary = async () => {
+        try {
+            const token = localStorage.getItem("token");
+            if (!token) throw new Error("No token found");
+
+            const response = await axios.get(`${CART_API_URL}/summary`, {
+                headers: {
+                    Authorization: `Bearer ${token}`,
+                },
+            });
+
+            if (response.data.message === "Cart is empty") {
+                setCartSummary({ items: [] });
+                setMessage("Your cart is empty. Please add items to proceed.");
+            } else {
+                setCartSummary(response.data);
+            }
+        } catch (error) {
+            console.error("Error fetching cart summary:", error);
+            setMessage("Failed to load cart summary. Please try again.");
+        }
+    };
 
     const handlePaymentChange = (e) => {
         const { name, value } = e.target;
@@ -27,6 +53,11 @@ const Checkout = () => {
     };
 
     const handleCheckout = async () => {
+        if (!cartSummary || !cartSummary.items || cartSummary.items.length === 0) {
+            setMessage("Your cart is empty. Please add items to proceed.");
+            return;
+        }
+
         if (!paymentDetails.cardNumber || !paymentDetails.expiryDate || !paymentDetails.cvv) {
             setMessage('Please fill in all payment details.');
             return;
@@ -198,6 +229,72 @@ const Checkout = () => {
                     maxWidth: '600px',
                     margin: '0 auto'
                 }}>
+                    {/* Order Summary */}
+                    {cartSummary && cartSummary.items && cartSummary.items.length > 0 && (
+                        <div style={{
+                            backgroundColor: '#1A1A1A',
+                            padding: '20px',
+                            borderRadius: '10px'
+                        }}>
+                            <h3 style={{
+                                fontSize: '24px',
+                                color: '#D4AF37',
+                                marginBottom: '15px'
+                            }}>
+                                Order Summary
+                            </h3>
+                            <p
+                                style={{
+                                    fontSize: "16px",
+                                    color: "#E0E0E0",
+                                    marginBottom: "15px",
+                                }}
+                            >
+                                Subtotal: ${cartSummary.subtotal?.toFixed(2) || "0.00"}
+                            </p>
+                            {cartSummary.discountApplied > 0 && (
+                                <p
+                                    style={{
+                                        fontSize: "16px",
+                                        color: "#D4AF37",
+                                        marginBottom: "15px",
+                                    }}
+                                >
+                                    Discount ({cartSummary.discountCode} - {cartSummary.discountPercentage}%): -$
+                                    {cartSummary.discountApplied?.toFixed(2) || "0.00"}
+                                </p>
+                            )}
+                            <p
+                                style={{
+                                    fontSize: "16px",
+                                    color: "#E0E0E0",
+                                    marginBottom: "15px",
+                                }}
+                            >
+                                Taxes: ${cartSummary.taxes?.toFixed(2) || "0.00"}
+                            </p>
+                            <p
+                                style={{
+                                    fontSize: "16px",
+                                    color: "#E0E0E0",
+                                    marginBottom: "15px",
+                                }}
+                            >
+                                Shipping Fee: ${cartSummary.shippingFee?.toFixed(2) || "0.00"}
+                            </p>
+                            <p
+                                style={{
+                                    fontSize: "18px",
+                                    fontWeight: "bold",
+                                    color: "#D4AF37",
+                                    marginBottom: "20px",
+                                }}
+                            >
+                                Total: ${cartSummary.total?.toFixed(2) || "0.00"}
+                            </p>
+                        </div>
+                    )}
+
                     {/* Payment Details */}
                     <div style={{
                         backgroundColor: '#1A1A1A',
