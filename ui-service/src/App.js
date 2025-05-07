@@ -10,6 +10,7 @@ import Register from './pages/Register';
 import Login from './pages/Login';
 import Checkout from './pages/Checkout';
 import Profile from './pages/Profile';
+import OrderHistory from './pages/OrderHistory';
 
 // Create Auth Context
 export const AuthContext = createContext();
@@ -114,6 +115,11 @@ function App() {
           <Route path="/checkout" element={
             <ProtectedRoute>
               <Checkout />
+            </ProtectedRoute>
+          } />
+          <Route path="/orders" element={
+            <ProtectedRoute>
+              <OrderHistory />
             </ProtectedRoute>
           } />
           <Route path="/register" element={<Register />} />
