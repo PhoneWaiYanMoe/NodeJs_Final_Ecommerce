@@ -7,8 +7,10 @@ const LandingPage = () => {
     'New Products': [],
     'Best Sellers': [],
     Laptops: [],
-    Monitors: [],
+    Accessories: [],
     'Hard Drives': [],
+    'Monitors': [],
+
   });
   const API_URL = 'https://product-management-soyo.onrender.com/api/products';
 
