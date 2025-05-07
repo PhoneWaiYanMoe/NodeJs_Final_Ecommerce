@@ -379,9 +379,9 @@ router.get('/session', verifyToken, async (req, res) => {
   }
 });
 
-// Route for users to update their own profile
+// Updated route for users to update their own profile
 router.put('/profile', verifyToken, userSessionRequired, async (req, res) => {
-  const { name, password, shippingAddress, shippingAddressCollection } = req.body;
+  const { name, shippingAddressCollection, oldPassword, newPassword, confirmPassword } = req.body;
 
   try {
     const user = await User.findById(req.user.id);
@@ -389,15 +389,38 @@ router.put('/profile', verifyToken, userSessionRequired, async (req, res) => {
       return res.status(404).json({ message: 'User not found' });
     }
 
-    user.name = name || user.name;
-    if (password) {
-      user.password = await bcrypt.hash(password, 10);
+    // Update name if provided
+    if (name !== undefined) {
+      user.name = name;
     }
-    if (shippingAddress) {
-      user.shippingAddress = shippingAddress;
+
+    // Handle shipping address collection (append new addresses)
+    if (shippingAddressCollection && Array.isArray(shippingAddressCollection)) {
+      const newAddresses = shippingAddressCollection.filter(address => 
+        !user.shippingAddressCollection.some(existing => 
+          JSON.stringify(existing) === JSON.stringify(address)
+        )
+      );
+      if (newAddresses.length > 0) {
+        user.shippingAddressCollection = [...user.shippingAddressCollection, ...newAddresses];
+      }
     }
-    if (shippingAddressCollection) {
-      user.shippingAddressCollection = shippingAddressCollection;
+
+    // Handle password change
+    if (oldPassword && newPassword && confirmPassword) {
+      const isMatch = await bcrypt.compare(oldPassword, user.password);
+      if (!isMatch) {
+        return res.status(401).json({ message: 'Old password is incorrect' });
+      }
+      if (newPassword !== confirmPassword) {
+        return res.status(400).json({ message: 'New password and confirmation do not match' });
+      }
+      if (newPassword === oldPassword) {
+        return res.status(400).json({ message: 'New password cannot be the same as the old password' });
+      }
+      user.password = await bcrypt.hash(newPassword, 10);
+    } else if ((oldPassword || newPassword || confirmPassword) && !(oldPassword && newPassword && confirmPassword)) {
+      return res.status(400).json({ message: 'All password fields (old, new, and confirm) are required for password change' });
     }
 
     await user.save();
