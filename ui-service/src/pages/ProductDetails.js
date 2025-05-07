@@ -90,59 +90,61 @@ const ProductDetails = () => {
         }
         
         try {
-            const token = localStorage.getItem('token');
-            
-            // Prepare the review payload
-            const reviewPayload = {
-                userName: user ? user.name : 'Anonymous',
-                comment: newReview.comment,
-                rating: Number(newReview.rating) || null
-            };
-            
-            // Make request with axios defaults which should include the token
-            // This matches how other parts of the app handle authentication
-            const response = await axios.post(
-                `${API_URL}/api/products/${id}/review`,
-                reviewPayload
-            );
-            
-            // Update reviews with the server response
-            if (response.data && response.data.review) {
-                setReviews([...reviews, response.data.review]);
-            } else {
-                // If the response format is different, create a review object from our payload
-                const newReviewObj = {
-                    ...reviewPayload,
-                    createdAt: new Date().toISOString()
-                };
-                setReviews([...reviews, newReviewObj]);
-            }
-            
-            // Reset form
-            setNewReview({ comment: '', rating: 0 });
-            setReviewSuccess('Review submitted successfully!');
-            
-            // Clear success message after 3 seconds
-            setTimeout(() => {
-                setReviewSuccess('');
-            }, 3000);
-            
-        } catch (error) {
-            console.error('Error submitting review:', error);
-            
-            if (error.response?.status === 401) {
-                // Handle unauthorized error - likely not logged in
-                setReviewError('You need to be logged in to submit a rated review. You can still submit comments anonymously.');
-                
-                // Try to submit as anonymous if there's no token
-                if (!localStorage.getItem('token')) {
-                    try {
-                        const anonymousReview = {
-                            userName: 'Anonymous',
-                            comment: newReview.comment,
-                            rating: null
+            // Check if user is defined
+            if (user && newReview.rating) {
+                // For authenticated users with ratings
+                try {
+                    // Directly use the authorization header for this specific API endpoint
+                    // The product-service API might have different auth requirements than other services
+                    const token = localStorage.getItem('token');
+                    console.log("Using token for review:", token ? "Token exists" : "No token found");
+                    
+                    const reviewPayload = {
+                        userName: user.name,
+                        comment: newReview.comment,
+                        rating: Number(newReview.rating)
+                    };
+                    
+                    const response = await axios({
+                        method: 'post',
+                        url: `${API_URL}/api/products/${id}/review`,
+                        data: reviewPayload,
+                        headers: {
+                            'Authorization': `Bearer ${token}`,
+                            'Content-Type': 'application/json'
+                        }
+                    });
+                    
+                    // Update reviews with the server response
+                    if (response.data && response.data.review) {
+                        setReviews([...reviews, response.data.review]);
+                    } else {
+                        const newReviewObj = {
+                            ...reviewPayload,
+                            createdAt: new Date().toISOString()
                         };
-                        
+                        setReviews([...reviews, newReviewObj]);
+                    }
+                    
+                    // Reset form
+                    setNewReview({ comment: '', rating: 0 });
+                    setReviewSuccess('Review submitted successfully!');
+                    
+                    setTimeout(() => {
+                        setReviewSuccess('');
+                    }, 3000);
+                } catch (authError) {
+                    console.error('Error submitting authenticated review:', authError);
+                    setReviewError('Unable to submit as a logged-in user. Your session may have expired.');
+                    
+                    // If authentication failed, try as anonymous instead
+                    const anonymousReview = {
+                        userName: 'Anonymous',
+                        comment: newReview.comment,
+                        rating: null
+                    };
+                    
+                    try {
                         await axios.post(
                             `${API_URL}/api/products/${id}/review`, 
                             anonymousReview
@@ -157,21 +159,46 @@ const ProductDetails = () => {
                         setReviews([...reviews, anonReviewObj]);
                         setNewReview({ comment: '', rating: 0 });
                         setReviewError('');
-                        setReviewSuccess('Anonymous review submitted successfully!');
+                        setReviewSuccess('Submitted as anonymous review due to authentication issue.');
                         
-                        // Clear success message after 3 seconds
                         setTimeout(() => {
                             setReviewSuccess('');
                         }, 3000);
-                        
-                    } catch (retryError) {
-                        console.error('Error submitting anonymous review:', retryError);
+                    } catch (anonError) {
+                        console.error('Error submitting fallback anonymous review:', anonError);
                         setReviewError('Failed to submit review. Please try again later.');
                     }
                 }
             } else {
-                setReviewError('Failed to submit review. Please try again.');
+                // For anonymous users without ratings
+                const anonymousReview = {
+                    userName: 'Anonymous',
+                    comment: newReview.comment,
+                    rating: null
+                };
+                
+                await axios.post(
+                    `${API_URL}/api/products/${id}/review`, 
+                    anonymousReview
+                );
+                
+                // Update UI with anonymous review
+                const anonReviewObj = {
+                    ...anonymousReview,
+                    createdAt: new Date().toISOString()
+                };
+                
+                setReviews([...reviews, anonReviewObj]);
+                setNewReview({ comment: '', rating: 0 });
+                setReviewSuccess('Anonymous review submitted successfully!');
+                
+                setTimeout(() => {
+                    setReviewSuccess('');
+                }, 3000);
             }
+        } catch (error) {
+            console.error('Error submitting review:', error);
+            setReviewError('Failed to submit review. Please try again later.');
         }
     };
 
