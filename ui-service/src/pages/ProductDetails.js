@@ -90,26 +90,31 @@ const ProductDetails = () => {
         }
         
         try {
-            const token = localStorage.getItem('token');
-            const config = {
-                headers: { 'Content-Type': 'application/json' }
-            };
-            
-            if (token) {
-                config.headers.Authorization = `Bearer ${token}`;
+            // For rated reviews, ensure user is logged in
+            if (newReview.rating && !user) {
+                setReviewError('You need to be logged in to submit a rated review.');
+                return;
             }
             
+            const token = localStorage.getItem('token');
             const reviewPayload = {
                 userName: user ? user.name : 'Anonymous',
                 comment: newReview.comment,
                 rating: Number(newReview.rating) || null
             };
             
-            const response = await axios.post(
-                `${API_URL}/api/products/${id}/review`,
-                reviewPayload,
-                config
-            );
+            // When user is logged in, we need to include the token
+            const response = await axios({
+                method: 'post',
+                url: `${API_URL}/api/products/${id}/review`,
+                data: reviewPayload,
+                headers: token ? {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                } : {
+                    'Content-Type': 'application/json'
+                }
+            });
             
             // Update reviews with the server response
             if (response.data && response.data.review) {
