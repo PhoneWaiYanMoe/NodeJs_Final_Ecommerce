@@ -24,11 +24,14 @@ const Profile = () => {
   const [success, setSuccess] = useState('');
   const navigate = useNavigate();
 
+  // Initialize state only once on mount
   useEffect(() => {
-    setFormData({
-      name: user?.name || '',
-      shippingAddressCollection: user?.shippingAddressCollection || [],
-    });
+    if (user) {
+      setFormData({
+        name: user.name || '',
+        shippingAddressCollection: user.shippingAddressCollection || [],
+      });
+    }
   }, [user]);
 
   const handleInputChange = (e) => {
@@ -52,6 +55,18 @@ const Profile = () => {
       !newAddress.country
     ) {
       setError('All address fields are required.');
+      return;
+    }
+    // Check for duplicates before adding
+    const isDuplicate = formData.shippingAddressCollection.some(address =>
+      address.street === newAddress.street &&
+      address.city === newAddress.city &&
+      address.state === newAddress.state &&
+      address.zip === newAddress.zip &&
+      address.country === newAddress.country
+    );
+    if (isDuplicate) {
+      setError('This address already exists.');
       return;
     }
     setFormData({
@@ -435,7 +450,7 @@ const Profile = () => {
             color: '#000000',
             border: 'none',
             borderRadius: '5px',
-            fontFamily: "'Roboto', sans-serif'",
+            fontFamily: "'Roboto', sans-serif",
             cursor: 'pointer',
             transition: 'background-color 0.3s',
             marginBottom: '20px',
@@ -454,7 +469,7 @@ const Profile = () => {
             color: '#000000',
             border: 'none',
             borderRadius: '5px',
-            fontFamily: "'Roboto', sans-serif'",
+            fontFamily: "'Roboto', sans-serif",
             cursor: 'pointer',
             transition: 'background-color 0.3s',
             marginBottom: '20px',
