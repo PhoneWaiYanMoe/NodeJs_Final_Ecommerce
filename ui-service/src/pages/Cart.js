@@ -69,7 +69,7 @@ const Cart = () => {
       const token = localStorage.getItem("token");
       if (!token) throw new Error("No token found");
 
-      await axios.put(
+      await axios.post(
         `${CART_API_URL}/update/${itemId}`,
         { quantity: newQuantity },
         { headers: { Authorization: `Bearer ${token}` } }
@@ -114,7 +114,7 @@ const Cart = () => {
       // Refresh cart summary to reflect the applied discount
       await fetchCartSummary();
 
-      setMessage("Discount applied successfully!");
+      setMessage(`Discount applied successfully! (${discountCode})`);
       setTimeout(() => setMessage(""), 3000);
       setDiscountCode("");
     } catch (error) {
@@ -248,7 +248,7 @@ const Cart = () => {
           <p
             style={{
               fontSize: "16px",
-              color: message.includes("Failed") ? "#FF5555" : "#D4AF37",
+              color: message.includes("Failed") || message.includes("Invalid") ? "#FF5555" : "#D4AF37",
               textAlign: "center",
               marginBottom: "20px",
             }}
@@ -302,7 +302,7 @@ const Cart = () => {
               <tbody>
                 {cartSummary.items.map((item) => (
                   <tr
-                    key={item._id}
+                    key={item.id}
                     style={{ borderBottom: "1px solid #333333" }}
                   >
                     <td style={{ padding: "10px" }}>{item.productId}</td>
@@ -312,7 +312,7 @@ const Cart = () => {
                         value={item.quantity}
                         min="1"
                         onChange={(e) =>
-                          handleUpdateQuantity(item._id, Number(e.target.value))
+                          handleUpdateQuantity(item.id, Number(e.target.value))
                         }
                         style={{
                           width: "60px",
@@ -332,7 +332,7 @@ const Cart = () => {
                     </td>
                     <td style={{ padding: "10px" }}>
                       <button
-                        onClick={() => handleRemoveItem(item._id)}
+                        onClick={() => handleRemoveItem(item.id)}
                         style={{
                           padding: "5px 10px",
                           backgroundColor: "#FF5555",
@@ -439,16 +439,18 @@ const Cart = () => {
               Subtotal: ${cartSummary.subtotal?.toFixed(2) || "0.00"}
             </p>
             {cartSummary.discountApplied > 0 && (
-              <p
-                style={{
-                  fontSize: "16px",
-                  color: "#D4AF37",
-                  marginBottom: "15px",
-                }}
-              >
-                Discount Applied: -$
-                {cartSummary.discountApplied?.toFixed(2) || "0.00"}
-              </p>
+              <>
+                <p
+                  style={{
+                    fontSize: "16px",
+                    color: "#D4AF37",
+                    marginBottom: "15px",
+                  }}
+                >
+                  Discount ({cartSummary.discountCode} - {cartSummary.discountPercentage}%): -$
+                  {cartSummary.discountApplied?.toFixed(2) || "0.00"}
+                </p>
+              </>
             )}
             <p
               style={{
