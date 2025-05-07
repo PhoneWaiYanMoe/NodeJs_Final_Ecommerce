@@ -79,8 +79,8 @@ const Checkout = () => {
             const updateSalesPromises = cartSummary.items.map(async (item) => {
                 try {
                     await axios.patch(
-                        `${PRODUCTS_API_URL}/${item.productId}`,
-                        { $inc: { salesCount: item.quantity } }, // Increment salesCount by quantity
+                        `${PRODUCTS_API_URL}/${item.productId}/sales-count`,
+                        { quantity: item.quantity }, // Send quantity to increment
                         { headers: { Authorization: `Bearer ${token}` } }
                     );
                 } catch (error) {
