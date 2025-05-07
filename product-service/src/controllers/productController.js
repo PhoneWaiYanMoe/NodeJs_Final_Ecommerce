@@ -1,6 +1,5 @@
 import Product from "../models/productModel.js";
 import Category from "../models/categoryModel.js";
-
 import axios from "axios";
 
 // Helper function to validate category
@@ -434,5 +433,25 @@ export const updateInventory = async (req, res) => {
     res
       .status(500)
       .json({ message: "Error updating inventory", error: error.message });
+  }
+};
+
+// New method to increment salesCount
+export const incrementSalesCount = async (req, res) => {
+  const { id } = req.params;
+  const { quantity = 1 } = req.body; // Default to 1 if quantity not provided
+
+  try {
+    const product = await Product.findById(id);
+    if (!product) {
+      return res.status(404).json({ message: "Product not found" });
+    }
+
+    product.salesCount += Number(quantity);
+    await product.save();
+
+    res.status(200).json({ message: "Sales count updated successfully", product });
+  } catch (error) {
+    res.status(500).json({ message: "Error updating sales count", error: error.message });
   }
 };
