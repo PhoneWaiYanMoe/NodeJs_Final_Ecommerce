@@ -23,19 +23,22 @@ const Products = () => {
   const navigate = useNavigate();
   const location = useLocation();
 
+  // Sync filters.category with URL on navigation
   useEffect(() => {
-    // Parse query parameters from URL on mount and navigation
     const searchParams = new URLSearchParams(location.search);
-    const categoryFromUrl = searchParams.get('category');
+    const categoryFromUrl = searchParams.get('category') || '';
     const pageFromUrl = parseInt(searchParams.get('page'), 10) || 1;
 
+    // Update filters and page based on URL
     setFilters((prev) => ({
       ...prev,
-      category: categoryFromUrl || '',
+      category: categoryFromUrl,
     }));
     setCurrentPage(pageFromUrl);
+  }, [location.search]); // Re-run whenever the URL changes
 
-    // Fetch categories from the Category collection
+  // Fetch categories (only once on mount)
+  useEffect(() => {
     const fetchCategories = async () => {
       try {
         const response = await axios.get(CATEGORIES_API_URL);
@@ -47,46 +50,43 @@ const Products = () => {
       }
     };
     fetchCategories();
+  }, []); // Empty dependency array to run only on mount
 
-    // Fetch products on initial load or filter change
-    fetchProducts();
-  }, [location.search]); // Trigger on URL change
-
-  const fetchProducts = async () => {
-    try {
-      const params = {
-        page: currentPage,
-        limit: 5,
-        sortBy: sort.sortBy,
-        order: sort.order,
-        ...filters,
-      };
-      const response = await axios.get(`${API_URL}`, { params });
-      setProducts(response.data.products || []);
-      setTotalPages(response.data.totalPages || 1);
-    } catch (error) {
-      console.error('Error fetching products:', error);
-      setProducts([]);
-    }
-  };
-
+  // Fetch products when page, filters, or sort changes
   useEffect(() => {
-    // Refetch products when page, filters, or sort changes
+    const fetchProducts = async () => {
+      try {
+        const params = {
+          page: currentPage,
+          limit: 5,
+          sortBy: sort.sortBy,
+          order: sort.order,
+          ...filters,
+        };
+        const response = await axios.get(`${API_URL}`, { params });
+        setProducts(response.data.products || []);
+        setTotalPages(response.data.totalPages || 1);
+      } catch (error) {
+        console.error('Error fetching products:', error);
+        setProducts([]);
+      }
+    };
     fetchProducts();
-  }, [currentPage, filters, sort]);
+  }, [currentPage, filters, sort]); // Re-fetch products when these change
 
   const handleFilterChange = (e) => {
     const { name, value } = e.target;
     setFilters((prev) => ({ ...prev, [name]: value }));
     setCurrentPage(1); // Reset to first page on filter change
-    updateUrl();
+    // Update URL after state change
+    setTimeout(() => updateUrl(1), 0); // Ensure state updates before URL change
   };
 
   const handleSortChange = (e) => {
     const [sortBy, order] = e.target.value.split(':');
     setSort({ sortBy, order });
     setCurrentPage(1); // Reset to first page on sort change
-    updateUrl();
+    setTimeout(() => updateUrl(1), 0);
   };
 
   const handlePageChange = (page) => {
@@ -99,7 +99,7 @@ const Products = () => {
       category: filters.category || '',
       page: page.toString(),
     });
-    navigate(`/products?${searchParams.toString()}`);
+    navigate(`/products?${searchParams.toString()}`, { replace: true });
   };
 
   const handleAuthAction = async () => {

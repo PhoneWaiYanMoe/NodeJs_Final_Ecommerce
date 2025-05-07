@@ -106,7 +106,6 @@ const Checkout = () => {
             minHeight: '100vh',
             fontFamily: "'Playfair Display', serif"
         }}>
-            {/* Header */}
             <header style={{
                 backgroundColor: '#000000',
                 padding: '20px 40px',
@@ -199,7 +198,6 @@ const Checkout = () => {
                 </div>
             </header>
 
-            {/* Main Content */}
             <main style={{ padding: '40px' }}>
                 <h1 style={{
                     fontSize: '36px',
@@ -229,7 +227,6 @@ const Checkout = () => {
                     maxWidth: '600px',
                     margin: '0 auto'
                 }}>
-                    {/* Order Summary */}
                     {cartSummary && cartSummary.items && cartSummary.items.length > 0 && (
                         <div style={{
                             backgroundColor: '#1A1A1A',
@@ -295,7 +292,6 @@ const Checkout = () => {
                         </div>
                     )}
 
-                    {/* Payment Details */}
                     <div style={{
                         backgroundColor: '#1A1A1A',
                         padding: '20px',
@@ -361,7 +357,6 @@ const Checkout = () => {
                         />
                     </div>
 
-                    {/* Submit Button */}
                     <button
                         onClick={handleCheckout}
                         style={{
