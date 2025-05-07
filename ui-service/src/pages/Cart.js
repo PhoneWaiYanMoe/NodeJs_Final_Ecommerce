@@ -47,9 +47,9 @@ const Cart = () => {
       const token = localStorage.getItem("token");
       if (!token) throw new Error("No token found");
 
-      const productId = "507f1f77bcf86cd799439011"; // Replace with dynamic product ID from Products.js
+      const productId = "507f1f77bcf86cd799439011"; // Replace with dynamic product ID
       const quantity = 1;
-      const price = 10.0; // Should be fetched dynamically from product-service
+      const price = 10.0; // Dynamic price from product-service
 
       await axios.post(
         `${CART_API_URL}/add`,
@@ -69,7 +69,7 @@ const Cart = () => {
       const token = localStorage.getItem("token");
       if (!token) throw new Error("No token found");
 
-      await axios.post(
+      await axios.put(
         `${CART_API_URL}/update/${itemId}`,
         { quantity: newQuantity },
         { headers: { Authorization: `Bearer ${token}` } }
@@ -111,9 +111,7 @@ const Cart = () => {
         { headers: { Authorization: `Bearer ${token}` } }
       );
 
-      // Refresh cart summary to reflect the applied discount
       await fetchCartSummary();
-
       setMessage(`Discount applied successfully! (${discountCode})`);
       setTimeout(() => setMessage(""), 3000);
       setDiscountCode("");
@@ -141,7 +139,6 @@ const Cart = () => {
         fontFamily: "'Playfair Display', serif",
       }}
     >
-      {/* Header */}
       <header
         style={{
           backgroundColor: "#000000",
@@ -230,7 +227,6 @@ const Cart = () => {
         </div>
       </header>
 
-      {/* Main Content */}
       <main style={{ padding: "40px" }}>
         <h1
           style={{
@@ -439,18 +435,16 @@ const Cart = () => {
               Subtotal: ${cartSummary.subtotal?.toFixed(2) || "0.00"}
             </p>
             {cartSummary.discountApplied > 0 && (
-              <>
-                <p
-                  style={{
-                    fontSize: "16px",
-                    color: "#D4AF37",
-                    marginBottom: "15px",
-                  }}
-                >
-                  Discount ({cartSummary.discountCode} - {cartSummary.discountPercentage}%): -$
-                  {cartSummary.discountApplied?.toFixed(2) || "0.00"}
-                </p>
-              </>
+              <p
+                style={{
+                  fontSize: "16px",
+                  color: "#D4AF37",
+                  marginBottom: "15px",
+                }}
+              >
+                Discount ({cartSummary.discountCode} - {cartSummary.discountPercentage}%): -$
+                {cartSummary.discountApplied?.toFixed(2) || "0.00"}
+              </p>
             )}
             <p
               style={{
