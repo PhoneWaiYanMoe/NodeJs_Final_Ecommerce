@@ -80,21 +80,50 @@ const Checkout = () => {
         { headers: { Authorization: `Bearer ${token}` } }
       );
 
-      // After successful checkout, update salesCount for each product
-      const updateSalesPromises = cartSummary.items.map(async (item) => {
+      // After successful checkout, update salesCount and stock for each product
+      const updatePromises = cartSummary.items.map(async (item) => {
         try {
+          // Update salesCount
           await axios.patch(
             `${PRODUCTS_API_URL}/${item.productId}/sales-count`,
             { quantity: item.quantity },
             { headers: { Authorization: `Bearer ${token}` } }
           );
+
+          // Fetch the product to get its variants
+          const productResponse = await axios.get(`${PRODUCTS_API_URL}/${item.productId}`);
+          const product = productResponse.data;
+
+          // For simplicity, assume we're using the first variant (e.g., "Color: Black")
+          // If your cart supports selecting variants, you should include variantName in cart items
+          const variantName = product.variants[0]?.name || null;
+
+          if (!variantName) {
+            console.error(`No variants found for product ${item.productId}`);
+            return;
+          }
+
+          // Update stock using the existing update-stock endpoint
+          await axios.post(
+            `${PRODUCTS_API_URL}/update-stock`,
+            {
+              items: [
+                {
+                  productId: item.productId,
+                  variantName: variantName,
+                  quantity: item.quantity,
+                },
+              ],
+            },
+            { headers: { Authorization: `Bearer ${token}` } }
+          );
         } catch (error) {
-          console.error(`Error updating salesCount for product ${item.productId}:`, error);
+          console.error(`Error updating product ${item.productId}:`, error);
         }
       });
 
-      // Wait for all salesCount updates to complete
-      await Promise.all(updateSalesPromises);
+      // Wait for all updates to complete
+      await Promise.all(updatePromises);
 
       setMessage(`Checkout successful! Order ID: ${checkoutResponse.data.orderId}`);
       setTimeout(() => {
@@ -250,7 +279,7 @@ const Checkout = () => {
             <div style={{
               backgroundColor: '#1A1A1A',
               padding: '20px',
-              borderRadius: '10px'
+              borderRadius: '10xpath: /cart/summarypx'
             }}>
               <h3 style={{
                 fontSize: '24px',
