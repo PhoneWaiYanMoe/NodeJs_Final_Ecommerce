@@ -57,9 +57,8 @@ router.post('/add', [verifyToken, userRequired], async (req, res) => {
     return res.status(400).json({ error: 'Missing product_id or price' });
   }
 
-  // Validate product_id as a MongoDB ObjectID
   if (!mongoose.Types.ObjectId.isValid(product_id)) {
-    return res.status(400).json({ error: 'Invalid product_id format. Must be a valid MongoDB ObjectID.' });
+    return res.status(400).json({ error: 'Invalid product_id format' });
   }
 
   try {
@@ -147,7 +146,6 @@ router.get('/summary', [verifyToken, userRequired], async (req, res) => {
     let appliedDiscountCode = null;
     let discountPercentage = 0;
 
-    // Check if a discount code is applied
     if (req.user.discountCode) {
       const discount = await DiscountCode.findOne({ code: req.user.discountCode });
       if (discount && discount.timesUsed < discount.usageLimit) {
@@ -212,7 +210,6 @@ router.post('/apply-discount', [verifyToken, userRequired], async (req, res) => 
     const taxes = (subtotal - discountAmount) * TAX_RATE;
     const total = (subtotal - discountAmount) + taxes + SHIPPING_FEE;
 
-    // Store discount code in the request object for use in checkout
     req.user.discountCode = code;
 
     res.status(200).json({
@@ -239,10 +236,11 @@ router.post('/checkout', [verifyToken, userRequired], async (req, res) => {
   }
 
   try {
-    // Fetch user to get shipping address
+    console.log(`Checkout - User ID: ${req.user.id}, Discount Code: ${req.user.discountCode}`);
+
     const user = await User.findById(req.user.id);
     if (!user) {
-      return res.status(400).json({ error: 'User shipping address not found. Please update your profile in the user service.' });
+      return res.status(400).json({ error: 'User not found' });
     }
 
     const cartIdentifier = getCartIdentifier(req);
@@ -252,14 +250,12 @@ router.post('/checkout', [verifyToken, userRequired], async (req, res) => {
       return res.status(400).json({ error: 'Cart is empty' });
     }
 
-    // Map cart items to order items
     const orderItems = cartItems.map(item => ({
       productId: item.productId,
       quantity: item.quantity,
       price: item.price
     }));
 
-    // Calculate totals
     const subtotal = cartItems.reduce((sum, item) => sum + item.price * item.quantity, 0);
     let discountAmount = 0;
     let appliedDiscountCode = null;
@@ -272,7 +268,6 @@ router.post('/checkout', [verifyToken, userRequired], async (req, res) => {
         await discount.save();
         appliedDiscountCode = discount.code;
       } else {
-        // Clear discountCode if invalid or usage limit reached
         delete req.user.discountCode;
       }
     }
@@ -280,7 +275,6 @@ router.post('/checkout', [verifyToken, userRequired], async (req, res) => {
     const taxes = (subtotal - discountAmount) * TAX_RATE;
     const total = (subtotal - discountAmount) + taxes + SHIPPING_FEE;
 
-    // Create order
     const order = new Order({
       userId: req.user.id,
       items: orderItems,
@@ -295,10 +289,7 @@ router.post('/checkout', [verifyToken, userRequired], async (req, res) => {
     });
     const savedOrder = await order.save();
 
-    // Clear cart
     await CartItem.deleteMany(cartIdentifier);
-
-    // Clear discount
     delete req.user.discountCode;
 
     res.status(201).json({ message: 'Checkout successful', orderId: savedOrder._id.toString() });
