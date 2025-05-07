@@ -84,119 +84,64 @@ const ProductDetails = () => {
             return;
         }
         
-        if (!user && newReview.rating) {
-            setReviewError('You need to be logged in to submit a rated review. You can still submit comments anonymously.');
-            return;
-        }
-        
         try {
-            // For anonymous review (no rating, no user authentication needed)
-            if (!user || !newReview.rating) {
-                const anonymousReview = {
-                    comment: newReview.comment
+            const token = localStorage.getItem('token');
+            
+            // For logged-in users with rating
+            if (user && newReview.rating > 0) {
+                const reviewPayload = {
+                    comment: newReview.comment,
+                    rating: Number(newReview.rating),
+                    userName: user.name
                 };
                 
                 const response = await axios.post(
-                    `${API_URL}/api/products/${id}/review`, 
-                    anonymousReview
+                    `${API_URL}/api/products/${id}/review`,
+                    reviewPayload,
+                    {
+                        headers: {
+                            'Authorization': `Bearer ${token}`,
+                            'Content-Type': 'application/json'
+                        }
+                    }
                 );
                 
                 if (response.data && response.data.review) {
-                    setReviews([...reviews, response.data.review]);
-                } else {
-                    // Fallback if response format is unexpected
-                    const anonReviewObj = {
-                        userName: 'Anonymous',
-                        comment: newReview.comment,
-                        rating: null,
-                        createdAt: new Date().toISOString()
-                    };
-                    setReviews([...reviews, anonReviewObj]);
+                    setReviews(prevReviews => [...prevReviews, response.data.review]);
+                    setNewReview({ comment: '', rating: 0 });
+                    setReviewSuccess('Review submitted successfully!');
+                    setTimeout(() => setReviewSuccess(''), 3000);
                 }
-                
-                setNewReview({ comment: '', rating: 0 });
-                setReviewSuccess('Anonymous review submitted successfully!');
-                setTimeout(() => setReviewSuccess(''), 3000);
-                return;
-            }
-            
-            // For authenticated review with rating
-            const token = localStorage.getItem('token');
-            
-            // Create a minimal payload that matches exactly what the server expects
-            const reviewPayload = {
-                comment: newReview.comment,
-                rating: Number(newReview.rating)
-            };
-            
-            // Make a simple request with standard Authorization header
-            // Since this is for auth-service.onrender.com, we need to match their expected format
-            const response = await axios({
-                method: 'post',
-                url: `${API_URL}/api/products/${id}/review`,
-                data: reviewPayload,
-                headers: {
-                    'Authorization': `Bearer ${token}`,
-                    'Content-Type': 'application/json'
-                }
-            });
-            
-            if (response.data && response.data.review) {
-                setReviews([...reviews, response.data.review]);
             } else {
-                // Fallback for unexpected response format
-                const reviewObj = {
-                    userName: user.name,
+                // For anonymous comments (no rating) or logged-in users without rating
+                const reviewPayload = {
                     comment: newReview.comment,
-                    rating: Number(newReview.rating),
-                    createdAt: new Date().toISOString()
+                    userName: user ? user.name : 'Anonymous',
+                    rating: null
                 };
-                setReviews([...reviews, reviewObj]);
+                
+                const response = await axios.post(
+                    `${API_URL}/api/products/${id}/review`,
+                    reviewPayload,
+                    {
+                        headers: {
+                            'Content-Type': 'application/json'
+                        }
+                    }
+                );
+                
+                if (response.data && response.data.review) {
+                    setReviews(prevReviews => [...prevReviews, response.data.review]);
+                    setNewReview({ comment: '', rating: 0 });
+                    setReviewSuccess('Comment submitted successfully!');
+                    setTimeout(() => setReviewSuccess(''), 3000);
+                }
             }
-            
-            setNewReview({ comment: '', rating: 0 });
-            setReviewSuccess('Review submitted successfully!');
-            setTimeout(() => setReviewSuccess(''), 3000);
-            
         } catch (error) {
             console.error('Error submitting review:', error);
             
-            // If authentication failed for a rated review, try submitting as anonymous
-            if (error.response?.status === 401 && newReview.rating) {
-                setReviewError('You need to be logged in to submit a rated review. Submitting as anonymous comment instead.');
-                
-                // Try submitting as anonymous without rating
-                try {
-                    const anonymousReview = {
-                        comment: newReview.comment
-                    };
-                    
-                    const response = await axios.post(
-                        `${API_URL}/api/products/${id}/review`, 
-                        anonymousReview
-                    );
-                    
-                    if (response.data && response.data.review) {
-                        setReviews([...reviews, response.data.review]);
-                    } else {
-                        const anonReviewObj = {
-                            userName: 'Anonymous',
-                            comment: newReview.comment,
-                            rating: null,
-                            createdAt: new Date().toISOString()
-                        };
-                        setReviews([...reviews, anonReviewObj]);
-                    }
-                    
-                    setNewReview({ comment: '', rating: 0 });
-                    setReviewError('');
-                    setReviewSuccess('Submitted as anonymous review instead.');
-                    setTimeout(() => setReviewSuccess(''), 3000);
-                    
-                } catch (anonError) {
-                    console.error('Error submitting anonymous review:', anonError);
-                    setReviewError('Failed to submit review. Please try again later.');
-                }
+            if (error.response?.status === 401 && newReview.rating > 0) {
+                setReviewError('You need to be logged in to submit a rated review. You can still submit comments without rating.');
             } else {
                 setReviewError('Failed to submit review. Please try again.');
             }
