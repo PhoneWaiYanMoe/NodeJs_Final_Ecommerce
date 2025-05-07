@@ -1,18 +1,18 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 
 const LandingPage = () => {
   const [categories, setCategories] = useState({
     'New Products': [],
     'Best Sellers': [],
     Laptops: [],
+    Monitors: [],
     Accessories: [],
     'Hard Drives': [],
-    'Monitors': [],
-
   });
   const API_URL = 'https://product-management-soyo.onrender.com/api/products';
+  const navigate = useNavigate();
 
   useEffect(() => {
     const fetchCategoryProducts = async (category) => {
@@ -21,15 +21,12 @@ const LandingPage = () => {
         const params = { limit: 4 }; // Show 4 products per category
 
         if (category === 'New Products') {
-          // Fetch newest products by sorting on createdAt
           params.sortBy = 'createdAt';
           params.order = 'desc';
           params.page = 1;
         } else if (category === 'Best Sellers') {
-          // Fetch best sellers using the dedicated endpoint
           url = `${API_URL}/best-sellers`;
         } else {
-          // Fetch products by category (e.g., Laptops, Monitors)
           params.category = category;
           params.page = 1;
         }
@@ -55,9 +52,36 @@ const LandingPage = () => {
     loadCategories();
   }, []);
 
-  const getProductPage = (category, productId) => {
-    // Simplified: always start on page 1; Products page handles pagination
-    return 1;
+  const handleProductClick = async (productId) => {
+    try {
+      // Fetch all products with the same sorting as Products page (name: asc)
+      const response = await axios.get(API_URL, {
+        params: {
+          sortBy: 'name',
+          order: 'asc',
+          limit: 1000, // Fetch a large number to get all products
+        },
+      });
+      const allProducts = response.data.products || [];
+
+      // Find the index of the clicked product
+      const productIndex = allProducts.findIndex(product => product._id === productId);
+      if (productIndex === -1) {
+        console.error('Product not found in the list');
+        navigate('/products?page=1');
+        return;
+      }
+
+      // Calculate the page number (5 products per page on Products page)
+      const productsPerPage = 5;
+      const page = Math.floor(productIndex / productsPerPage) + 1;
+
+      // Navigate to the Products page with the calculated page
+      navigate(`/products?page=${page}`);
+    } catch (error) {
+      console.error('Error calculating product page:', error);
+      navigate('/products?page=1');
+    }
   };
 
   return (
@@ -100,29 +124,31 @@ const LandingPage = () => {
             </p>
           </div>
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
-          <Link to="/products" style={{ textDecoration: 'none' }}>
-            <span style={{
-              fontSize: '16px',
-              color: '#D4AF37',
-              cursor: 'pointer',
-              transition: 'color 0.3s',
-            }}
-            onMouseEnter={(e) => (e.currentTarget.style.color = '#E0E0E0')}
-            onMouseLeave={(e) => (e.currentTarget.style.color = '#D4AF37')}
+        <div style={{ display: "flex", alignItems: "center", gap: "20px" }}>
+          <Link to="/products" style={{ textDecoration: "none" }}>
+            <span
+              style={{
+                fontSize: "16px",
+                color: "#D4AF37",
+                cursor: "pointer",
+                transition: "color 0.3s",
+              }}
+              onMouseEnter={(e) => (e.currentTarget.style.color = "#E0E0E0")}
+              onMouseLeave={(e) => (e.currentTarget.style.color = "#D4AF37")}
             >
               Browse All Products
             </span>
           </Link>
-          <Link to="/login" style={{ textDecoration: 'none' }}>
-            <span style={{
-              fontSize: '16px',
-              color: '#D4AF37',
-              cursor: 'pointer',
-              transition: 'color 0.3s',
-            }}
-            onMouseEnter={(e) => (e.currentTarget.style.color = '#E0E0E0')}
-            onMouseLeave={(e) => (e.currentTarget.style.color = '#D4AF37')}
+          <Link to="/login" style={{ textDecoration: "none" }}>
+            <span
+              style={{
+                fontSize: "16px",
+                color: "#D4AF37",
+                cursor: "pointer",
+                transition: "color 0.3s",
+              }}
+              onMouseEnter={(e) => (e.currentTarget.style.color = "#E0E0E0")}
+              onMouseLeave={(e) => (e.currentTarget.style.color = "#D4AF37")}
             >
               Login
             </span>
@@ -160,51 +186,47 @@ const LandingPage = () => {
             }}>
               {products.length > 0 ? (
                 products.map((product) => (
-                  <Link
-                    to={`/products?category=${encodeURIComponent(category)}&page=1`}
+                  <div
                     key={product._id}
-                    style={{ textDecoration: 'none', color: 'inherit' }}
+                    onClick={() => handleProductClick(product._id)}
+                    style={{
+                      backgroundColor: '#1A1A1A',
+                      borderRadius: '10px',
+                      overflow: 'hidden',
+                      boxShadow: '0 4px 10px rgba(0, 0, 0, 0.3)',
+                      transition: 'transform 0.3s',
+                      cursor: 'pointer',
+                    }}
+                    onMouseEnter={(e) => (e.currentTarget.style.transform = 'scale(1.03)')}
+                    onMouseLeave={(e) => (e.currentTarget.style.transform = 'scale(1.0)')}
                   >
-                    <div
+                    <img
+                      src={product.images[0] || 'https://via.placeholder.com/200'}
+                      alt={product.name}
                       style={{
-                        backgroundColor: '#1A1A1A',
-                        borderRadius: '10px',
-                        overflow: 'hidden',
-                        boxShadow: '0 4px 10px rgba(0, 0, 0, 0.3)',
-                        transition: 'transform 0.3s',
-                        cursor: 'pointer',
+                        width: '100%',
+                        height: '150px',
+                        objectFit: 'cover',
                       }}
-                      onMouseEnter={(e) => (e.currentTarget.style.transform = 'scale(1.03)')}
-                      onMouseLeave={(e) => (e.currentTarget.style.transform = 'scale(1.0)')}
-                    >
-                      <img
-                        src={product.images[0] || 'https://via.placeholder.com/200'}
-                        alt={product.name}
-                        style={{
-                          width: '100%',
-                          height: '150px',
-                          objectFit: 'cover',
-                        }}
-                      />
-                      <div style={{ padding: '15px' }}>
-                        <h3 style={{
-                          fontSize: '18px',
-                          fontWeight: 'bold',
-                          color: '#FFFFFF',
-                          marginBottom: '10px',
-                        }}>
-                          {product.name}
-                        </h3>
-                        <p style={{
-                          fontSize: '16px',
-                          color: '#D4AF37',
-                          marginBottom: '5px',
-                        }}>
-                          ${Math.min(...product.variants.map(v => v.price))} - ${Math.max(...product.variants.map(v => v.price))}
-                        </p>
-                      </div>
+                    />
+                    <div style={{ padding: '15px' }}>
+                      <h3 style={{
+                        fontSize: '18px',
+                        fontWeight: 'bold',
+                        color: '#FFFFFF',
+                        marginBottom: '10px',
+                      }}>
+                        {product.name}
+                      </h3>
+                      <p style={{
+                        fontSize: '16px',
+                        color: '#D4AF37',
+                        marginBottom: '5px',
+                      }}>
+                        ${Math.min(...product.variants.map(v => v.price))} - ${Math.max(...product.variants.map(v => v.price))}
+                      </p>
                     </div>
-                  </Link>
+                  </div>
                 ))
               ) : (
                 <p style={{ color: '#E0E0E0', textAlign: 'center' }}>No products available.</p>

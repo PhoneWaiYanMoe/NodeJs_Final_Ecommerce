@@ -23,19 +23,12 @@ const Products = () => {
   const navigate = useNavigate();
   const location = useLocation();
 
-  // Sync filters.category with URL on navigation
+  // Sync currentPage with URL on navigation
   useEffect(() => {
     const searchParams = new URLSearchParams(location.search);
-    const categoryFromUrl = searchParams.get('category') || '';
     const pageFromUrl = parseInt(searchParams.get('page'), 10) || 1;
-
-    // Update filters and page based on URL
-    setFilters((prev) => ({
-      ...prev,
-      category: categoryFromUrl,
-    }));
     setCurrentPage(pageFromUrl);
-  }, [location.search]); // Re-run whenever the URL changes
+  }, [location.search]);
 
   // Fetch categories (only once on mount)
   useEffect(() => {
@@ -50,7 +43,7 @@ const Products = () => {
       }
     };
     fetchCategories();
-  }, []); // Empty dependency array to run only on mount
+  }, []);
 
   // Fetch products when page, filters, or sort changes
   useEffect(() => {
@@ -72,14 +65,13 @@ const Products = () => {
       }
     };
     fetchProducts();
-  }, [currentPage, filters, sort]); // Re-fetch products when these change
+  }, [currentPage, filters, sort]);
 
   const handleFilterChange = (e) => {
     const { name, value } = e.target;
     setFilters((prev) => ({ ...prev, [name]: value }));
     setCurrentPage(1); // Reset to first page on filter change
-    // Update URL after state change
-    setTimeout(() => updateUrl(1), 0); // Ensure state updates before URL change
+    setTimeout(() => updateUrl(1), 0);
   };
 
   const handleSortChange = (e) => {
@@ -96,7 +88,6 @@ const Products = () => {
 
   const updateUrl = (page = currentPage) => {
     const searchParams = new URLSearchParams({
-      category: filters.category || '',
       page: page.toString(),
     });
     navigate(`/products?${searchParams.toString()}`, { replace: true });
