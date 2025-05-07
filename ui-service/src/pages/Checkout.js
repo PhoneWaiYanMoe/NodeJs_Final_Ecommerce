@@ -15,6 +15,7 @@ const Checkout = () => {
     const [message, setMessage] = useState('');
 
     const CART_API_URL = 'https://nodejs-final-ecommerce-1.onrender.com/cart';
+    const PRODUCTS_API_URL = 'https://product-management-soyo.onrender.com/api/products';
 
     useEffect(() => {
         if (!user) {
@@ -67,17 +68,30 @@ const Checkout = () => {
             const token = localStorage.getItem('token');
             if (!token) throw new Error('No token found');
 
-            const response = await axios.post(
+            // Process the checkout
+            const checkoutResponse = await axios.post(
                 `${CART_API_URL}/checkout`,
-                {
-                    paymentDetails
-                },
-                {
-                    headers: { Authorization: `Bearer ${token}` }
-                }
+                { paymentDetails },
+                { headers: { Authorization: `Bearer ${token}` } }
             );
 
-            setMessage(`Checkout successful! Order ID: ${response.data.orderId}`);
+            // After successful checkout, update salesCount for each product
+            const updateSalesPromises = cartSummary.items.map(async (item) => {
+                try {
+                    await axios.patch(
+                        `${PRODUCTS_API_URL}/${item.productId}`,
+                        { $inc: { salesCount: item.quantity } }, // Increment salesCount by quantity
+                        { headers: { Authorization: `Bearer ${token}` } }
+                    );
+                } catch (error) {
+                    console.error(`Error updating salesCount for product ${item.productId}:`, error);
+                }
+            });
+
+            // Wait for all salesCount updates to complete
+            await Promise.all(updateSalesPromises);
+
+            setMessage(`Checkout successful! Order ID: ${checkoutResponse.data.orderId}`);
             setTimeout(() => {
                 navigate('/');
             }, 3000);
