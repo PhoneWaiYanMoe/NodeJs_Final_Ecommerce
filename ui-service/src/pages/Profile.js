@@ -57,7 +57,6 @@ const Profile = () => {
       setError('All address fields are required.');
       return;
     }
-    // Check for duplicates before adding
     const isDuplicate = formData.shippingAddressCollection.some(address =>
       address.street === newAddress.street &&
       address.city === newAddress.city &&
@@ -83,9 +82,76 @@ const Profile = () => {
     setError('');
   };
 
-  const handleDeleteAddress = (index) => {
+  const handleDeleteAddress = async (index) => {
     const updatedAddresses = formData.shippingAddressCollection.filter((_, i) => i !== index);
     setFormData({ ...formData, shippingAddressCollection: updatedAddresses });
+
+    try {
+      const response = await fetch('https://nodejs-final-ecommerce.onrender.com/user/profile', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('token')}`,
+        },
+        body: JSON.stringify({
+          shippingAddressCollection: updatedAddresses,
+        }),
+      });
+
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data.message || 'Failed to delete address');
+      }
+
+      setUser(data.user);
+      setError('');
+      setSuccess('Address deleted successfully!');
+      setTimeout(() => {
+        setSuccess('');
+      }, 2000);
+    } catch (error) {
+      console.error('Error deleting address:', error);
+      setError(error.message || 'Failed to delete address. Please try again.');
+      setSuccess('');
+      // Revert the local state if the backend update fails
+      setFormData({ ...formData, shippingAddressCollection: user.shippingAddressCollection || [] });
+    }
+  };
+
+  const handleSetDefaultAddress = async (index) => {
+    if (!formData.shippingAddressCollection[index]) {
+      setError('Invalid address index.');
+      return;
+    }
+
+    try {
+      const response = await fetch('https://nodejs-final-ecommerce.onrender.com/user/profile', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('token')}`,
+        },
+        body: JSON.stringify({
+          setDefaultAddressIndex: index,
+        }),
+      });
+
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data.message || 'Failed to set default address');
+      }
+
+      setUser(data.user);
+      setError('');
+      setSuccess('Default address set successfully!');
+      setTimeout(() => {
+        setSuccess('');
+      }, 2000);
+    } catch (error) {
+      console.error('Error setting default address:', error);
+      setError(error.message || 'Failed to set default address. Please try again.');
+      setSuccess('');
+    }
   };
 
   const handleSaveAddress = async () => {
@@ -340,11 +406,30 @@ const Profile = () => {
                   fontFamily: "'Roboto', sans-serif",
                   cursor: 'pointer',
                   transition: 'background-color 0.3s',
+                  marginBottom: '10px',
                 }}
                 onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#FF7777')}
                 onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = '#FF5555')}
               >
                 Delete Address
+              </button>
+              <button
+                onClick={() => handleSetDefaultAddress(index)}
+                style={{
+                  width: '100%',
+                  padding: '10px',
+                  backgroundColor: '#D4AF37',
+                  color: '#000000',
+                  border: 'none',
+                  borderRadius: '5px',
+                  fontFamily: "'Roboto', sans-serif",
+                  cursor: 'pointer',
+                  transition: 'background-color 0.3s',
+                }}
+                onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#E0E0E0')}
+                onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = '#D4AF37')}
+              >
+                Set as Default
               </button>
             </div>
           ))
@@ -555,5 +640,5 @@ const Profile = () => {
     </div>
   );
 };
-
+//* Profile Component */
 export default Profile;
