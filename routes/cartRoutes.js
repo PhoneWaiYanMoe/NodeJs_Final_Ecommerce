@@ -307,24 +307,24 @@ router.get('/orders', [verifyToken, userRequired], async (req, res) => {
     const orders = await Order.find({ userId: req.user.id }).sort({ createdAt: -1 }).lean();
     const formattedOrders = orders.map(order => ({
       orderId: order._id.toString(),
-      items: order.items.map(item => ({
+      items: Array.isArray(order.items) ? order.items.map(item => ({
         productId: item.productId.toString(),
         variantName: item.variantName || 'Default',
         quantity: item.quantity,
         price: item.price,
-      })),
+      })) : [],
       totalPrice: order.totalPrice,
       taxes: order.taxes,
       shippingFee: order.shippingFee,
       discountApplied: order.discountApplied,
       discountCode: order.discountCode,
-      statusHistory: order.statusHistory,
-      currentStatus: order.statusHistory[order.statusHistory.length - 1]?.status || 'ordered',
-      shippingAddress: order.shippingAddress,
-      paymentDetails: {
+      statusHistory: order.statusHistory || [],
+      currentStatus: order.statusHistory && order.statusHistory.length > 0 ? order.statusHistory[order.statusHistory.length - 1].status : 'ordered',
+      shippingAddress: order.shippingAddress || {},
+      paymentDetails: order.paymentDetails ? {
         cardNumber: `**** **** **** ${order.paymentDetails.cardNumber.slice(-4)}`,
         expiryDate: order.paymentDetails.expiryDate,
-      },
+      } : { cardNumber: 'N/A', expiryDate: 'N/A' },
       createdAt: order.createdAt,
     }));
 
