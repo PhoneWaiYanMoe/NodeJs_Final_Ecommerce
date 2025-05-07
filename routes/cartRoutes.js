@@ -51,7 +51,7 @@ const getCartIdentifier = (req) => {
 
 // Add to Cart
 router.post('/add', [verifyToken, userRequired], async (req, res) => {
-  const { product_id, quantity = 1, price } = req.body;
+  const { product_id, variantName = null, quantity = 1, price } = req.body;
 
   if (!product_id || !price) {
     return res.status(400).json({ error: 'Missing product_id or price' });
@@ -63,7 +63,7 @@ router.post('/add', [verifyToken, userRequired], async (req, res) => {
 
   try {
     const cartIdentifier = getCartIdentifier(req);
-    let cartItem = await CartItem.findOne({ ...cartIdentifier, productId: product_id });
+    let cartItem = await CartItem.findOne({ ...cartIdentifier, productId: product_id, variantName });
 
     if (cartItem) {
       cartItem.quantity += quantity;
@@ -72,6 +72,7 @@ router.post('/add', [verifyToken, userRequired], async (req, res) => {
       cartItem = new CartItem({
         ...cartIdentifier,
         productId: product_id,
+        variantName, // Store variantName if provided
         quantity,
         price,
       });
@@ -164,6 +165,7 @@ router.get('/summary', [verifyToken, userRequired], async (req, res) => {
       items: cartItems.map(item => ({
         id: item._id.toString(),
         productId: item.productId.toString(),
+        variantName: item.variantName || 'Default', // Include variantName in response
         quantity: item.quantity,
         price: item.price,
       })),
@@ -255,6 +257,7 @@ router.post('/checkout', [verifyToken, userRequired], async (req, res) => {
 
     const orderItems = cartItems.map(item => ({
       productId: item.productId,
+      variantName: item.variantName || 'Default', // Include variantName in order
       quantity: item.quantity,
       price: item.price,
     }));
