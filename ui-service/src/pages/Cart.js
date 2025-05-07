@@ -20,28 +20,28 @@ const Cart = () => {
     fetchCartSummary();
   }, [user, navigate]);
 
- const fetchCartSummary = async () => {
-  try {
-    const token = localStorage.getItem("token");
-    if (!token) throw new Error("No token found");
+  const fetchCartSummary = async () => {
+    try {
+      const token = localStorage.getItem("token");
+      if (!token) throw new Error("No token found");
 
-    const response = await axios.get(`${CART_API_URL}/summary`, {
-      headers: {
-        Authorization: `Bearer ${token}`,
-      },
-      params: { discountCode }, // Send discount code with the request
-    });
+      const response = await axios.get(`${CART_API_URL}/summary`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+        params: { discountCode },
+      });
 
-    if (response.data.message === "Cart is empty") {
-      setCartSummary({ items: [] });
-    } else {
-      setCartSummary(response.data);
+      if (response.data.message === "Cart is empty") {
+        setCartSummary({ items: [] });
+      } else {
+        setCartSummary(response.data);
+      }
+    } catch (error) {
+      console.error("Error fetching cart summary:", error);
+      setMessage("Failed to load cart. Please try again.");
     }
-  } catch (error) {
-    console.error("Error fetching cart summary:", error);
-    setMessage("Failed to load cart. Please try again.");
-  }
-};
+  };
   
   const handleAddToCart = async () => {
     try {
@@ -50,7 +50,7 @@ const Cart = () => {
 
       const productId = "507f1f77bcf86cd799439011"; // Replace with dynamic product ID
       const quantity = 1;
-      const price = 10.0; // Dynamic price from product-service
+      const price = 10.0;
 
       await axios.post(
         `${CART_API_URL}/add`,
@@ -101,26 +101,26 @@ const Cart = () => {
     }
   };
 
- const handleApplyDiscount = async () => {
-  try {
-    const token = localStorage.getItem("token");
-    if (!token) throw new Error("No token found");
+  const handleApplyDiscount = async () => {
+    try {
+      const token = localStorage.getItem("token");
+      if (!token) throw new Error("No token found");
 
-    const response = await axios.post(
-      `${CART_API_URL}/apply-discount`,
-      { code: discountCode },
-      { headers: { Authorization: `Bearer ${token}` } }
-    );
+      const response = await axios.post(
+        `${CART_API_URL}/apply-discount`,
+        { code: discountCode },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
 
-    await fetchCartSummary(); // Refresh summary with the applied discount
-    setMessage(`Discount applied successfully! (${discountCode})`);
-    setTimeout(() => setMessage(""), 3000);
-    setDiscountCode("");
-  } catch (error) {
-    console.error("Error applying discount:", error);
-    setMessage(error.response?.data?.error || "Invalid or expired discount code.");
-  }
-};
+      await fetchCartSummary();
+      setMessage(`Discount applied successfully! (${discountCode})`);
+      setTimeout(() => setMessage(""), 3000);
+      setDiscountCode("");
+    } catch (error) {
+      console.error("Error applying discount:", error);
+      setMessage(error.response?.data?.error || "Invalid or expired discount code.");
+    }
+  };
 
   const handleAuthAction = async () => {
     if (user) {
@@ -129,6 +129,12 @@ const Cart = () => {
     } else {
       navigate("/login");
     }
+  };
+
+  // Function to format the productId(variantName) display
+  const formatProductDisplay = (productId) => {
+    const [id, variant] = productId.split(',');
+    return `${id} (${variant})`;
   };
 
   return (
@@ -284,7 +290,7 @@ const Cart = () => {
               <thead>
                 <tr style={{ borderBottom: "1px solid #D4AF37" }}>
                   <th style={{ padding: "10px", textAlign: "left" }}>
-                    Product ID
+                    Product ID (Variant)
                   </th>
                   <th style={{ padding: "10px", textAlign: "left" }}>
                     Quantity
@@ -302,7 +308,7 @@ const Cart = () => {
                     key={item.id}
                     style={{ borderBottom: "1px solid #333333" }}
                   >
-                    <td style={{ padding: "10px" }}>{item.productId}</td>
+                    <td style={{ padding: "10px" }}>{formatProductDisplay(item.productId)}</td>
                     <td style={{ padding: "10px" }}>
                       <input
                         type="number"
@@ -475,26 +481,25 @@ const Cart = () => {
             >
               Total: ${cartSummary.total?.toFixed(2) || "0.00"}
             </p>
-// Update the Link to pass discountCode
-<Link to="/checkout" state={{ cartSummary, discountCode: cartSummary.discountCode }}>
-  <button
-    style={{
-      width: "100%",
-      padding: "10px",
-      backgroundColor: "#D4AF37",
-      color: "#000000",
-      border: "none",
-      borderRadius: "5px",
-      fontFamily: "'Roboto', sans-serif",
-      cursor: "pointer",
-      transition: "background-color 0.3s",
-    }}
-    onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "#E0E0E0")}
-    onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "#D4AF37")}
-  >
-    Proceed to Checkout
-  </button>
-</Link>
+            <Link to="/checkout" state={{ cartSummary, discountCode: cartSummary.discountCode }}>
+              <button
+                style={{
+                  width: "100%",
+                  padding: "10px",
+                  backgroundColor: "#D4AF37",
+                  color: "#000000",
+                  border: "none",
+                  borderRadius: "5px",
+                  fontFamily: "'Roboto', sans-serif",
+                  cursor: "pointer",
+                  transition: "background-color 0.3s",
+                }}
+                onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "#E0E0E0")}
+                onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "#D4AF37")}
+              >
+                Proceed to Checkout
+              </button>
+            </Link>
           </div>
         )}
       </main>
