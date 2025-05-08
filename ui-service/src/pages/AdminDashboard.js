@@ -47,8 +47,10 @@ const AdminDashboard = () => {
     const [modalOpen, setModalOpen] = useState(false);
     const [chartType, setChartType] = useState('bar');
     const barChartRef = useRef(null);
+    const lineChartRef = useRef(null);
     const pieChartRef = useRef(null);
     const barChartInstance = useRef(null);
+    const lineChartInstance = useRef(null);
     const pieChartInstance = useRef(null);
 
     const PRODUCT_API_URL = 'https://product-management-soyo.onrender.com';
@@ -185,35 +187,92 @@ const AdminDashboard = () => {
         barChartInstance.current = new Chart(ctx, {
             type: 'bar',
             data: {
-                labels: Object.keys(stats),
-                datasets: [
-                    {
-                        label: 'Orders Count',
-                        data: Object.values(stats).map(s => s.ordersCount || 0),
-                        backgroundColor: 'rgba(212, 175, 55, 0.6)',
-                    },
-                    {
-                        label: 'Total Revenue',
-                        data: Object.values(stats).map(s => s.totalRevenue || 0),
-                        backgroundColor: 'rgba(255, 99, 132, 0.6)',
-                    },
-                    {
-                        label: 'Total Profit',
-                        data: Object.values(stats).map(s => s.totalProfit || 0),
-                        backgroundColor: 'rgba(54, 162, 235, 0.6)',
-                    },
-                ],
+                labels: ['Orders Count', 'Total Products Sold', 'Unique Product Types'],
+                datasets: [{
+                    label: 'Count',
+                    data: [
+                        Object.values(stats).reduce((sum, s) => sum + (s.ordersCount || 0), 0),
+                        productStats.totalProducts || 0,
+                        productStats.uniqueProductTypes || 0
+                    ],
+                    backgroundColor: ['rgba(212, 175, 55, 0.6)', 'rgba(54, 162, 235, 0.6)', 'rgba(255, 99, 132, 0.6)'],
+                    borderColor: ['rgba(212, 175, 55, 1)', 'rgba(54, 162, 235, 1)', 'rgba(255, 99, 132, 1)'],
+                    borderWidth: 1
+                }]
             },
             options: {
                 responsive: true,
                 maintainAspectRatio: false,
                 scales: {
-                    y: { beginAtZero: true }
+                    y: {
+                        beginAtZero: true,
+                        title: { display: true, text: 'Count', color: '#FFFFFF' },
+                        ticks: { color: '#FFFFFF' }
+                    },
+                    x: { ticks: { color: '#FFFFFF' } }
                 },
                 plugins: {
-                    legend: { labels: { color: '#FFFFFF' } }
-                },
+                    legend: { labels: { color: '#FFFFFF' } },
+                    title: {
+                        display: true,
+                        text: 'Order and Product Metrics',
+                        color: '#D4AF37',
+                        font: { size: 18 }
+                    }
+                }
+            }
+        });
+    }, [stats, productStats]);
+
+    const renderLineChart = useCallback(() => {
+        if (!lineChartRef.current) return;
+        if (lineChartInstance.current) {
+            lineChartInstance.current.destroy();
+        }
+        const ctx = lineChartRef.current.getContext('2d');
+        lineChartInstance.current = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: ['Total Revenue', 'Total Profit'],
+                datasets: [{
+                    label: 'Financial Metrics ($)',
+                    data: [
+                        Object.values(stats).reduce((sum, s) => sum + (s.totalRevenue || 0), 0),
+                        Object.values(stats).reduce((sum, s) => sum + (s.totalProfit || 0), 0)
+                    ],
+                    backgroundColor: 'rgba(75, 192, 192, 0.2)',
+                    borderColor: 'rgba(75, 192, 192, 1)',
+                    borderWidth: 2,
+                    fill: true,
+                    tension: 0.1
+                }]
             },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        title: { display: true, text: 'Amount ($)', color: '#FFFFFF' },
+                        ticks: {
+                            color: '#FFFFFF',
+                            callback: function(value) {
+                                return '$' + value.toLocaleString();
+                            }
+                        }
+                    },
+                    x: { ticks: { color: '#FFFFFF' } }
+                },
+                plugins: {
+                    legend: { labels: { color: '#FFFFFF' } },
+                    title: {
+                        display: true,
+                        text: 'Revenue and Profit Overview',
+                        color: '#D4AF37',
+                        font: { size: 18 }
+                    }
+                }
+            }
         });
     }, [stats]);
 
@@ -230,15 +289,23 @@ const AdminDashboard = () => {
                 datasets: [{
                     data: [productStats.totalProducts || 0, productStats.uniqueProductTypes || 0],
                     backgroundColor: ['rgba(255, 206, 86, 0.6)', 'rgba(75, 192, 192, 0.6)'],
-                }],
+                    borderColor: ['rgba(255, 206, 86, 1)', 'rgba(75, 192, 192, 1)'],
+                    borderWidth: 1
+                }]
             },
             options: {
                 responsive: true,
                 maintainAspectRatio: false,
                 plugins: {
-                    legend: { labels: { color: '#FFFFFF' } }
-                },
-            },
+                    legend: { labels: { color: '#FFFFFF' } },
+                    title: {
+                        display: true,
+                        text: 'Product Distribution',
+                        color: '#D4AF37',
+                        font: { size: 18 }
+                    }
+                }
+            }
         });
     }, [productStats]);
 
@@ -257,10 +324,14 @@ const AdminDashboard = () => {
 
     // Render charts when stats or chartType changes
     useEffect(() => {
-        if (Object.keys(stats).length > 0 && chartType === 'bar') {
-            renderBarChart();
+        if (Object.keys(stats).length > 0) {
+            if (chartType === 'bar') {
+                renderBarChart();
+            } else if (chartType === 'line') {
+                renderLineChart();
+            }
         }
-    }, [stats, chartType, renderBarChart]);
+    }, [stats, chartType, renderBarChart, renderLineChart]);
 
     useEffect(() => {
         if (Object.keys(productStats).length > 0 && chartType === 'pie') {
@@ -539,7 +610,6 @@ const AdminDashboard = () => {
             fontFamily: "'Playfair Display', serif",
             padding: '20px'
         }}>
-            {/* Header */}
             <header style={{
                 backgroundColor: '#000000',
                 padding: '20px 40px',
@@ -594,7 +664,6 @@ const AdminDashboard = () => {
                 </button>
             </header>
 
-            {/* Main Content */}
             <main style={{ padding: '40px' }}>
                 <h1 style={{
                     fontSize: '36px',
@@ -606,7 +675,6 @@ const AdminDashboard = () => {
                     Admin Dashboard
                 </h1>
 
-                {/* Advanced Dashboard */}
                 <div style={{
                     backgroundColor: '#1A1A1A',
                     padding: '30px',
@@ -681,8 +749,9 @@ const AdminDashboard = () => {
                                 color: '#000000'
                             }}
                         >
-                            <option value="bar">Bar Chart</option>
-                            <option value="pie">Pie Chart</option>
+                            <option value="bar">Bar Chart (Counts)</option>
+                            <option value="line">Line Chart (Finance)</option>
+                            <option value="pie">Pie Chart (Products)</option>
                         </select>
                         <button
                             onClick={handleGetData}
@@ -707,8 +776,11 @@ const AdminDashboard = () => {
                             <canvas ref={barChartRef} style={{ display: chartType === 'bar' ? 'block' : 'none', width: '100%', height: '100%' }}></canvas>
                         </div>
                         <div style={{ width: '48%', height: '400px' }}>
-                            <canvas ref={pieChartRef} style={{ display: chartType === 'pie' ? 'block' : 'none', width: '100%', height: '100%' }}></canvas>
+                            <canvas ref={lineChartRef} style={{ display: chartType === 'line' ? 'block' : 'none', width: '100%', height: '100%' }}></canvas>
                         </div>
+                    </div>
+                    <div style={{ width: '48%', height: '400px', marginLeft: 'auto' }}>
+                        <canvas ref={pieChartRef} style={{ display: chartType === 'pie' ? 'block' : 'none', width: '100%', height: '100%' }}></canvas>
                     </div>
                     <table style={{
                         width: '100%',
@@ -749,7 +821,6 @@ const AdminDashboard = () => {
                     </table>
                 </div>
 
-                {/* Order History */}
                 <div style={{
                     backgroundColor: '#1A1A1A',
                     padding: '30px',
@@ -825,7 +896,6 @@ const AdminDashboard = () => {
                     )}
                 </div>
 
-                {/* Create Discount Code */}
                 <div style={{
                     backgroundColor: '#1A1A1A',
                     padding: '30px',
@@ -922,7 +992,6 @@ const AdminDashboard = () => {
                     </div>
                 </div>
 
-                {/* Discount List */}
                 <div style={{
                     backgroundColor: '#1A1A1A',
                     padding: '30px',
@@ -974,7 +1043,6 @@ const AdminDashboard = () => {
                     )}
                 </div>
 
-                {/* Manage Users */}
                 <div style={{
                     backgroundColor: '#1A1A1A',
                     padding: '30px',
@@ -1089,7 +1157,6 @@ const AdminDashboard = () => {
                     </div>
                 </div>
 
-                {/* User List */}
                 <div style={{
                     backgroundColor: '#1A1A1A',
                     padding: '30px',
@@ -1179,7 +1246,6 @@ const AdminDashboard = () => {
                     )}
                 </div>
 
-                {/* Product Form */}
                 <div style={{
                     backgroundColor: '#1A1A1A',
                     padding: '30px',
@@ -1362,7 +1428,6 @@ const AdminDashboard = () => {
                     </div>
                 </div>
 
-                {/* Product List */}
                 <div style={{
                     backgroundColor: '#1A1A1A',
                     padding: '30px',
@@ -1455,7 +1520,6 @@ const AdminDashboard = () => {
                 </div>
             </main>
 
-            {/* Modal for Updating Order Status */}
             {modalOpen && selectedOrder && (
                 <div style={{
                     position: 'fixed',
