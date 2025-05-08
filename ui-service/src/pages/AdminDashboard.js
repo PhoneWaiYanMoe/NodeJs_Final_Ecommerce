@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useContext, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
-import { AuthContext } from '../App';
 import Chart from 'chart.js/auto';
 
 const AdminDashboard = () => {
@@ -178,6 +177,7 @@ const AdminDashboard = () => {
     }, [logout, navigate, timeInterval, startDate, endDate]);
 
     const renderBarChart = useCallback(() => {
+        if (!barChartRef.current) return;
         if (barChartInstance.current) {
             barChartInstance.current.destroy();
         }
@@ -205,13 +205,20 @@ const AdminDashboard = () => {
                 ],
             },
             options: {
-                scales: { y: { beginAtZero: true } },
-                plugins: { legend: { labels: { color: '#FFFFFF' } } },
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    y: { beginAtZero: true }
+                },
+                plugins: {
+                    legend: { labels: { color: '#FFFFFF' } }
+                },
             },
         });
     }, [stats]);
 
     const renderPieChart = useCallback(() => {
+        if (!pieChartRef.current) return;
         if (pieChartInstance.current) {
             pieChartInstance.current.destroy();
         }
@@ -226,7 +233,11 @@ const AdminDashboard = () => {
                 }],
             },
             options: {
-                plugins: { legend: { labels: { color: '#FFFFFF' } } },
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { labels: { color: '#FFFFFF' } }
+                },
             },
         });
     }, [productStats]);
@@ -241,11 +252,21 @@ const AdminDashboard = () => {
     }, [fetchCategories, fetchProducts, fetchUsers, fetchDiscounts]);
 
     const handleGetData = () => {
-        fetchOrders().then(() => {
-            if (chartType === 'bar') renderBarChart();
-            else if (chartType === 'pie') renderPieChart();
-        });
+        fetchOrders();
     };
+
+    // Render charts when stats or chartType changes
+    useEffect(() => {
+        if (Object.keys(stats).length > 0 && chartType === 'bar') {
+            renderBarChart();
+        }
+    }, [stats, chartType, renderBarChart]);
+
+    useEffect(() => {
+        if (Object.keys(productStats).length > 0 && chartType === 'pie') {
+            renderPieChart();
+        }
+    }, [productStats, chartType, renderPieChart]);
 
     // Verify admin role and initialize token on mount
     useEffect(() => {
@@ -682,8 +703,12 @@ const AdminDashboard = () => {
                         </button>
                     </div>
                     <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '20px' }}>
-                        <canvas ref={barChartRef} style={{ maxWidth: '48%', height: '400px', display: chartType === 'bar' ? 'block' : 'none' }}></canvas>
-                        <canvas ref={pieChartRef} style={{ maxWidth: '48%', height: '400px', display: chartType === 'pie' ? 'block' : 'none' }}></canvas>
+                        <div style={{ width: '48%', height: '400px' }}>
+                            <canvas ref={barChartRef} style={{ display: chartType === 'bar' ? 'block' : 'none', width: '100%', height: '100%' }}></canvas>
+                        </div>
+                        <div style={{ width: '48%', height: '400px' }}>
+                            <canvas ref={pieChartRef} style={{ display: chartType === 'pie' ? 'block' : 'none', width: '100%', height: '100%' }}></canvas>
+                        </div>
                     </div>
                     <table style={{
                         width: '100%',
