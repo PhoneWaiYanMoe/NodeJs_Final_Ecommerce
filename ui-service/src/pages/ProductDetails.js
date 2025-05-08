@@ -102,8 +102,23 @@ const ProductDetails = () => {
                     return;
                 }
 
-                // Log token for debugging (remove in production)
-                console.log("Using token:", token);
+
+                
+                // Refresh token if needed
+                try {
+                    // Verify token is still valid
+                    await axios.get('https://nodejs-final-ecommerce.onrender.com/user/session', {
+                        headers: {
+                            'Authorization': `Bearer ${token}`
+                        }
+                    });
+                } catch (tokenError) {
+                    // Token is invalid, redirect to login
+                    localStorage.removeItem('token');
+                    setReviewError('Your session has expired. Please log in again.');
+                    setTimeout(() => navigate('/login'), 2000);
+                    return;
+                }
 
                 const reviewPayload = {
                     comment: newReview.comment,
