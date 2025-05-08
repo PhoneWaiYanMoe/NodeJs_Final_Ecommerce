@@ -671,7 +671,7 @@ const AdminDashboard = () => {
                                 color: '#000000',
                                 border: 'none',
                                 borderRadius: '5px',
-                                fontFamily: "'Roboto', sans-serif',
+                                fontFamily: "'Roboto', sans-serif",
                                 cursor: 'pointer',
                                 transition: 'background-color 0.3s'
                             }}
@@ -689,7 +689,7 @@ const AdminDashboard = () => {
                         width: '100%',
                         borderCollapse: 'collapse',
                         color: '#FFFFFF',
-                        fontFamily: "'Roboto', sans-serif',
+                        fontFamily: "'Roboto', sans-serif",
                         backgroundColor: '#2A2A2A',
                         border: '1px solid #D4AF37'
                     }}>
