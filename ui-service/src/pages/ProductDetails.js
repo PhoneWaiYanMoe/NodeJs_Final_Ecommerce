@@ -85,24 +85,30 @@ const ProductDetails = () => {
         }
         
         try {
-            const token = localStorage.getItem('token');
-            
+            // For logged-in users with rating
             if (user && newReview.rating > 0) {
+                const token = localStorage.getItem('token');
+                if (!token) {
+                    setReviewError('Authentication token not found. Please log in again.');
+                    return;
+                }
+
                 const reviewPayload = {
                     comment: newReview.comment,
-                    rating: Number(newReview.rating)
+                    rating: Number(newReview.rating),
+                    userId: user._id  // Add user ID to the payload
                 };
                 
-                const response = await axios.post(
-                    `${API_URL}/api/products/${id}/review`,
-                    reviewPayload,
-                    {
-                        headers: {
-                            'Authorization': `Bearer ${token}`,
-                            'Content-Type': 'application/json'
-                        }
-                    }
-                );
+                const response = await axios({
+                    method: 'post',
+                    url: `${API_URL}/api/products/${id}/review`,
+                    data: reviewPayload,
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json'
+                    },
+                    withCredentials: true  // Important for handling cookies
+                });
                 
                 if (response.data && response.data.review) {
                     setReviews(prevReviews => {
@@ -117,6 +123,7 @@ const ProductDetails = () => {
                     setTimeout(() => setReviewSuccess(''), 3000);
                 }
             } else {
+                // For anonymous comments (no rating) or logged-in users without rating
                 const reviewPayload = {
                     comment: newReview.comment,
                     userName: user ? user.name : 'Anonymous'
