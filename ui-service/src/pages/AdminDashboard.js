@@ -2,6 +2,7 @@ import React, { useState, useEffect, useContext } from 'react';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { AuthContext } from '../App';
+import Chart from 'chart.js/auto';
 
 const AdminDashboard = () => {
     const navigate = useNavigate();
@@ -10,6 +11,8 @@ const AdminDashboard = () => {
     const [categories, setCategories] = useState([]);
     const [users, setUsers] = useState([]);
     const [discounts, setDiscounts] = useState([]);
+    const [orders, setOrders] = useState([]);
+    const [stats, setStats] = useState({});
     const [formData, setFormData] = useState({
         _id: null,
         name: '',
@@ -36,6 +39,14 @@ const AdminDashboard = () => {
     const [productError, setProductError] = useState('');
     const [categoryError, setCategoryError] = useState('');
     const [discountError, setDiscountError] = useState('');
+    const [timeInterval, setTimeInterval] = useState('year');
+    const [startDate, setStartDate] = useState('');
+    const [endDate, setEndDate] = useState('');
+    const [selectedOrder, setSelectedOrder] = useState(null);
+    const [newStatus, setNewStatus] = useState('');
+    const [modalOpen, setModalOpen] = useState(false);
+    const chartRef = useRef(null);
+    const chartInstance = useRef(null);
 
     const PRODUCT_API_URL = 'https://product-management-soyo.onrender.com';
     const ACCOUNT_API_URL = 'https://nodejs-final-ecommerce.onrender.com';
@@ -51,136 +62,132 @@ const AdminDashboard = () => {
         if (token && !axios.defaults.headers.Authorization) {
             axios.defaults.headers.Authorization = `Bearer ${token}`;
         }
+        fetchData();
     }, [user, navigate]);
 
-    // Fetch categories
-    useEffect(() => {
-        let isMounted = true;
-        const fetchCategories = async () => {
-            try {
-                const token = localStorage.getItem('token');
-                if (!token) throw new Error('No JWT token found in localStorage');
-                axios.defaults.headers.Authorization = `Bearer ${token}`;
+    const fetchData = async () => {
+        await Promise.all([
+            fetchCategories(),
+            fetchProducts(),
+            fetchUsers(),
+            fetchDiscounts(),
+            fetchOrders(),
+        ]);
+        renderCharts();
+    };
 
-                const response = await axios.get(`${PRODUCT_API_URL}/api/categories`);
-                if (isMounted) {
-                    setCategories(Array.isArray(response.data) ? response.data : []);
-                    setCategoryError('');
-                }
-            } catch (err) {
-                if (isMounted) {
-                    setCategories([]);
-                    setCategoryError(`Failed to fetch categories: ${err.message}${err.response?.data?.error ? ` - ${err.response.data.error}` : ''}`);
-                    if (err.response?.status === 401) {
-                        await logout();
-                        navigate('/login');
-                    }
-                }
+    const fetchCategories = async () => {
+        try {
+            const token = localStorage.getItem('token');
+            if (!token) throw new Error('No JWT token found in localStorage');
+            axios.defaults.headers.Authorization = `Bearer ${token}`;
+
+            const response = await axios.get(`${PRODUCT_API_URL}/api/categories`);
+            setCategories(Array.isArray(response.data) ? response.data : []);
+            setCategoryError('');
+        } catch (err) {
+            setCategories([]);
+            setCategoryError(`Failed to fetch categories: ${err.message}${err.response?.data?.error ? ` - ${err.response.data.error}` : ''}`);
+            if (err.response?.status === 401) {
+                await logout();
+                navigate('/login');
             }
-        };
-        if (user) fetchCategories();
-        return () => { isMounted = false; };
-    }, [user, navigate, logout]);
+        }
+    };
 
-    // Fetch products
-    useEffect(() => {
-        let isMounted = true;
-        const fetchProducts = async () => {
-            try {
-                const token = localStorage.getItem('token');
-                if (!token) throw new Error('No JWT token found in localStorage');
-                axios.defaults.headers.Authorization = `Bearer ${token}`;
+    const fetchProducts = async () => {
+        try {
+            const token = localStorage.getItem('token');
+            if (!token) throw new Error('No JWT token found in localStorage');
+            axios.defaults.headers.Authorization = `Bearer ${token}`;
 
-                const response = await axios.get(`${PRODUCT_API_URL}/api/products`, {
-                    params: { limit: 100 }
-                });
-                if (isMounted) {
-                    setProducts(response.data.products || []);
-                    setProductError('');
-                }
-            } catch (err) {
-                if (isMounted) {
-                    setProducts([]);
-                    setProductError(`Failed to fetch products: ${err.message}${err.response?.data?.error ? ` - ${err.response.data.error}` : ''}`);
-                    if (err.response?.status === 401) {
-                        await logout();
-                        navigate('/login');
-                    }
-                }
+            const response = await axios.get(`${PRODUCT_API_URL}/api/products`, {
+                params: { limit: 100 }
+            });
+            setProducts(response.data.products || []);
+            setProductError('');
+        } catch (err) {
+            setProducts([]);
+            setProductError(`Failed to fetch products: ${err.message}${err.response?.data?.error ? ` - ${err.response.data.error}` : ''}`);
+            if (err.response?.status === 401) {
+                await logout();
+                navigate('/login');
             }
-        };
-        if (user) fetchProducts();
-        return () => { isMounted = false; };
-    }, [user, navigate, logout]);
+        }
+    };
 
-    // Fetch users
-    useEffect(() => {
-        let isMounted = true;
-        const fetchUsers = async () => {
-            try {
-                const token = localStorage.getItem('token');
-                if (!token) throw new Error('No JWT token found in localStorage');
-                axios.defaults.headers.Authorization = `Bearer ${token}`;
+    const fetchUsers = async () => {
+        try {
+            const token = localStorage.getItem('token');
+            if (!token) throw new Error('No JWT token found in localStorage');
+            axios.defaults.headers.Authorization = `Bearer ${token}`;
 
-                const response = await axios.get(`${ACCOUNT_API_URL}/user/admin/users`);
-                if (isMounted) {
-                    if (!Array.isArray(response.data)) {
-                        throw new Error('Unexpected response format: response.data is not an array');
-                    }
-                    // Map created_at to createdAt and ensure proper date parsing
-                    const mappedUsers = response.data.map(user => ({
-                        ...user,
-                        id: user._id, // Ensure id is set for handleEditUser and handleDeleteUser
-                        createdAt: user.created_at || user.createdAt // Handle both created_at and createdAt
-                    }));
-                    setUsers(mappedUsers);
-                    setError('');
-                }
-            } catch (err) {
-                if (isMounted) {
-                    setError(`Failed to fetch users: ${err.message}${err.response?.data?.message ? ` - ${err.response.data.message}` : ''}`);
-                    if (err.response?.status === 401) {
-                        await logout();
-                        navigate('/login');
-                    }
-                }
+            const response = await axios.get(`${ACCOUNT_API_URL}/user/admin/users`);
+            if (!Array.isArray(response.data)) {
+                throw new Error('Unexpected response format: response.data is not an array');
             }
-        };
-        if (user) fetchUsers();
-        return () => { isMounted = false; };
-    }, [user, navigate, logout]);
-
-    // Fetch discounts
-    useEffect(() => {
-        let isMounted = true;
-        const fetchDiscounts = async () => {
-            try {
-                const token = localStorage.getItem('token');
-                if (!token) throw new Error('No JWT token found in localStorage');
-                axios.defaults.headers.Authorization = `Bearer ${token}`;
-
-                const response = await axios.get(`${CART_API_URL}/cart/admin/discounts`);
-                if (isMounted) {
-                    setDiscounts(Array.isArray(response.data) ? response.data.map(discount => ({
-                        ...discount,
-                        discountPercentage: discount.discount_percentage || discount.discountPercentage
-                    })) : []);
-                    setDiscountError('');
-                }
-            } catch (err) {
-                if (isMounted) {
-                    setDiscounts([]);
-                    setDiscountError(`Failed to fetch discount codes: ${err.message}${err.response?.data?.error ? ` - ${err.response.data.error}` : ''}`);
-                    if (err.response?.status === 401) {
-                        await logout();
-                        navigate('/login');
-                    }
-                }
+            const mappedUsers = response.data.map(user => ({
+                ...user,
+                id: user._id,
+                createdAt: user.created_at || user.createdAt
+            }));
+            setUsers(mappedUsers);
+            setError('');
+        } catch (err) {
+            setError(`Failed to fetch users: ${err.message}${err.response?.data?.message ? ` - ${err.response.data.message}` : ''}`);
+            if (err.response?.status === 401) {
+                await logout();
+                navigate('/login');
             }
-        };
-        if (user) fetchDiscounts();
-        return () => { isMounted = false; };
-    }, [user, navigate, logout]);
+        }
+    };
+
+    const fetchDiscounts = async () => {
+        try {
+            const token = localStorage.getItem('token');
+            if (!token) throw new Error('No JWT token found in localStorage');
+            axios.defaults.headers.Authorization = `Bearer ${token}`;
+
+            const response = await axios.get(`${CART_API_URL}/cart/admin/discounts`);
+            setDiscounts(Array.isArray(response.data) ? response.data.map(discount => ({
+                ...discount,
+                discountPercentage: discount.discount_percentage || discount.discountPercentage
+            })) : []);
+            setDiscountError('');
+        } catch (err) {
+            setDiscounts([]);
+            setDiscountError(`Failed to fetch discount codes: ${err.message}${err.response?.data?.error ? ` - ${err.response.data.error}` : ''}`);
+            if (err.response?.status === 401) {
+                await logout();
+                navigate('/login');
+            }
+        }
+    };
+
+    const fetchOrders = async () => {
+        try {
+            const token = localStorage.getItem('token');
+            if (!token) throw new Error('No JWT token found in localStorage');
+            axios.defaults.headers.Authorization = `Bearer ${token}`;
+
+            const params = { interval: timeInterval };
+            if (startDate && endDate) {
+                params.startDate = startDate;
+                params.endDate = endDate;
+            }
+            const response = await axios.get(`${CART_API_URL}/cart/admin/orders`, { params });
+            setOrders(response.data.orders || []);
+            setStats(response.data.stats || {});
+        } catch (err) {
+            setOrders([]);
+            setStats({});
+            setError(`Failed to fetch orders: ${err.message}${err.response?.data?.error ? ` - ${err.response.data.error}` : ''}`);
+            if (err.response?.status === 401) {
+                await logout();
+                navigate('/login');
+            }
+        }
+    };
 
     const handleInputChange = (e) => {
         const { name, value } = e.target;
@@ -352,7 +359,6 @@ const AdminDashboard = () => {
             await axios[method](url, userData);
             const response = await axios.get(`${ACCOUNT_API_URL}/user/admin/users`);
 
-            // Map created_at to createdAt for consistency
             const mappedUsers = response.data.map(user => ({
                 ...user,
                 id: user._id,
@@ -403,9 +409,72 @@ const AdminDashboard = () => {
         }
     };
 
+    const handleOrderClick = (order) => {
+        setSelectedOrder(order);
+        setNewStatus(order.currentStatus);
+        setModalOpen(true);
+    };
+
+    const handleUpdateStatus = async (e) => {
+        e.preventDefault();
+        try {
+            const token = localStorage.getItem('token');
+            if (!token) throw new Error('No JWT token found in localStorage');
+            axios.defaults.headers.Authorization = `Bearer ${token}`;
+
+            await axios.put(`${CART_API_URL}/cart/admin/orders/${selectedOrder.orderId}/status`, { status: newStatus });
+            setOrders(orders.map(order => order.orderId === selectedOrder.orderId ? { ...order, currentStatus: newStatus, statusHistory: [...order.statusHistory, { status: newStatus, updatedAt: new Date() }] } : order));
+            setModalOpen(false);
+            alert('Order status updated successfully!');
+        } catch (err) {
+            setError(`Failed to update order status: ${err.message}${err.response?.data?.error ? ` - ${err.response.data.error}` : ''}`);
+        }
+    };
+
+    const renderCharts = () => {
+        if (chartInstance.current) {
+            chartInstance.current.destroy();
+        }
+        const ctx = chartRef.current.getContext('2d');
+        chartInstance.current = new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: Object.keys(stats),
+                datasets: [
+                    {
+                        label: 'Orders Count',
+                        data: Object.values(stats).map(s => s.ordersCount),
+                        backgroundColor: 'rgba(212, 175, 55, 0.6)',
+                    },
+                    {
+                        label: 'Total Revenue',
+                        data: Object.values(stats).map(s => s.totalRevenue),
+                        backgroundColor: 'rgba(255, 99, 132, 0.6)',
+                    },
+                    {
+                        label: 'Total Profit',
+                        data: Object.values(stats).map(s => s.totalProfit),
+                        backgroundColor: 'rgba(54, 162, 235, 0.6)',
+                    },
+                ],
+            },
+            options: {
+                scales: { y: { beginAtZero: true } },
+                plugins: { legend: { labels: { color: '#FFFFFF' } } },
+            },
+        });
+    };
+
+    useEffect(() => {
+        fetchOrders();
+    }, [timeInterval, startDate, endDate]);
+
+    useEffect(() => {
+        renderCharts();
+    }, [stats]);
+
     if (!user) return null;
 
-    // Function to format dates consistently
     const formatDate = (dateString) => {
         if (!dateString) return 'N/A';
         const date = new Date(dateString);
@@ -486,6 +555,130 @@ const AdminDashboard = () => {
                 }}>
                     Admin Dashboard
                 </h1>
+
+                {/* Advanced Dashboard */}
+                <div style={{
+                    backgroundColor: '#1A1A1A',
+                    padding: '30px',
+                    borderRadius: '10px',
+                    marginBottom: '40px',
+                    boxShadow: '0 4px 10px rgba(0, 0, 0, 0.5)'
+                }}>
+                    <h2 style={{
+                        fontSize: '24px',
+                        color: '#D4AF37',
+                        marginBottom: '20px'
+                    }}>
+                        Advanced Dashboard
+                    </h2>
+                    <div style={{ marginBottom: '20px' }}>
+                        <select value={timeInterval} onChange={(e) => setTimeInterval(e.target.value)} style={{
+                            padding: '10px',
+                            marginRight: '10px',
+                            backgroundColor: '#E0E0E0',
+                            border: 'none',
+                            borderRadius: '5px',
+                            color: '#000000'
+                        }}>
+                            <option value="year">Yearly</option>
+                            <option value="quarter">Quarterly</option>
+                            <option value="month">Monthly</option>
+                            <option value="week">Weekly</option>
+                        </select>
+                        <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} style={{
+                            padding: '10px',
+                            marginRight: '10px',
+                            backgroundColor: '#E0E0E0',
+                            border: 'none',
+                            borderRadius: '5px',
+                            color: '#000000'
+                        }} />
+                        <input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} style={{
+                            padding: '10px',
+                            backgroundColor: '#E0E0E0',
+                            border: 'none',
+                            borderRadius: '5px',
+                            color: '#000000'
+                        }} />
+                    </div>
+                    <canvas ref={chartRef} style={{ maxWidth: '100%', height: '400px' }}></canvas>
+                </div>
+
+                {/* Order History */}
+                <div style={{
+                    backgroundColor: '#1A1A1A',
+                    padding: '30px',
+                    borderRadius: '10px',
+                    boxShadow: '0 4px 10px rgba(0, 0, 0, 0.5)',
+                    marginBottom: '40px'
+                }}>
+                    <h2 style={{
+                        fontSize: '24px',
+                        color: '#D4AF37',
+                        marginBottom: '20px'
+                    }}>
+                        Order History
+                    </h2>
+                    {error && (
+                        <p style={{
+                            color: '#FF5555',
+                            marginBottom: '15px'
+                        }}>
+                            {error}
+                        </p>
+                    )}
+                    {orders.length === 0 && !error ? (
+                        <p style={{ color: '#E0E0E0' }}>No orders available.</p>
+                    ) : (
+                        <table style={{
+                            width: '100%',
+                            borderCollapse: 'collapse',
+                            color: '#FFFFFF',
+                            fontFamily: "'Roboto', sans-serif"
+                        }}>
+                            <thead>
+                                <tr style={{ borderBottom: '1px solid #D4AF37' }}>
+                                    <th style={{ padding: '10px', textAlign: 'left' }}>Order ID</th>
+                                    <th style={{ padding: '10px', textAlign: 'left' }}>User ID</th>
+                                    <th style={{ padding: '10px', textAlign: 'left' }}>Total Price</th>
+                                    <th style={{ padding: '10px', textAlign: 'left' }}>Status</th>
+                                    <th style={{ padding: '10px', textAlign: 'left' }}>Created At</th>
+                                    <th style={{ padding: '10px', textAlign: 'left' }}>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {orders.map(order => (
+                                    <tr key={order.orderId} style={{ borderBottom: '1px solid #333333' }}>
+                                        <td style={{ padding: '10px' }}>{order.orderId}</td>
+                                        <td style={{ padding: '10px' }}>{order.userId}</td>
+                                        <td style={{ padding: '10px' }}>${order.totalPrice.toFixed(2)}</td>
+                                        <td style={{ padding: '10px' }}>{order.currentStatus}</td>
+                                        <td style={{ padding: '10px' }}>{formatDate(order.createdAt)}</td>
+                                        <td style={{ padding: '10px' }}>
+                                            <button
+                                                onClick={() => handleOrderClick(order)}
+                                                style={{
+                                                    padding: '5px 10px',
+                                                    backgroundColor: '#D4AF37',
+                                                    color: '#000000',
+                                                    border: 'none',
+                                                    borderRadius: '5px',
+                                                    marginRight: '10px',
+                                                    cursor: 'pointer',
+                                                    transition: 'background-color 0.3s'
+                                                }}
+                                                onMouseEnter={e => (e.currentTarget.style.backgroundColor = '#E0E0E0')}
+                                                onMouseLeave={e => (e.currentTarget.style.backgroundColor = '#D4AF37')}
+                                            >
+                                                Edit Status
+                                            </button>
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    )}
+                </div>
 
                 {/* Create Discount Code */}
                 <div style={{
@@ -1116,6 +1309,98 @@ const AdminDashboard = () => {
                     )}
                 </div>
             </main>
+
+            {modalOpen && selectedOrder && (
+                <div style={{
+                    position: 'fixed',
+                    top: 0,
+                    left: 0,
+                    width: '100%',
+                    height: '100%',
+                    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+                    display: 'flex',
+                    justifyContent: 'center',
+                    alignItems: 'center',
+                    zIndex: 1000
+                }}>
+                    <div style={{
+                        backgroundColor: '#1A1A1A',
+                        padding: '30px',
+                        borderRadius: '10px',
+                        maxWidth: '600px',
+                        width: '90%',
+                        maxHeight: '80vh',
+                        overflowY: 'auto',
+                        position: 'relative'
+                    }}>
+                        <button
+                            onClick={() => setModalOpen(false)}
+                            style={{
+                                position: 'absolute',
+                                top: '10px',
+                                right: '10px',
+                                backgroundColor: '#D4AF37',
+                                color: '#000000',
+                                border: 'none',
+                                borderRadius: '5px',
+                                padding: '5px 10px',
+                                cursor: 'pointer',
+                                fontFamily: "'Roboto', sans-serif"
+                            }}
+                        >
+                            Close
+                        </button>
+                        <h2 style={{
+                            fontSize: '24px',
+                            color: '#D4AF37',
+                            marginBottom: '20px'
+                        }}>
+                            Update Order Status - ID: {selectedOrder.orderId}
+                        </h2>
+                        <p style={{
+                            fontSize: '16px',
+                            color: '#E0E0E0',
+                            marginBottom: '10px'
+                        }}>
+                            <strong>Current Status:</strong> {selectedOrder.currentStatus}
+                        </p>
+                        <select value={newStatus} onChange={(e) => setNewStatus(e.target.value)} style={{
+                            width: '100%',
+                            padding: '10px',
+                            marginBottom: '20px',
+                            backgroundColor: '#E0E0E0',
+                            border: 'none',
+                            borderRadius: '5px',
+                            color: '#000000',
+                            fontFamily: "'Roboto', sans-serif"
+                        }}>
+                            <option value="ordered">Ordered</option>
+                            <option value="processing">Processing</option>
+                            <option value="shipped">Shipped</option>
+                            <option value="delivered">Delivered</option>
+                            <option value="cancelled">Cancelled</option>
+                        </select>
+                        <button
+                            onClick={handleUpdateStatus}
+                            style={{
+                                width: '100%',
+                                padding: '10px',
+                                backgroundColor: '#D4AF37',
+                                color: '#000000',
+                                border: 'none',
+                                borderRadius: '5px',
+                                fontFamily: "'Roboto', sans-serif",
+                                cursor: 'pointer',
+                                transition: 'background-color 0.3s'
+                            }}
+                            onMouseEnter={e => (e.currentTarget.style.backgroundColor = '#E0E0E0')}
+                            onMouseLeave={e => (e.currentTarget.style.backgroundColor = '#D4AF37')}
+                        >
+                            Update Status
+                        </button>
+                    </div>
+                </div>
+            )}
         </div>
     );
 };
