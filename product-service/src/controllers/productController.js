@@ -213,7 +213,7 @@ export const updateProduct = async (req, res) => {
   }
 };
 
-// DELETE /api/products/:id - Delete a product (admin-only, already implemented)
+// DELETE /api/products/:id - Delete a product
 export const deleteProduct = async (req, res) => {
   const { id } = req.params;
 

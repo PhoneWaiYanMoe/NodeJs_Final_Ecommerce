@@ -92,7 +92,6 @@ const Products = () => {
     });
     navigate(`/products?${searchParams.toString()}`, { replace: true });
   };
-
   const handleAuthAction = async () => {
     if (user) {
       await logout();
