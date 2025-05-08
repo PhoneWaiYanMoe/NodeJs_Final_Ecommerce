@@ -52,30 +52,6 @@ const AdminDashboard = () => {
     const ACCOUNT_API_URL = 'https://nodejs-final-ecommerce.onrender.com';
     const CART_API_URL = 'https://nodejs-final-ecommerce-1.onrender.com';
 
-    // Verify admin role and initialize token on mount
-    useEffect(() => {
-        if (!user || (user.email !== 'admin@example.com' && user.role !== 'admin')) {
-            navigate('/login');
-            return;
-        }
-        const token = localStorage.getItem('token');
-        if (token && !axios.defaults.headers.Authorization) {
-            axios.defaults.headers.Authorization = `Bearer ${token}`;
-        }
-        fetchData();
-    }, [user, navigate, fetchData]);
-
-    const fetchData = useCallback(async () => {
-        await Promise.all([
-            fetchCategories(),
-            fetchProducts(),
-            fetchUsers(),
-            fetchDiscounts(),
-            fetchOrders(),
-        ]);
-        renderCharts();
-    }, [fetchCategories, fetchProducts, fetchUsers, fetchDiscounts, fetchOrders, renderCharts]);
-
     const fetchCategories = useCallback(async () => {
         try {
             const token = localStorage.getItem('token');
@@ -188,6 +164,64 @@ const AdminDashboard = () => {
             }
         }
     }, [logout, navigate, timeInterval, startDate, endDate]);
+
+    const renderCharts = useCallback(() => {
+        if (chartInstance.current) {
+            chartInstance.current.destroy();
+        }
+        const ctx = chartRef.current.getContext('2d');
+        chartInstance.current = new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: Object.keys(stats),
+                datasets: [
+                    {
+                        label: 'Orders Count',
+                        data: Object.values(stats).map(s => s.ordersCount),
+                        backgroundColor: 'rgba(212, 175, 55, 0.6)',
+                    },
+                    {
+                        label: 'Total Revenue',
+                        data: Object.values(stats).map(s => s.totalRevenue),
+                        backgroundColor: 'rgba(255, 99, 132, 0.6)',
+                    },
+                    {
+                        label: 'Total Profit',
+                        data: Object.values(stats).map(s => s.totalProfit),
+                        backgroundColor: 'rgba(54, 162, 235, 0.6)',
+                    },
+                ],
+            },
+            options: {
+                scales: { y: { beginAtZero: true } },
+                plugins: { legend: { labels: { color: '#FFFFFF' } } },
+            },
+        });
+    }, [stats]);
+
+    const fetchData = useCallback(async () => {
+        await Promise.all([
+            fetchCategories(),
+            fetchProducts(),
+            fetchUsers(),
+            fetchDiscounts(),
+            fetchOrders(),
+        ]);
+        renderCharts();
+    }, [fetchCategories, fetchProducts, fetchUsers, fetchDiscounts, fetchOrders, renderCharts]);
+
+    // Verify admin role and initialize token on mount
+    useEffect(() => {
+        if (!user || (user.email !== 'admin@example.com' && user.role !== 'admin')) {
+            navigate('/login');
+            return;
+        }
+        const token = localStorage.getItem('token');
+        if (token && !axios.defaults.headers.Authorization) {
+            axios.defaults.headers.Authorization = `Bearer ${token}`;
+        }
+        fetchData();
+    }, [user, navigate, fetchData]);
 
     const handleInputChange = (e) => {
         const { name, value } = e.target;
@@ -430,40 +464,6 @@ const AdminDashboard = () => {
             setError(`Failed to update order status: ${err.message}${err.response?.data?.error ? ` - ${err.response.data.error}` : ''}`);
         }
     };
-
-    const renderCharts = useCallback(() => {
-        if (chartInstance.current) {
-            chartInstance.current.destroy();
-        }
-        const ctx = chartRef.current.getContext('2d');
-        chartInstance.current = new Chart(ctx, {
-            type: 'bar',
-            data: {
-                labels: Object.keys(stats),
-                datasets: [
-                    {
-                        label: 'Orders Count',
-                        data: Object.values(stats).map(s => s.ordersCount),
-                        backgroundColor: 'rgba(212, 175, 55, 0.6)',
-                    },
-                    {
-                        label: 'Total Revenue',
-                        data: Object.values(stats).map(s => s.totalRevenue),
-                        backgroundColor: 'rgba(255, 99, 132, 0.6)',
-                    },
-                    {
-                        label: 'Total Profit',
-                        data: Object.values(stats).map(s => s.totalProfit),
-                        backgroundColor: 'rgba(54, 162, 235, 0.6)',
-                    },
-                ],
-            },
-            options: {
-                scales: { y: { beginAtZero: true } },
-                plugins: { legend: { labels: { color: '#FFFFFF' } } },
-            },
-        });
-    }, [stats]);
 
     useEffect(() => {
         fetchOrders();
