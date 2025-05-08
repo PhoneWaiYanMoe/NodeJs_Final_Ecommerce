@@ -1,6 +1,7 @@
 import React, { createContext, useState, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import axios from 'axios';
+import { GoogleOAuthProvider } from '@react-oauth/google';
 import LandingPage from './pages/LandingPage';
 import Products from './pages/Products';
 import ProductDetails from './pages/ProductDetails';
@@ -16,7 +17,7 @@ import OrderHistory from './pages/OrderHistory';
 export const AuthContext = createContext();
 
 // Configure Axios defaults
-axios.defaults.baseURL = 'https://nodejs-final-ecommerce.onrender.com/user';
+axios.defaults.baseURL = 'https://nodejs-final-ecommerce.onrender.com/api/users';
 
 // Add token to axios headers
 axios.interceptors.request.use((config) => {
@@ -59,17 +60,30 @@ function App() {
   }, []);
 
   // Login function
-  const login = async (email, password) => {
+  const login = async (email, password, token) => {
     try {
-      const loginUrl = email === 'admin@example.com' ? '/admin/login' : '/login';
-      const response = await axios.post(loginUrl, { email, password });
-      const { user, token } = response.data;
+      let response;
       if (token) {
+        // Social login (Google/Facebook) with token
         localStorage.setItem('token', token);
+        response = await axios.get('/session');
+      } else {
+        // Email/password login
+        const loginUrl = email === 'admin@example.com' ? '/admin/login' : '/login';
+        response = await axios.post(loginUrl, { email, password });
+        const { token: newToken } = response.data;
+        if (newToken) {
+          localStorage.setItem('token', newToken);
+        }
+      }
+      const { user } = response.data;
+      if (user) {
         setUser(user);
       }
       return response.data;
     } catch (err) {
+      localStorage.removeItem('token');
+      setUser(null);
       throw err.response?.data || { message: 'Login failed' };
     }
   };
@@ -96,44 +110,47 @@ function App() {
   };
 
   return (
-    <AuthContext.Provider value={{ user, setUser, login, logout }}>
-      <Router>
-        <Routes>
-          <Route path="/" element={<LandingPage />} />
-          <Route path="/products" element={<Products />} />
-          <Route path="/products/:id" element={<ProductDetails />} />
-          <Route path="/admin/dashboard" element={
-            <ProtectedRoute adminOnly={true}>
-              <AdminDashboard />
-            </ProtectedRoute>
-          } />
-          <Route path="/cart" element={
-            <ProtectedRoute>
-              <Cart />
-            </ProtectedRoute>
-          } />
-          <Route path="/checkout" element={
-            <ProtectedRoute>
-              <Checkout />
-            </ProtectedRoute>
-          } />
-          <Route path="/orders" element={
-            <ProtectedRoute>
-              <OrderHistory />
-            </ProtectedRoute>
-          } />
-          <Route path="/register" element={<Register />} />
-          <Route path="/login" element={<Login />} />
-          <Route path="/profile" element={
-            <ProtectedRoute>
-              <Profile />
-            </ProtectedRoute>
-          } />
-          <Route path="*" element={<div>404 Not Found</div>} />
-        </Routes>
-      </Router>
-    </AuthContext.Provider>
+    <GoogleOAuthProvider clientId={process.env.REACT_APP_GOOGLE_CLIENT_ID}>
+      <AuthContext.Provider value={{ user, setUser, login, logout }}>
+        <Router>
+          <Routes>
+            <Route path="/" element={<LandingPage />} />
+            <Route path="/products" element={<Products />} />
+            <Route path="/products/:id" element={<ProductDetails />} />
+            <Route path="/admin/dashboard" element={
+              <ProtectedRoute adminOnly={true}>
+                <AdminDashboard />
+              </ProtectedRoute>
+            } />
+            <Route path="/cart" element={
+              <ProtectedRoute>
+                <Cart />
+              </ProtectedRoute>
+            } />
+            <Route path="/checkout" element={
+              <ProtectedRoute>
+                <Checkout />
+              </ProtectedRoute>
+            } />
+            <Route path="/orders" element={
+              <ProtectedRoute>
+                <OrderHistory />
+              </ProtectedRoute>
+            } />
+            <Route path="/register" element={<Register />} />
+            <Route path="/login" element={<Login />} />
+            <Route path="/profile" element={
+              <ProtectedRoute>
+                <Profile />
+              </ProtectedRoute>
+            } />
+            <Route path="*" element={<div>404 Not Found</div>} />
+          </Routes>
+        </Router>
+      </AuthContext.Provider>
+    </GoogleOAuthProvider>
   );
 }
 
 export default App;
+export { AuthContext };
