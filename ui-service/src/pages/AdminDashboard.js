@@ -210,6 +210,12 @@ const AdminDashboard = () => {
         renderCharts();
     }, [fetchCategories, fetchProducts, fetchUsers, fetchDiscounts, fetchOrders, renderCharts]);
 
+    const handleGetGraph = () => {
+        fetchOrders().then(() => {
+            renderCharts();
+        });
+    };
+
     // Verify admin role and initialize token on mount
     useEffect(() => {
         if (!user || (user.email !== 'admin@example.com' && user.role !== 'admin')) {
@@ -465,14 +471,6 @@ const AdminDashboard = () => {
         }
     };
 
-    useEffect(() => {
-        fetchOrders();
-    }, [fetchOrders, timeInterval, startDate, endDate]);
-
-    useEffect(() => {
-        renderCharts();
-    }, [renderCharts, stats]);
-
     if (!user) return null;
 
     const formatDate = (dateString) => {
@@ -571,35 +569,67 @@ const AdminDashboard = () => {
                     }}>
                         Advanced Dashboard
                     </h2>
-                    <div style={{ marginBottom: '20px' }}>
-                        <select value={timeInterval} onChange={(e) => setTimeInterval(e.target.value)} style={{
-                            padding: '10px',
-                            marginRight: '10px',
-                            backgroundColor: '#E0E0E0',
-                            border: 'none',
-                            borderRadius: '5px',
-                            color: '#000000'
-                        }}>
+                    <div style={{ marginBottom: '20px', display: 'flex', alignItems: 'center' }}>
+                        <select 
+                            value={timeInterval} 
+                            onChange={(e) => setTimeInterval(e.target.value)} 
+                            style={{
+                                padding: '10px',
+                                marginRight: '10px',
+                                backgroundColor: '#E0E0E0',
+                                border: 'none',
+                                borderRadius: '5px',
+                                color: '#000000'
+                            }}
+                        >
                             <option value="year">Yearly</option>
                             <option value="quarter">Quarterly</option>
                             <option value="month">Monthly</option>
                             <option value="week">Weekly</option>
                         </select>
-                        <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} style={{
-                            padding: '10px',
-                            marginRight: '10px',
-                            backgroundColor: '#E0E0E0',
-                            border: 'none',
-                            borderRadius: '5px',
-                            color: '#000000'
-                        }} />
-                        <input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} style={{
-                            padding: '10px',
-                            backgroundColor: '#E0E0E0',
-                            border: 'none',
-                            borderRadius: '5px',
-                            color: '#000000'
-                        }} />
+                        <input 
+                            type="date" 
+                            value={startDate} 
+                            onChange={(e) => setStartDate(e.target.value)} 
+                            style={{
+                                padding: '10px',
+                                marginRight: '10px',
+                                backgroundColor: '#E0E0E0',
+                                border: 'none',
+                                borderRadius: '5px',
+                                color: '#000000'
+                            }} 
+                        />
+                        <input 
+                            type="date" 
+                            value={endDate} 
+                            onChange={(e) => setEndDate(e.target.value)} 
+                            style={{
+                                padding: '10px',
+                                marginRight: '10px',
+                                backgroundColor: '#E0E0E0',
+                                border: 'none',
+                                borderRadius: '5px',
+                                color: '#000000'
+                            }} 
+                        />
+                        <button
+                            onClick={handleGetGraph}
+                            style={{
+                                padding: '10px 20px',
+                                backgroundColor: '#D4AF37',
+                                color: '#000000',
+                                border: 'none',
+                                borderRadius: '5px',
+                                fontFamily: "'Roboto', sans-serif",
+                                cursor: 'pointer',
+                                transition: 'background-color 0.3s'
+                            }}
+                            onMouseEnter={e => (e.currentTarget.style.backgroundColor = '#E0E0E0')}
+                            onMouseLeave={e => (e.currentTarget.style.backgroundColor = '#D4AF37')}
+                        >
+                            Get Graph
+                        </button>
                     </div>
                     <canvas ref={chartRef} style={{ maxWidth: '100%', height: '400px' }}></canvas>
                 </div>
