@@ -162,10 +162,6 @@ const ProductDetails = () => {
     };
 
     const handleAddToCart = async () => {
-        if (!user) {
-            navigate('/login');
-            return;
-        }
         if (!selectedVariant) {
             setCartMessage('Please select a variant.');
             return;
@@ -176,28 +172,24 @@ const ProductDetails = () => {
 
         try {
             const token = localStorage.getItem('token');
-            if (!token) throw new Error('No token found');
+            const headers = token ? { Authorization: `Bearer ${token}` } : {};
 
             await axios.post(
                 `${CART_API_URL}/cart/add`,
                 {
-                    product_id: product._id, // Send only the productId
-                    variantName: selectedVariant, // Add variantName as a separate field
+                    product_id: product._id,
+                    variantName: selectedVariant,
                     quantity,
                     price
                 },
-                {
-                    headers: {
-                        Authorization: `Bearer ${token}`
-                    }
-                }
+                { headers }
             );
 
             setCartMessage('Item added to cart successfully!');
             setTimeout(() => setCartMessage(''), 3000);
         } catch (error) {
             console.error('Error adding to cart:', error);
-            setCartMessage('Failed to add item to cart. Please check the server response.');
+            setCartMessage('Failed to add item to cart. Please try again.');
         }
     };
 
