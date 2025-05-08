@@ -5,6 +5,8 @@ const userSchema = new mongoose.Schema({
   password: { type: String },
   name: { type: String, required: true },
   role: { type: String, default: 'user' },
+  googleId: { type: String, unique: true, sparse: true }, // Add Google ID
+  facebookId: { type: String, unique: true, sparse: true }, // Add Facebook ID
   shippingAddress: {
     street: { type: String, required: true },
     city: { type: String, required: true },
