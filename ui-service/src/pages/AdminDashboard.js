@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useContext } from 'react';
+import React, { useState, useEffect, useContext, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { AuthContext } from '../App';
@@ -63,9 +63,9 @@ const AdminDashboard = () => {
             axios.defaults.headers.Authorization = `Bearer ${token}`;
         }
         fetchData();
-    }, [user, navigate]);
+    }, [user, navigate, fetchData]);
 
-    const fetchData = async () => {
+    const fetchData = useCallback(async () => {
         await Promise.all([
             fetchCategories(),
             fetchProducts(),
@@ -74,9 +74,9 @@ const AdminDashboard = () => {
             fetchOrders(),
         ]);
         renderCharts();
-    };
+    }, [fetchCategories, fetchProducts, fetchUsers, fetchDiscounts, fetchOrders, renderCharts]);
 
-    const fetchCategories = async () => {
+    const fetchCategories = useCallback(async () => {
         try {
             const token = localStorage.getItem('token');
             if (!token) throw new Error('No JWT token found in localStorage');
@@ -93,9 +93,9 @@ const AdminDashboard = () => {
                 navigate('/login');
             }
         }
-    };
+    }, [logout, navigate]);
 
-    const fetchProducts = async () => {
+    const fetchProducts = useCallback(async () => {
         try {
             const token = localStorage.getItem('token');
             if (!token) throw new Error('No JWT token found in localStorage');
@@ -114,9 +114,9 @@ const AdminDashboard = () => {
                 navigate('/login');
             }
         }
-    };
+    }, [logout, navigate]);
 
-    const fetchUsers = async () => {
+    const fetchUsers = useCallback(async () => {
         try {
             const token = localStorage.getItem('token');
             if (!token) throw new Error('No JWT token found in localStorage');
@@ -140,9 +140,9 @@ const AdminDashboard = () => {
                 navigate('/login');
             }
         }
-    };
+    }, [logout, navigate]);
 
-    const fetchDiscounts = async () => {
+    const fetchDiscounts = useCallback(async () => {
         try {
             const token = localStorage.getItem('token');
             if (!token) throw new Error('No JWT token found in localStorage');
@@ -162,9 +162,9 @@ const AdminDashboard = () => {
                 navigate('/login');
             }
         }
-    };
+    }, [logout, navigate]);
 
-    const fetchOrders = async () => {
+    const fetchOrders = useCallback(async () => {
         try {
             const token = localStorage.getItem('token');
             if (!token) throw new Error('No JWT token found in localStorage');
@@ -187,7 +187,7 @@ const AdminDashboard = () => {
                 navigate('/login');
             }
         }
-    };
+    }, [logout, navigate, timeInterval, startDate, endDate]);
 
     const handleInputChange = (e) => {
         const { name, value } = e.target;
@@ -431,7 +431,7 @@ const AdminDashboard = () => {
         }
     };
 
-    const renderCharts = () => {
+    const renderCharts = useCallback(() => {
         if (chartInstance.current) {
             chartInstance.current.destroy();
         }
@@ -463,15 +463,15 @@ const AdminDashboard = () => {
                 plugins: { legend: { labels: { color: '#FFFFFF' } } },
             },
         });
-    };
+    }, [stats]);
 
     useEffect(() => {
         fetchOrders();
-    }, [timeInterval, startDate, endDate]);
+    }, [fetchOrders, timeInterval, startDate, endDate]);
 
     useEffect(() => {
         renderCharts();
-    }, [stats]);
+    }, [renderCharts, stats]);
 
     if (!user) return null;
 
