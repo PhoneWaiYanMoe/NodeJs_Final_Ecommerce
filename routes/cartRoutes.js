@@ -26,7 +26,8 @@ const transporter = nodemailer.createTransport({
 const verifyToken = (req, res, next) => {
   const token = req.headers.authorization?.split(' ')[1];
   if (!token) {
-    return res.status(401).json({ error: 'No token provided' });
+    req.user = null; // No token, treat as guest
+    return next();
   }
 
   try {
@@ -34,7 +35,8 @@ const verifyToken = (req, res, next) => {
     req.user = decoded;
     next();
   } catch (err) {
-    res.status(401).json({ error: 'Invalid token' });
+    req.user = null; // Invalid token, treat as guest
+    next();
   }
 };
 
@@ -54,13 +56,20 @@ const userRequired = (req, res, next) => {
   next();
 };
 
-// Helper to get cart identifier (userId only, no sessionId for guests)
+// Helper to get cart identifier (userId for logged-in users, sessionId for guests)
 const getCartIdentifier = (req) => {
-  return { userId: req.user.id };
+  if (req.user) {
+    return { userId: req.user.id };
+  }
+  // Generate or retrieve sessionId for guests
+  if (!req.session.sessionId) {
+    req.session.sessionId = mongoose.Types.ObjectId().toString();
+  }
+  return { sessionId: req.session.sessionId };
 };
 
 // Add to Cart
-router.post('/add', [verifyToken, userRequired], async (req, res) => {
+router.post('/add', verifyToken, async (req, res) => {
   const { product_id, variantName = null, quantity = 1, price } = req.body;
 
   if (!product_id || !price) {
@@ -97,7 +106,7 @@ router.post('/add', [verifyToken, userRequired], async (req, res) => {
 });
 
 // Update Cart Item Quantity
-router.put('/update/:itemId', [verifyToken, userRequired], async (req, res) => {
+router.put('/update/:itemId', verifyToken, async (req, res) => {
   const { itemId } = req.params;
   const { quantity } = req.body;
 
@@ -124,7 +133,7 @@ router.put('/update/:itemId', [verifyToken, userRequired], async (req, res) => {
 });
 
 // Remove Item from Cart
-router.delete('/remove/:itemId', [verifyToken, userRequired], async (req, res) => {
+router.delete('/remove/:itemId', verifyToken, async (req, res) => {
   const { itemId } = req.params;
 
   try {
@@ -143,7 +152,7 @@ router.delete('/remove/:itemId', [verifyToken, userRequired], async (req, res) =
 });
 
 // Cart Summary
-router.get('/summary', [verifyToken, userRequired], async (req, res) => {
+router.get('/summary', verifyToken, async (req, res) => {
   try {
     const cartIdentifier = getCartIdentifier(req);
     const cartItems = await CartItem.find(cartIdentifier);
@@ -193,7 +202,7 @@ router.get('/summary', [verifyToken, userRequired], async (req, res) => {
 });
 
 // Apply Discount Code
-router.post('/apply-discount', [verifyToken, userRequired], async (req, res) => {
+router.post('/apply-discount', verifyToken, async (req, res) => {
   const { code } = req.body;
 
   if (!code) {
@@ -242,11 +251,15 @@ router.post('/apply-discount', [verifyToken, userRequired], async (req, res) => 
 });
 
 // Checkout Process
-router.post('/checkout', [verifyToken, userRequired], async (req, res) => {
+router.post('/checkout', verifyToken, async (req, res) => {
   const { paymentDetails, discountCode } = req.body;
 
   if (!paymentDetails) {
     return res.status(400).json({ error: 'Missing paymentDetails' });
+  }
+
+  if (!req.user) {
+    return res.status(401).json({ error: 'Login required to complete checkout' });
   }
 
   try {
