@@ -17,7 +17,7 @@ import OrderHistory from './pages/OrderHistory';
 export const AuthContext = createContext();
 
 // Configure Axios defaults
-axios.defaults.baseURL = 'https://nodejs-final-ecommerce.onrender.com/api/users';
+axios.defaults.baseURL = 'https://nodejs-final-ecommerce.onrender.com/users';
 
 // Add token to axios headers
 axios.interceptors.request.use((config) => {
