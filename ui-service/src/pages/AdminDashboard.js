@@ -13,6 +13,7 @@ const AdminDashboard = () => {
     const [discounts, setDiscounts] = useState([]);
     const [orders, setOrders] = useState([]);
     const [stats, setStats] = useState({});
+    const [productStats, setProductStats] = useState({});
     const [formData, setFormData] = useState({
         _id: null,
         name: '',
@@ -45,8 +46,11 @@ const AdminDashboard = () => {
     const [selectedOrder, setSelectedOrder] = useState(null);
     const [newStatus, setNewStatus] = useState('');
     const [modalOpen, setModalOpen] = useState(false);
-    const chartRef = useRef(null);
-    const chartInstance = useRef(null);
+    const [chartType, setChartType] = useState('bar');
+    const barChartRef = useRef(null);
+    const pieChartRef = useRef(null);
+    const barChartInstance = useRef(null);
+    const pieChartInstance = useRef(null);
 
     const PRODUCT_API_URL = 'https://product-management-soyo.onrender.com';
     const ACCOUNT_API_URL = 'https://nodejs-final-ecommerce.onrender.com';
@@ -154,9 +158,17 @@ const AdminDashboard = () => {
             const response = await axios.get(`${CART_API_URL}/cart/admin/orders`, { params });
             setOrders(response.data.orders || []);
             setStats(response.data.stats || {});
+            // Calculate product stats (e.g., number of products sold and types)
+            const productCount = response.data.orders.reduce((acc, order) => acc + order.items.length, 0);
+            const productTypes = [...new Set(response.data.orders.flatMap(order => order.items.map(item => item.category)))];
+            setProductStats({
+                totalProducts: productCount,
+                uniqueProductTypes: productTypes.length
+            });
         } catch (err) {
             setOrders([]);
             setStats({});
+            setProductStats({});
             setError(`Failed to fetch orders: ${err.message}${err.response?.data?.error ? ` - ${err.response.data.error}` : ''}`);
             if (err.response?.status === 401) {
                 await logout();
@@ -165,29 +177,29 @@ const AdminDashboard = () => {
         }
     }, [logout, navigate, timeInterval, startDate, endDate]);
 
-    const renderCharts = useCallback(() => {
-        if (chartInstance.current) {
-            chartInstance.current.destroy();
+    const renderBarChart = useCallback(() => {
+        if (barChartInstance.current) {
+            barChartInstance.current.destroy();
         }
-        const ctx = chartRef.current.getContext('2d');
-        chartInstance.current = new Chart(ctx, {
+        const ctx = barChartRef.current.getContext('2d');
+        barChartInstance.current = new Chart(ctx, {
             type: 'bar',
             data: {
                 labels: Object.keys(stats),
                 datasets: [
                     {
                         label: 'Orders Count',
-                        data: Object.values(stats).map(s => s.ordersCount),
+                        data: Object.values(stats).map(s => s.ordersCount || 0),
                         backgroundColor: 'rgba(212, 175, 55, 0.6)',
                     },
                     {
                         label: 'Total Revenue',
-                        data: Object.values(stats).map(s => s.totalRevenue),
+                        data: Object.values(stats).map(s => s.totalRevenue || 0),
                         backgroundColor: 'rgba(255, 99, 132, 0.6)',
                     },
                     {
                         label: 'Total Profit',
-                        data: Object.values(stats).map(s => s.totalProfit),
+                        data: Object.values(stats).map(s => s.totalProfit || 0),
                         backgroundColor: 'rgba(54, 162, 235, 0.6)',
                     },
                 ],
@@ -199,20 +211,39 @@ const AdminDashboard = () => {
         });
     }, [stats]);
 
+    const renderPieChart = useCallback(() => {
+        if (pieChartInstance.current) {
+            pieChartInstance.current.destroy();
+        }
+        const ctx = pieChartRef.current.getContext('2d');
+        pieChartInstance.current = new Chart(ctx, {
+            type: 'pie',
+            data: {
+                labels: ['Total Products Sold', 'Unique Product Types'],
+                datasets: [{
+                    data: [productStats.totalProducts || 0, productStats.uniqueProductTypes || 0],
+                    backgroundColor: ['rgba(255, 206, 86, 0.6)', 'rgba(75, 192, 192, 0.6)'],
+                }],
+            },
+            options: {
+                plugins: { legend: { labels: { color: '#FFFFFF' } } },
+            },
+        });
+    }, [productStats]);
+
     const fetchData = useCallback(async () => {
         await Promise.all([
             fetchCategories(),
             fetchProducts(),
             fetchUsers(),
             fetchDiscounts(),
-
         ]);
     }, [fetchCategories, fetchProducts, fetchUsers, fetchDiscounts]);
 
-
-    const handleGetGraph = () => {
+    const handleGetData = () => {
         fetchOrders().then(() => {
-            renderCharts();
+            if (chartType === 'bar') renderBarChart();
+            else if (chartType === 'pie') renderPieChart();
         });
     };
 
@@ -535,8 +566,8 @@ const AdminDashboard = () => {
                         cursor: 'pointer',
                         transition: 'background-color 0.3s'
                     }}
-                    onMouseEnter={e => (e.currentTarget.style.backgroundColor = '#E0E0E0')}
-                    onMouseLeave={e => (e.currentTarget.style.backgroundColor = '#D4AF37')}
+                    onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#E0E0E0'}
+                    onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#D4AF37'}
                 >
                     Logout
                 </button>
@@ -569,13 +600,14 @@ const AdminDashboard = () => {
                     }}>
                         Advanced Dashboard
                     </h2>
-                    <div style={{ marginBottom: '20px', display: 'flex', alignItems: 'center' }}>
-                        <select 
-                            value={timeInterval} 
-                            onChange={(e) => setTimeInterval(e.target.value)} 
+                    <div style={{ marginBottom: '20px', display: 'flex', alignItems: 'center', flexWrap: 'wrap' }}>
+                        <select
+                            value={timeInterval}
+                            onChange={(e) => setTimeInterval(e.target.value)}
                             style={{
                                 padding: '10px',
                                 marginRight: '10px',
+                                marginBottom: '10px',
                                 backgroundColor: '#E0E0E0',
                                 border: 'none',
                                 borderRadius: '5px',
@@ -587,34 +619,52 @@ const AdminDashboard = () => {
                             <option value="month">Monthly</option>
                             <option value="week">Weekly</option>
                         </select>
-                        <input 
-                            type="date" 
-                            value={startDate} 
-                            onChange={(e) => setStartDate(e.target.value)} 
+                        <input
+                            type="date"
+                            value={startDate}
+                            onChange={(e) => setStartDate(e.target.value)}
                             style={{
                                 padding: '10px',
                                 marginRight: '10px',
+                                marginBottom: '10px',
                                 backgroundColor: '#E0E0E0',
                                 border: 'none',
                                 borderRadius: '5px',
                                 color: '#000000'
-                            }} 
+                            }}
                         />
-                        <input 
-                            type="date" 
-                            value={endDate} 
-                            onChange={(e) => setEndDate(e.target.value)} 
+                        <input
+                            type="date"
+                            value={endDate}
+                            onChange={(e) => setEndDate(e.target.value)}
                             style={{
                                 padding: '10px',
                                 marginRight: '10px',
+                                marginBottom: '10px',
                                 backgroundColor: '#E0E0E0',
                                 border: 'none',
                                 borderRadius: '5px',
                                 color: '#000000'
-                            }} 
+                            }}
                         />
+                        <select
+                            value={chartType}
+                            onChange={(e) => setChartType(e.target.value)}
+                            style={{
+                                padding: '10px',
+                                marginRight: '10px',
+                                marginBottom: '10px',
+                                backgroundColor: '#E0E0E0',
+                                border: 'none',
+                                borderRadius: '5px',
+                                color: '#000000'
+                            }}
+                        >
+                            <option value="bar">Bar Chart</option>
+                            <option value="pie">Pie Chart</option>
+                        </select>
                         <button
-                            onClick={handleGetGraph}
+                            onClick={handleGetData}
                             style={{
                                 padding: '10px 20px',
                                 backgroundColor: '#D4AF37',
@@ -625,13 +675,53 @@ const AdminDashboard = () => {
                                 cursor: 'pointer',
                                 transition: 'background-color 0.3s'
                             }}
-                            onMouseEnter={e => (e.currentTarget.style.backgroundColor = '#E0E0E0')}
-                            onMouseLeave={e => (e.currentTarget.style.backgroundColor = '#D4AF37')}
+                            onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#E0E0E0'}
+                            onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#D4AF37'}
                         >
-                            Get Graph
+                            Get Data
                         </button>
                     </div>
-                    <canvas ref={chartRef} style={{ maxWidth: '100%', height: '400px' }}></canvas>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '20px' }}>
+                        <canvas ref={barChartRef} style={{ maxWidth: '48%', height: '400px', display: chartType === 'bar' ? 'block' : 'none' }}></canvas>
+                        <canvas ref={pieChartRef} style={{ maxWidth: '48%', height: '400px', display: chartType === 'pie' ? 'block' : 'none' }}></canvas>
+                    </div>
+                    <table style={{
+                        width: '100%',
+                        borderCollapse: 'collapse',
+                        color: '#FFFFFF',
+                        fontFamily: "'Roboto', sans-serif",
+                        backgroundColor: '#2A2A2A',
+                        border: '1px solid #D4AF37'
+                    }}>
+                        <thead>
+                            <tr style={{ borderBottom: '1px solid #D4AF37' }}>
+                                <th style={{ padding: '10px', textAlign: 'left' }}>Metric</th>
+                                <th style={{ padding: '10px', textAlign: 'left' }}>Value</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr style={{ borderBottom: '1px solid #333333' }}>
+                                <td style={{ padding: '10px' }}>Orders Count</td>
+                                <td style={{ padding: '10px' }}>{Object.values(stats).reduce((sum, s) => sum + (s.ordersCount || 0), 0)}</td>
+                            </tr>
+                            <tr style={{ borderBottom: '1px solid #333333' }}>
+                                <td style={{ padding: '10px' }}>Total Revenue</td>
+                                <td style={{ padding: '10px' }}>${Object.values(stats).reduce((sum, s) => sum + (s.totalRevenue || 0), 0).toFixed(2)}</td>
+                            </tr>
+                            <tr style={{ borderBottom: '1px solid #333333' }}>
+                                <td style={{ padding: '10px' }}>Total Profit</td>
+                                <td style={{ padding: '10px' }}>${Object.values(stats).reduce((sum, s) => sum + (s.totalProfit || 0), 0).toFixed(2)}</td>
+                            </tr>
+                            <tr style={{ borderBottom: '1px solid #333333' }}>
+                                <td style={{ padding: '10px' }}>Total Products Sold</td>
+                                <td style={{ padding: '10px' }}>{productStats.totalProducts || 0}</td>
+                            </tr>
+                            <tr style={{ borderBottom: '1px solid #333333' }}>
+                                <td style={{ padding: '10px' }}>Unique Product Types</td>
+                                <td style={{ padding: '10px' }}>{productStats.uniqueProductTypes || 0}</td>
+                            </tr>
+                        </tbody>
+                    </table>
                 </div>
 
                 {/* Order History */}
@@ -697,8 +787,8 @@ const AdminDashboard = () => {
                                                     cursor: 'pointer',
                                                     transition: 'background-color 0.3s'
                                                 }}
-                                                onMouseEnter={e => (e.currentTarget.style.backgroundColor = '#E0E0E0')}
-                                                onMouseLeave={e => (e.currentTarget.style.backgroundColor = '#D4AF37')}
+                                                onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#E0E0E0'}
+                                                onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#D4AF37'}
                                             >
                                                 Edit Status
                                             </button>
@@ -799,8 +889,8 @@ const AdminDashboard = () => {
                                 cursor: 'pointer',
                                 transition: 'background-color 0.3s'
                             }}
-                            onMouseEnter={e => (e.currentTarget.style.backgroundColor = '#E0E0E0')}
-                            onMouseLeave={e => (e.currentTarget.style.backgroundColor = '#D4AF37')}
+                            onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#E0E0E0'}
+                            onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#D4AF37'}
                         >
                             Create Discount Code
                         </button>
@@ -966,8 +1056,8 @@ const AdminDashboard = () => {
                                 cursor: 'pointer',
                                 transition: 'background-color 0.3s'
                             }}
-                            onMouseEnter={e => (e.currentTarget.style.backgroundColor = '#E0E0E0')}
-                            onMouseLeave={e => (e.currentTarget.style.backgroundColor = '#D4AF37')}
+                            onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#E0E0E0'}
+                            onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#D4AF37'}
                         >
                             {userForm._id ? 'Update User' : 'Create User'}
                         </button>
@@ -1035,8 +1125,8 @@ const AdminDashboard = () => {
                                                     cursor: 'pointer',
                                                     transition: 'background-color 0.3s'
                                                 }}
-                                                onMouseEnter={e => (e.currentTarget.style.backgroundColor = '#E0E0E0')}
-                                                onMouseLeave={e => (e.currentTarget.style.backgroundColor = '#D4AF37')}
+                                                onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#E0E0E0'}
+                                                onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#D4AF37'}
                                             >
                                                 Edit
                                             </button>
@@ -1051,8 +1141,8 @@ const AdminDashboard = () => {
                                                     cursor: 'pointer',
                                                     transition: 'background-color 0.3s'
                                                 }}
-                                                onMouseEnter={e => (e.currentTarget.style.backgroundColor = '#FF7777')}
-                                                onMouseLeave={e => (e.currentTarget.style.backgroundColor = '#FF5555')}
+                                                onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#FF7777'}
+                                                onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#FF5555'}
                                             >
                                                 Delete
                                             </button>
@@ -1239,8 +1329,8 @@ const AdminDashboard = () => {
                                 cursor: 'pointer',
                                 transition: 'background-color 0.3s'
                             }}
-                            onMouseEnter={e => (e.currentTarget.style.backgroundColor = '#E0E0E0')}
-                            onMouseLeave={e => (e.currentTarget.style.backgroundColor = '#D4AF37')}
+                            onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#E0E0E0'}
+                            onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#D4AF37'}
                         >
                             {formData._id ? 'Update Product' : 'Create Product'}
                         </button>
@@ -1310,8 +1400,8 @@ const AdminDashboard = () => {
                                                     cursor: 'pointer',
                                                     transition: 'background-color 0.3s'
                                                 }}
-                                                onMouseEnter={e => (e.currentTarget.style.backgroundColor = '#E0E0E0')}
-                                                onMouseLeave={e => (e.currentTarget.style.backgroundColor = '#D4AF37')}
+                                                onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#E0E0E0'}
+                                                onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#D4AF37'}
                                             >
                                                 Edit
                                             </button>
@@ -1326,8 +1416,8 @@ const AdminDashboard = () => {
                                                     cursor: 'pointer',
                                                     transition: 'background-color 0.3s'
                                                 }}
-                                                onMouseEnter={e => (e.currentTarget.style.backgroundColor = '#FF7777')}
-                                                onMouseLeave={e => (e.currentTarget.style.backgroundColor = '#FF5555')}
+                                                onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#FF7777'}
+                                                onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#FF5555'}
                                             >
                                                 Delete
                                             </button>
@@ -1340,6 +1430,7 @@ const AdminDashboard = () => {
                 </div>
             </main>
 
+            {/* Modal for Updating Order Status */}
             {modalOpen && selectedOrder && (
                 <div style={{
                     position: 'fixed',
@@ -1394,16 +1485,20 @@ const AdminDashboard = () => {
                         }}>
                             <strong>Current Status:</strong> {selectedOrder.currentStatus}
                         </p>
-                        <select value={newStatus} onChange={(e) => setNewStatus(e.target.value)} style={{
-                            width: '100%',
-                            padding: '10px',
-                            marginBottom: '20px',
-                            backgroundColor: '#E0E0E0',
-                            border: 'none',
-                            borderRadius: '5px',
-                            color: '#000000',
-                            fontFamily: "'Roboto', sans-serif"
-                        }}>
+                        <select
+                            value={newStatus}
+                            onChange={(e) => setNewStatus(e.target.value)}
+                            style={{
+                                width: '100%',
+                                padding: '10px',
+                                marginBottom: '20px',
+                                backgroundColor: '#E0E0E0',
+                                border: 'none',
+                                borderRadius: '5px',
+                                color: '#000000',
+                                fontFamily: "'Roboto', sans-serif"
+                            }}
+                        >
                             <option value="ordered">Ordered</option>
                             <option value="processing">Processing</option>
                             <option value="shipped">Shipped</option>
@@ -1423,8 +1518,8 @@ const AdminDashboard = () => {
                                 cursor: 'pointer',
                                 transition: 'background-color 0.3s'
                             }}
-                            onMouseEnter={e => (e.currentTarget.style.backgroundColor = '#E0E0E0')}
-                            onMouseLeave={e => (e.currentTarget.style.backgroundColor = '#D4AF37')}
+                            onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#E0E0E0'}
+                            onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#D4AF37'}
                         >
                             Update Status
                         </button>
