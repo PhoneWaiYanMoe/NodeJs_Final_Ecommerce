@@ -19,24 +19,17 @@ const Checkout = () => {
   const PRODUCTS_API_URL = 'https://product-management-soyo.onrender.com/api/products';
 
   useEffect(() => {
-    if (!user) {
-      navigate('/login');
-      return;
-    }
     if (!cartSummary || !cartSummary.items || cartSummary.items.length === 0) {
       fetchCartSummary();
     }
-  }, [user, navigate, cartSummary]);
+  }, [cartSummary]);
 
   const fetchCartSummary = async () => {
     try {
       const token = localStorage.getItem('token');
-      if (!token) throw new Error('No token found');
-
+      const headers = token ? { Authorization: `Bearer ${token}` } : {};
       const response = await axios.get(`${CART_API_URL}/summary`, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
+        headers,
         params: { discountCode },
       });
 
@@ -65,6 +58,11 @@ const Checkout = () => {
 
     if (!paymentDetails.cardNumber || !paymentDetails.expiryDate || !paymentDetails.cvv) {
       setMessage('Please fill in all payment details.');
+      return;
+    }
+
+    if (!user) {
+      navigate('/login', { state: { from: '/checkout', cartSummary, discountCode } });
       return;
     }
 
@@ -120,7 +118,7 @@ const Checkout = () => {
       console.error('Error during checkout:', error);
       setMessage(error.response?.data?.error || 'Checkout failed. Please try again.');
       if (error.response?.status === 401) {
-        navigate('/login');
+        navigate('/login', { state: { from: '/checkout', cartSummary, discountCode } });
       }
     }
   };
