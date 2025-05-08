@@ -22,7 +22,7 @@ const transporter = nodemailer.createTransport({
   },
 });
 
-// Middleware to verify JWT
+// Middleware to verify JWT (allows guests to proceed)
 const verifyToken = (req, res, next) => {
   const token = req.headers.authorization?.split(' ')[1];
   if (!token) {
@@ -59,13 +59,13 @@ const userRequired = (req, res, next) => {
 // Helper to get cart identifier (userId for logged-in users, sessionId for guests)
 const getCartIdentifier = (req) => {
   if (req.user) {
-    return { userId: req.user.id };
+    return { userId: req.user.id, sessionId: null };
   }
   // Generate or retrieve sessionId for guests
   if (!req.session.sessionId) {
     req.session.sessionId = mongoose.Types.ObjectId().toString();
   }
-  return { sessionId: req.session.sessionId };
+  return { sessionId: req.session.sessionId, userId: null };
 };
 
 // Add to Cart
