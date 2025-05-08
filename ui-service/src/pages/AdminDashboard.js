@@ -1045,7 +1045,7 @@ const AdminDashboard = () => {
                 </div>
 
                 <div style={{
-                    backgroundColor: #1A1A1A',
+                    backgroundColor: '#1A1A1A',
                     padding: '30px',
                     borderRadius: '10px',
                     maxWidth: '600px',
