@@ -107,7 +107,7 @@ const ProductDetails = () => {
                         'Authorization': `Bearer ${token}`,
                         'Content-Type': 'application/json'
                     },
-                    withCredentials: true  // Important for handling cookies
+                    withCredentials: false  // Changed from true to false to avoid CORS issues
                 });
                 
                 if (response.data && response.data.review) {
@@ -189,7 +189,7 @@ const ProductDetails = () => {
                     quantity,
                     price
                 },
-                { headers, withCredentials: true }
+                { headers, withCredentials: false }  // Changed from true to false to be consistent
             );
 
             setCartMessage('Item added to cart successfully!');
