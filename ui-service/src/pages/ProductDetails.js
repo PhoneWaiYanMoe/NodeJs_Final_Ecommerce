@@ -182,7 +182,7 @@ const ProductDetails = () => {
                     quantity,
                     price
                 },
-                { headers }
+                { headers, withCredentials: true }
             );
 
             setCartMessage('Item added to cart successfully!');
