@@ -2,7 +2,7 @@ import React, { useState, useEffect, useContext, useRef, useCallback } from 'rea
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import Chart from 'chart.js/auto';
-import { AuthContext } from '../App';
+import { AuthContext } from "../App";
 
 const AdminDashboard = () => {
     const navigate = useNavigate();
