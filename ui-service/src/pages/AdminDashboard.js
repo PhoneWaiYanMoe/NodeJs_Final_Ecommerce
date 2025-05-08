@@ -2,6 +2,7 @@ import React, { useState, useEffect, useContext, useRef, useCallback } from 'rea
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import Chart from 'chart.js/auto';
+import { AuthContext } from '../App';
 
 const AdminDashboard = () => {
     const navigate = useNavigate();
@@ -196,7 +197,7 @@ const AdminDashboard = () => {
                         productStats.uniqueProductTypes || 0
                     ],
                     backgroundColor: ['rgba(212, 175, 55, 0.6)', 'rgba(54, 162, 235, 0.6)', 'rgba(255, 99, 132, 0.6)'],
-                    borderColor: ['rgba(212, 175, 55, 1)', 'rgba(54, 162, 235, 1)', 'rgba(255, 99, 132, 1)'],
+                    borderColor: ['rgba(212, 175, 55, 1)', 'rgba( Eastman, 235, 1)', 'rgba(255, 99, 132, 1)'],
                     borderWidth: 1
                 }]
             },
@@ -1044,7 +1045,7 @@ const AdminDashboard = () => {
                 </div>
 
                 <div style={{
-                    backgroundColor: '#1A1A1A',
+                    backgroundColor: #1A1A1A',
                     padding: '30px',
                     borderRadius: '10px',
                     maxWidth: '600px',
