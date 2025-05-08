@@ -102,28 +102,32 @@ const ProductDetails = () => {
                     return;
                 }
 
+                // Log token for debugging (remove in production)
+                console.log("Using token:", token);
+
                 const reviewPayload = {
                     comment: newReview.comment,
-                    rating: Number(newReview.rating),
-                    userId: user._id  // Add user ID to the payload
+                    rating: Number(newReview.rating)
                 };
                 
-                const response = await axios({
-                    method: 'post',
-                    url: `${API_URL}/api/products/${id}/review`,
-                    data: reviewPayload,
-                    headers: {
-                        'Authorization': `Bearer ${token}`,
-                        'Content-Type': 'application/json'
-                    },
-                    withCredentials: false  // Changed from true to false to avoid CORS issues
-                });
+                const response = await axios.post(
+                    `${API_URL}/api/products/${id}/review`,
+                    reviewPayload,
+                    {
+                        headers: {
+                            'Authorization': `Bearer ${token}`,
+                            'Content-Type': 'application/json'
+                        }
+                    }
+                );
                 
                 if (response.data && response.data.review) {
                     setReviews(prevReviews => {
                         const exists = prevReviews.some(rev => 
-                            rev.comment === response.data.review.comment && 
-                            rev.createdAt === response.data.review.createdAt
+                            (rev._id && rev._id === response.data.review._id) || 
+                            (rev.comment === response.data.review.comment && 
+                             rev.userName === response.data.review.userName && 
+                             rev.createdAt === response.data.review.createdAt)
                         );
                         return exists ? prevReviews : [...prevReviews, response.data.review];
                     });
@@ -151,8 +155,10 @@ const ProductDetails = () => {
                 if (response.data && response.data.review) {
                     setReviews(prevReviews => {
                         const exists = prevReviews.some(rev => 
-                            rev.comment === response.data.review.comment && 
-                            rev.createdAt === response.data.review.createdAt
+                            (rev._id && rev._id === response.data.review._id) || 
+                            (rev.comment === response.data.review.comment && 
+                             rev.userName === response.data.review.userName && 
+                             rev.createdAt === response.data.review.createdAt)
                         );
                         return exists ? prevReviews : [...prevReviews, response.data.review];
                     });
@@ -164,13 +170,16 @@ const ProductDetails = () => {
         } catch (error) {
             console.error('Error submitting review:', error);
             
+            // More detailed error logging
+            if (error.response) {
+                console.log('Error response data:', error.response.data);
+                console.log('Error response status:', error.response.status);
+                console.log('Error response headers:', error.response.headers);
+            }
+            
             if (error.response?.status === 401) {
-                if (newReview.rating > 0) {
-                    setReviewError('You need to be logged in to submit a rated review. You can still submit comments without rating.');
-                    setNewReview(prev => ({ ...prev, rating: 0 }));
-                } else {
-                    setReviewError('Failed to submit review. Please try again.');
-                }
+                setReviewError('Authentication failed. Please log out and log in again to submit a rated review.');
+                // Don't automatically clear the rating - let the user decide
             } else {
                 setReviewError('Failed to submit review. Please try again.');
             }
