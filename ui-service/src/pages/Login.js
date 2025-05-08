@@ -33,7 +33,7 @@ const Login = () => {
 
   const handleGoogleLogin = async (credentialResponse) => {
     try {
-      const response = await fetch('https://your-backend-url.onrender.com/api/users/media-login/google', {
+      const response = await fetch('https://nodejs-final-ecommerce.onrender.com/api/users/media-login/google', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ token: credentialResponse.credential }),
@@ -59,7 +59,7 @@ const Login = () => {
   const handleFacebookLogin = async (response) => {
     if (response.accessToken) {
       try {
-        const res = await fetch('https://your-backend-url.onrender.com/api/users/media-login/facebook', {
+        const res = await fetch('https://nodejs-final-ecommerce.onrender.com/api/users/media-login/facebook', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ accessToken: response.accessToken, userID: response.userID }),
