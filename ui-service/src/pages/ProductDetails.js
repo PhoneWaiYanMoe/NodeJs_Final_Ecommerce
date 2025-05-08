@@ -68,7 +68,16 @@ const ProductDetails = () => {
     useEffect(() => {
         const newSocket = io(API_URL);
         newSocket.on(`product:${id}:review`, (review) => {
-            setReviews((prevReviews) => [...prevReviews, review]);
+            // Check if review already exists before adding
+            setReviews((prevReviews) => {
+                const exists = prevReviews.some(rev => 
+                    (rev._id && rev._id === review._id) || 
+                    (rev.comment === review.comment && 
+                     rev.userName === review.userName && 
+                     rev.createdAt === review.createdAt)
+                );
+                return exists ? prevReviews : [...prevReviews, review];
+            });
         });
 
         return () => newSocket.close();
