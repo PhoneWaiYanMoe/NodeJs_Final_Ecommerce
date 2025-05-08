@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const mongoose = require('mongoose');
 const jwt = require('jsonwebtoken');
+const nodemailer = require('nodemailer');
 const CartItem = require('../models/CartItem');
 const Order = require('../models/Order');
 const DiscountCode = require('../models/DiscountCode');
@@ -11,6 +12,15 @@ const User = require('../models/User');
 const TAX_RATE = 0.1; // 10% tax
 const SHIPPING_FEE = 5.0;
 const SECRET_KEY = process.env.JWT_SECRET || 'your-jwt-secret-key';
+
+// Email setup with Nodemailer
+const transporter = nodemailer.createTransport({
+  service: 'gmail',
+  auth: {
+    user: process.env.EMAIL_USER,
+    pass: process.env.EMAIL_PASS,
+  },
+});
 
 // Middleware to verify JWT
 const verifyToken = (req, res, next) => {
@@ -291,6 +301,43 @@ router.post('/checkout', [verifyToken, userRequired], async (req, res) => {
       paymentDetails,
     });
     const savedOrder = await order.save();
+
+    // Send confirmation email
+    try {
+      const itemsList = orderItems
+        .map(item => `${item.productId} (${item.variantName}): ${item.quantity} x $${item.price.toFixed(2)} = $${(item.quantity * item.price).toFixed(2)}`)
+        .join('\n');
+      const shippingAddressString = `${user.shippingAddress.street}, ${user.shippingAddress.city}, ${user.shippingAddress.state}, ${user.shippingAddress.zip}, ${user.shippingAddress.country}`;
+      const emailContent = `
+        Thank you for your order from LuxeLane!
+
+        Order ID: ${savedOrder._id.toString()}
+        Order Details:
+        ${itemsList}
+
+        Subtotal: $${subtotal.toFixed(2)}
+        ${discountAmount > 0 ? `Discount (${appliedDiscountCode}): -$${discountAmount.toFixed(2)}` : ''}
+        Taxes: $${taxes.toFixed(2)}
+        Shipping Fee: $${SHIPPING_FEE.toFixed(2)}
+        Total: $${total.toFixed(2)}
+
+        Shipping Address:
+        ${shippingAddressString}
+
+        We will notify you once your order has been shipped.
+        If you have any questions, please contact our support team.
+      `;
+
+      await transporter.sendMail({
+        from: process.env.EMAIL_USER,
+        to: user.email,
+        subject: `LuxeLane Order Confirmation - Order #${savedOrder._id.toString()}`,
+        text: emailContent,
+      });
+    } catch (emailErr) {
+      console.error('Error sending confirmation email:', emailErr);
+      // Note: We don't fail the checkout if the email fails, but log the error
+    }
 
     await CartItem.deleteMany(cartIdentifier);
 
