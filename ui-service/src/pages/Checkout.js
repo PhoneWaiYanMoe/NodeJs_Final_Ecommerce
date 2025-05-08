@@ -14,11 +14,18 @@ const Checkout = () => {
     cvv: ''
   });
   const [message, setMessage] = useState('');
+  const [previousOrderDiscount, setPreviousOrderDiscount] = useState(0);
 
   const CART_API_URL = 'https://nodejs-final-ecommerce-1.onrender.com/cart';
   const PRODUCTS_API_URL = 'https://product-management-soyo.onrender.com/api/products';
 
   useEffect(() => {
+    // Fetch the previous order discount from localStorage
+    const storedDiscount = localStorage.getItem('lastOrderDiscount');
+    if (storedDiscount) {
+      setPreviousOrderDiscount(parseFloat(storedDiscount));
+    }
+
     if (!cartSummary || !cartSummary.items || cartSummary.items.length === 0) {
       fetchCartSummary();
     }
@@ -78,18 +85,15 @@ const Checkout = () => {
 
       const updatePromises = cartSummary.items.map(async (item) => {
         try {
-          // Use productId and variantName from the cart item
           const productId = item.productId;
           const variantName = item.variantName;
 
-          // Update salesCount for the product
           await axios.patch(
             `${PRODUCTS_API_URL}/${productId}/sales-count`,
             { quantity: item.quantity },
             { headers: { Authorization: `Bearer ${token}` } }
           );
 
-          // Update stock for the specific variant
           await axios.post(
             `${PRODUCTS_API_URL}/update-stock`,
             {
@@ -109,6 +113,15 @@ const Checkout = () => {
       });
 
       await Promise.all(updatePromises);
+
+      // Calculate and store 10% of the current order total as a discount for the next order
+      const orderTotal = cartSummary.total || 0;
+      const discountForNextOrder = orderTotal * 0.1; // 10% of the total
+      localStorage.setItem('lastOrderDiscount', discountForNextOrder.toFixed(2));
+
+      // Clear the previous order discount after use
+      setPreviousOrderDiscount(0);
+      localStorage.removeItem('lastOrderDiscount');
 
       setMessage(`Checkout successful! Order ID: ${checkoutResponse.data.orderId}`);
       setTimeout(() => {
@@ -132,10 +145,12 @@ const Checkout = () => {
     }
   };
 
-  // Function to format the productId(variantName) display
   const formatProductDisplay = (item) => {
     return `${item.productId} (${item.variantName})`;
   };
+
+  // Calculate the final total after applying the previous order discount
+  const finalTotal = (cartSummary?.total || 0) - previousOrderDiscount;
 
   return (
     <div style={{
@@ -329,6 +344,11 @@ const Checkout = () => {
                   {cartSummary.discountApplied?.toFixed(2) || '0.00'}
                 </p>
               )}
+              {previousOrderDiscount > 0 && (
+                <p style={{ fontSize: '16px', color: '#D4AF37', marginBottom: '15px' }}>
+                  Previous Order Discount (10% of last order): -${previousOrderDiscount.toFixed(2)}
+                </p>
+              )}
               <p style={{ fontSize: '16px', color: '#E0E0E0', marginBottom: '15px' }}>
                 Taxes: ${cartSummary.taxes?.toFixed(2) || '0.00'}
               </p>
@@ -336,7 +356,7 @@ const Checkout = () => {
                 Shipping Fee: ${cartSummary.shippingFee?.toFixed(2) || '0.00'}
               </p>
               <p style={{ fontSize: '18px', fontWeight: 'bold', color: '#D4AF37', marginBottom: '20px' }}>
-                Total: ${cartSummary.total?.toFixed(2) || '0.00'}
+                Total: ${finalTotal < 0 ? '0.00' : finalTotal.toFixed(2)}
               </p>
             </div>
           )}
