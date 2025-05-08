@@ -500,6 +500,21 @@ router.get('/admin/discounts', [verifyToken, adminRequired], async (req, res) =>
   }
 });
 
+// Fetch Last Order for Loyalty Discount
+router.get('/orders/last', [verifyToken, userRequired], async (req, res) => {
+  try {
+    const lastOrder = await Order.findOne({ userId: req.user.id })
+      .sort({ createdAt: -1 })
+      .select('totalPrice')
+      .lean();
+
+    res.status(200).json({ total: lastOrder ? lastOrder.totalPrice || 0 : 0 });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
 // Admin: Get Detailed Order Information for a Specific Discount Code
 router.get('/admin/discount/:code/orders', [verifyToken, adminRequired], async (req, res) => {
   const { code } = req.params;
