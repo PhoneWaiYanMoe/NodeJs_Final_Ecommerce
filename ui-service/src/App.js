@@ -11,12 +11,13 @@ import Login from './pages/Login';
 import Checkout from './pages/Checkout';
 import Profile from './pages/Profile';
 import OrderHistory from './pages/OrderHistory';
+import config from './config';
 
 // Create Auth Context
 export const AuthContext = createContext();
 
 // Configure Axios defaults
-axios.defaults.baseURL = 'https://nodejs-final-ecommerce.onrender.com/user';
+axios.defaults.baseURL = config.API_URLS.USER_SERVICE;
 
 // Add token to axios headers
 axios.interceptors.request.use((config) => {

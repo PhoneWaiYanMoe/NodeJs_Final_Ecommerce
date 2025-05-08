@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import io from 'socket.io-client';
 import { AuthContext } from '../App';
+import config from '../config';
 
 // Star Rating Component
 const StarRating = ({ value, onChange, readOnly = false }) => {
@@ -49,8 +50,9 @@ const ProductDetails = () => {
     const [reviewError, setReviewError] = useState('');
     const [reviewSuccess, setReviewSuccess] = useState('');
 
-    const API_URL = 'https://product-management-soyo.onrender.com';
-    const CART_API_URL = 'https://nodejs-final-ecommerce-1.onrender.com';
+    // Replace hardcoded URLs with config
+    const API_URL = config.API_URLS.PRODUCT_SERVICE.replace('/api', '');
+    const CART_API_URL = config.API_URLS.CART_SERVICE.replace('/cart', '');
 
     useEffect(() => {
         const fetchProduct = async () => {
@@ -107,7 +109,7 @@ const ProductDetails = () => {
                 // Refresh token if needed
                 try {
                     // Verify token is still valid
-                    await axios.get('https://nodejs-final-ecommerce.onrender.com/user/session', {
+                    await axios.get(`${config.API_URLS.USER_SERVICE}/session`, {
                         headers: {
                             'Authorization': `Bearer ${token}`
                         }
