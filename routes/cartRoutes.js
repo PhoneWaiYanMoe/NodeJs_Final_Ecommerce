@@ -2,7 +2,6 @@ const express = require('express');
 const router = express.Router();
 const mongoose = require('mongoose');
 const jwt = require('jsonwebtoken');
-const nodemailer = require('nodemailer');
 const CartItem = require('../models/CartItem');
 const Order = require('../models/Order');
 const DiscountCode = require('../models/DiscountCode');
@@ -13,21 +12,11 @@ const TAX_RATE = 0.1; // 10% tax
 const SHIPPING_FEE = 5.0;
 const SECRET_KEY = process.env.JWT_SECRET || 'your-jwt-secret-key';
 
-// Email setup with Nodemailer
-const transporter = nodemailer.createTransport({
-  service: 'gmail',
-  auth: {
-    user: process.env.EMAIL_USER,
-    pass: process.env.EMAIL_PASS,
-  },
-});
-
-// Middleware to verify JWT (allows guests to proceed)
+// Middleware to verify JWT
 const verifyToken = (req, res, next) => {
   const token = req.headers.authorization?.split(' ')[1];
   if (!token) {
-    req.user = null; // No token, treat as guest
-    return next();
+    return res.status(401).json({ error: 'No token provided' });
   }
 
   try {
@@ -35,8 +24,7 @@ const verifyToken = (req, res, next) => {
     req.user = decoded;
     next();
   } catch (err) {
-    req.user = null; // Invalid token, treat as guest
-    next();
+    res.status(401).json({ error: 'Invalid token' });
   }
 };
 
@@ -56,20 +44,13 @@ const userRequired = (req, res, next) => {
   next();
 };
 
-// Helper to get cart identifier (userId for logged-in users, sessionId for guests)
+// Helper to get cart identifier (userId only, no sessionId for guests)
 const getCartIdentifier = (req) => {
-  if (req.user) {
-    return { userId: req.user.id, sessionId: null };
-  }
-  // Generate or retrieve sessionId for guests
-  if (!req.session.sessionId) {
-    req.session.sessionId = mongoose.Types.ObjectId().toString();
-  }
-  return { sessionId: req.session.sessionId, userId: null };
+  return { userId: req.user.id };
 };
 
 // Add to Cart
-router.post('/add', verifyToken, async (req, res) => {
+router.post('/add', [verifyToken, userRequired], async (req, res) => {
   const { product_id, variantName = null, quantity = 1, price } = req.body;
 
   if (!product_id || !price) {
@@ -106,7 +87,7 @@ router.post('/add', verifyToken, async (req, res) => {
 });
 
 // Update Cart Item Quantity
-router.put('/update/:itemId', verifyToken, async (req, res) => {
+router.put('/update/:itemId', [verifyToken, userRequired], async (req, res) => {
   const { itemId } = req.params;
   const { quantity } = req.body;
 
@@ -133,7 +114,7 @@ router.put('/update/:itemId', verifyToken, async (req, res) => {
 });
 
 // Remove Item from Cart
-router.delete('/remove/:itemId', verifyToken, async (req, res) => {
+router.delete('/remove/:itemId', [verifyToken, userRequired], async (req, res) => {
   const { itemId } = req.params;
 
   try {
@@ -152,7 +133,7 @@ router.delete('/remove/:itemId', verifyToken, async (req, res) => {
 });
 
 // Cart Summary
-router.get('/summary', verifyToken, async (req, res) => {
+router.get('/summary', [verifyToken, userRequired], async (req, res) => {
   try {
     const cartIdentifier = getCartIdentifier(req);
     const cartItems = await CartItem.find(cartIdentifier);
@@ -202,7 +183,7 @@ router.get('/summary', verifyToken, async (req, res) => {
 });
 
 // Apply Discount Code
-router.post('/apply-discount', verifyToken, async (req, res) => {
+router.post('/apply-discount', [verifyToken, userRequired], async (req, res) => {
   const { code } = req.body;
 
   if (!code) {
@@ -251,15 +232,11 @@ router.post('/apply-discount', verifyToken, async (req, res) => {
 });
 
 // Checkout Process
-router.post('/checkout', verifyToken, async (req, res) => {
+router.post('/checkout', [verifyToken, userRequired], async (req, res) => {
   const { paymentDetails, discountCode } = req.body;
 
   if (!paymentDetails) {
     return res.status(400).json({ error: 'Missing paymentDetails' });
-  }
-
-  if (!req.user) {
-    return res.status(401).json({ error: 'Login required to complete checkout' });
   }
 
   try {
@@ -315,43 +292,6 @@ router.post('/checkout', verifyToken, async (req, res) => {
     });
     const savedOrder = await order.save();
 
-    // Send confirmation email
-    try {
-      const itemsList = orderItems
-        .map(item => `${item.productId} (${item.variantName}): ${item.quantity} x $${item.price.toFixed(2)} = $${(item.quantity * item.price).toFixed(2)}`)
-        .join('\n');
-      const shippingAddressString = `${user.shippingAddress.street}, ${user.shippingAddress.city}, ${user.shippingAddress.state}, ${user.shippingAddress.zip}, ${user.shippingAddress.country}`;
-      const emailContent = `
-        Thank you for your order from LuxeLane!
-
-        Order ID: ${savedOrder._id.toString()}
-        Order Details:
-        ${itemsList}
-
-        Subtotal: $${subtotal.toFixed(2)}
-        ${discountAmount > 0 ? `Discount (${appliedDiscountCode}): -$${discountAmount.toFixed(2)}` : ''}
-        Taxes: $${taxes.toFixed(2)}
-        Shipping Fee: $${SHIPPING_FEE.toFixed(2)}
-        Total: $${total.toFixed(2)}
-
-        Shipping Address:
-        ${shippingAddressString}
-
-        We will notify you once your order has been shipped.
-        If you have any questions, please contact our support team.
-      `;
-
-      await transporter.sendMail({
-        from: process.env.EMAIL_USER,
-        to: user.email,
-        subject: `LuxeLane Order Confirmation - Order #${savedOrder._id.toString()}`,
-        text: emailContent,
-      });
-    } catch (emailErr) {
-      console.error('Error sending confirmation email:', emailErr);
-      // Note: We don't fail the checkout if the email fails, but log the error
-    }
-
     await CartItem.deleteMany(cartIdentifier);
 
     res.status(201).json({ message: 'Checkout successful', orderId: savedOrder._id.toString() });
@@ -389,6 +329,109 @@ router.get('/orders', [verifyToken, userRequired], async (req, res) => {
     }));
 
     res.status(200).json(formattedOrders);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// Fetch All Orders for Admin
+router.get('/admin/orders', [verifyToken, adminRequired], async (req, res) => {
+  try {
+    const { startDate, endDate, interval } = req.query;
+    let query = {};
+
+    if (startDate && endDate) {
+      query.createdAt = { $gte: new Date(startDate), $lte: new Date(endDate) };
+    } else {
+      const now = new Date();
+      const yearAgo = new Date(now.setFullYear(now.getFullYear() - 1));
+      query.createdAt = { $gte: yearAgo };
+    }
+
+    let orders = await Order.find(query).sort({ createdAt: -1 }).lean();
+
+    // Aggregate stats based on interval
+    const stats = orders.reduce((acc, order) => {
+      const date = new Date(order.createdAt);
+      let key;
+      switch (interval || 'year') {
+        case 'year':
+          key = date.getFullYear().toString();
+          break;
+        case 'quarter':
+          key = `${date.getFullYear()}-Q${Math.floor(date.getMonth() / 3) + 1}`;
+          break;
+        case 'month':
+          key = date.toLocaleString('default', { year: 'numeric', month: '2-digit' });
+          break;
+        case 'week':
+          const week = Math.floor((date - new Date(date.getFullYear(), 0, 1)) / (7 * 24 * 60 * 60 * 1000)) + 1;
+          key = `${date.getFullYear()}-W${week}`;
+          break;
+        default:
+          key = date.getFullYear().toString();
+      }
+
+      if (!acc[key]) {
+        acc[key] = { ordersCount: 0, totalRevenue: 0, totalProfit: 0 };
+      }
+      acc[key].ordersCount += 1;
+      acc[key].totalRevenue += order.totalPrice;
+      acc[key].totalProfit += order.totalPrice - (order.taxes + order.shippingFee) - (order.items.reduce((sum, item) => sum + item.price * item.quantity, 0) * 0.7); // 70% cost assumption
+      return acc;
+    }, {});
+
+    const formattedOrders = orders.map(order => ({
+      orderId: order._id.toString(),
+      userId: order.userId,
+      items: Array.isArray(order.items) ? order.items.map(item => ({
+        productId: item.productId.toString(),
+        variantName: item.variantName || 'Default',
+        quantity: item.quantity,
+        price: item.price,
+      })) : [],
+      totalPrice: order.totalPrice,
+      taxes: order.taxes,
+      shippingFee: order.shippingFee,
+      discountApplied: order.discountApplied,
+      discountCode: order.discountCode,
+      statusHistory: order.statusHistory || [],
+      currentStatus: order.statusHistory && order.statusHistory.length > 0 ? order.statusHistory[order.statusHistory.length - 1].status : 'ordered',
+      shippingAddress: order.shippingAddress || {},
+      paymentDetails: order.paymentDetails ? {
+        cardNumber: `**** **** **** ${order.paymentDetails.cardNumber.slice(-4)}`,
+        expiryDate: order.paymentDetails.expiryDate,
+      } : { cardNumber: 'N/A', expiryDate: 'N/A' },
+      createdAt: order.createdAt,
+    }));
+
+    res.status(200).json({ orders: formattedOrders, stats });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// Update Order Status
+router.put('/admin/orders/:orderId/status', [verifyToken, adminRequired], async (req, res) => {
+  const { orderId } = req.params;
+  const { status } = req.body;
+
+  if (!['ordered', 'processing', 'shipped', 'delivered', 'cancelled'].includes(status)) {
+    return res.status(400).json({ error: 'Invalid status' });
+  }
+
+  try {
+    const order = await Order.findById(orderId);
+    if (!order) {
+      return res.status(404).json({ error: 'Order not found' });
+    }
+
+    order.statusHistory.push({ status, updatedAt: new Date() });
+    await order.save();
+
+    res.status(200).json({ message: 'Order status updated', orderId, status });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Server error' });
