@@ -205,10 +205,8 @@ const AdminDashboard = () => {
             fetchProducts(),
             fetchUsers(),
             fetchDiscounts(),
-            fetchOrders(),
         ]);
-        renderCharts();
-    }, [fetchCategories, fetchProducts, fetchUsers, fetchDiscounts, fetchOrders, renderCharts]);
+    }, [fetchCategories, fetchProducts, fetchUsers, fetchDiscounts]);
 
     const handleGetGraph = () => {
         fetchOrders().then(() => {
