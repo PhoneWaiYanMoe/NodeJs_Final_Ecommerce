@@ -7,7 +7,8 @@ const Checkout = () => {
   const { user, logout } = useContext(AuthContext);
   const navigate = useNavigate();
   const location = useLocation();
-  const { cartSummary, discountCode } = location.state || {};
+  const { cartSummary: initialCartSummary, discountCode } = location.state || {};
+  const [cartSummary, setCartSummary] = useState(initialCartSummary);
   const [paymentDetails, setPaymentDetails] = useState({
     cardNumber: '',
     expiryDate: '',
@@ -20,16 +21,32 @@ const Checkout = () => {
   const PRODUCTS_API_URL = 'https://product-management-soyo.onrender.com/api/products';
 
   useEffect(() => {
-    // Fetch the previous order discount from localStorage
-    const storedDiscount = localStorage.getItem('lastOrderDiscount');
-    if (storedDiscount) {
-      setPreviousOrderDiscount(parseFloat(storedDiscount));
+    if (user) {
+      fetchLastOrderPrice();
     }
-
     if (!cartSummary || !cartSummary.items || cartSummary.items.length === 0) {
       fetchCartSummary();
     }
-  }, [cartSummary]);
+  }, [user, cartSummary]);
+
+  const fetchLastOrderPrice = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      if (!token) throw new Error('No token found');
+      const response = await axios.get(`${CART_API_URL}/orders`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      const orders = response.data;
+      if (orders.length > 0) {
+        const lastOrderTotal = orders[0].totalPrice || 0;
+        const discount = lastOrderTotal * 0.1; // 10% of the last order's total
+        setPreviousOrderDiscount(discount);
+      }
+    } catch (error) {
+      console.error('Error fetching last order:', error);
+      setPreviousOrderDiscount(0);
+    }
+  };
 
   const fetchCartSummary = async () => {
     try {
@@ -114,15 +131,6 @@ const Checkout = () => {
 
       await Promise.all(updatePromises);
 
-      // Calculate and store 10% of the current order total as a discount for the next order
-      const orderTotal = cartSummary.total || 0;
-      const discountForNextOrder = orderTotal * 0.1; // 10% of the total
-      localStorage.setItem('lastOrderDiscount', discountForNextOrder.toFixed(2));
-
-      // Clear the previous order discount after use
-      setPreviousOrderDiscount(0);
-      localStorage.removeItem('lastOrderDiscount');
-
       setMessage(`Checkout successful! Order ID: ${checkoutResponse.data.orderId}`);
       setTimeout(() => {
         navigate('/');
@@ -149,7 +157,6 @@ const Checkout = () => {
     return `${item.productId} (${item.variantName})`;
   };
 
-  // Calculate the final total after applying the previous order discount
   const finalTotal = (cartSummary?.total || 0) - previousOrderDiscount;
 
   return (
@@ -340,13 +347,13 @@ const Checkout = () => {
               </p>
               {cartSummary.discountApplied > 0 && (
                 <p style={{ fontSize: '16px', color: '#D4AF37', marginBottom: '15px' }}>
-                  Discount ({discountCode} - {cartSummary.discountPercentage}%): -$
+                  Discount ({cartSummary.discountCode} - {cartSummary.discountPercentage}%): -$
                   {cartSummary.discountApplied?.toFixed(2) || '0.00'}
                 </p>
               )}
               {previousOrderDiscount > 0 && (
                 <p style={{ fontSize: '16px', color: '#D4AF37', marginBottom: '15px' }}>
-                  Previous Order Discount (10% of last order): -${previousOrderDiscount.toFixed(2)}
+                  Loyalty Discount (10% of last order): -${previousOrderDiscount.toFixed(2)}
                 </p>
               )}
               <p style={{ fontSize: '16px', color: '#E0E0E0', marginBottom: '15px' }}>
