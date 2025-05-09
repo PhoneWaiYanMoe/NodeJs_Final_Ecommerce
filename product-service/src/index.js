@@ -13,35 +13,20 @@ const app = express();
 const port = process.env.PORT || 3001;
 const HOST = '0.0.0.0';
 
+// Create HTTP server
 const server = createServer(app);
+
+// Configure Socket.IO with CORS
 const io = new Server(server, {
     cors: {
-        origin: 'https://frontend-u30c.onrender.com', // Allow UI Service running locally
-        methods: ['GET', 'POST']
+        origin: '*', // Allow all origins for socket connections
+        methods: ['GET', 'POST'],
+        credentials: true
     }
 });
 global.io = io;
 
-app.use(cors({
-    origin: 'https://frontend-u30c.onrender.com' // Allow UI Service running locally
-}));
-app.use(express.json());
-
-// Routes
-app.use("/api/products", productRoutes);
-app.use("/api/categories", categoryRoutes);
-
-connectDB()
-    .then(() => {
-        server.listen(port, HOST, () => {
-            console.log(`Server running on ${HOST}:${port}`);
-        });
-    })
-    .catch((error) => {
-        console.error("Error connecting to MongoDB:", error);
-    });
-
-// Handle OPTIONS preflight requests for CORS
+// Handle OPTIONS preflight requests first
 app.use((req, res, next) => {
     if (req.method === 'OPTIONS') {
         res.header('Access-Control-Allow-Origin', '*');
@@ -53,10 +38,28 @@ app.use((req, res, next) => {
     next();
 });
 
-// Replace or add the CORS middleware
+// Main CORS configuration
 app.use(cors({
     origin: '*', // Allow all origins
-    credentials: false, // Don't require credentials
+    credentials: true,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Origin', 'X-Requested-With', 'Content-Type', 'Accept', 'Authorization']
 }));
+
+// Parse JSON bodies
+app.use(express.json());
+
+// Routes
+app.use("/api/products", productRoutes);
+app.use("/api/categories", categoryRoutes);
+
+// Connect to database and start server
+connectDB()
+    .then(() => {
+        server.listen(port, HOST, () => {
+            console.log(`Server running on ${HOST}:${port}`);
+        });
+    })
+    .catch((error) => {
+        console.error("Error connecting to MongoDB:", error);
+    });
