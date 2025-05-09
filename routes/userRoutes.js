@@ -438,8 +438,8 @@ router.put('/profile', verifyToken, userSessionRequired, async (req, res) => {
   }
 });
 
-// Add this route to debug tokens
-router.post('/verify-token', (req, res) => {
+// Add this route to help with token verification for other services
+router.get('/verify-token', (req, res) => {
     const token = req.headers.authorization?.split(' ')[1];
     if (!token) {
         return res.status(401).json({ message: 'No token provided' });
@@ -447,12 +447,32 @@ router.post('/verify-token', (req, res) => {
     
     try {
         const decoded = jwt.verify(token, SECRET_KEY);
-        res.status(200).json({ 
-            valid: true, 
-            userId: decoded.id,
-            fullName: decoded.name || "User",
-            role: decoded.role || "user"
-        });
+        
+        // First check if admin
+        if (decoded.role === 'admin') {
+            return res.status(200).json({
+                userId: decoded.id,
+                fullName: 'Admin',
+                role: 'admin'
+            });
+        }
+        
+        // Verify user in database
+        User.findById(decoded.id)
+            .then(user => {
+                if (!user) {
+                    return res.status(404).json({ message: 'User not found' });
+                }
+                
+                return res.status(200).json({
+                    userId: user._id.toString(),
+                    fullName: user.name,
+                    role: user.role
+                });
+            })
+            .catch(err => {
+                return res.status(500).json({ message: 'Database error', error: err.message });
+            });
     } catch (err) {
         res.status(401).json({ message: 'Invalid token', error: err.message });
     }
