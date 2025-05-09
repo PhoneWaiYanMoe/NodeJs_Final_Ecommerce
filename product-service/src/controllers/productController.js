@@ -250,21 +250,36 @@ export const addReview = async (req, res) => {
     
     if (token) {
         try {
+            console.log("Verifying token:", token.substring(0, 10) + "..."); // Log partial token for debugging
+            
             const response = await axios.get(
-                "https://nodejs-final-ecommerce-1.onrender.com/user/verify-token",
+                "https://nodejs-final-ecommerce.onrender.com/user/verify-token",
                 {
                     headers: { Authorization: `Bearer ${token}` },
                 }
             );
+            
+            console.log("Token verification response:", response.data); // Log full response
+            
             user = response.data;
-            // Use authenticated user's name if available
-            reviewUserName = user.fullName || userName || "Authenticated User";
+            
+            // Make sure we're using the correct property for user name
+            reviewUserName = user.fullName || user.name || userName || "Authenticated User";
+            
+            console.log("Using authenticated user name:", reviewUserName);
         } catch (error) {
             console.log("Token verification error:", error.message);
+            // Log more details about the error
+            if (error.response) {
+                console.log("Error response data:", error.response.data);
+                console.log("Error response status:", error.response.status);
+            }
+            
             // If token verification fails but no rating, allow anonymous review
             if (!rating) {
                 // Continue with anonymous review
                 reviewUserName = userName || "Anonymous";
+                console.log("Falling back to anonymous review with name:", reviewUserName);
             } else {
                 // Only require authentication for rated reviews
                 return res.status(401).json({ message: "Invalid token for rated review" });
@@ -273,6 +288,7 @@ export const addReview = async (req, res) => {
     } else if (userName) {
         // Use provided userName for anonymous reviews
         reviewUserName = userName;
+        console.log("Using provided userName for anonymous review:", reviewUserName);
     }
 
     // Only require authentication for rated reviews (with a rating value)
@@ -296,6 +312,8 @@ export const addReview = async (req, res) => {
             createdAt: new Date(),
         };
 
+        console.log("Creating review with:", review);
+
         product.reviews.push(review);
         
         // Recalculate average rating if this review includes a rating
@@ -315,6 +333,7 @@ export const addReview = async (req, res) => {
 
         res.status(201).json({ message: "Review added successfully", review });
     } catch (error) {
+        console.error("Error saving review:", error);
         res
             .status(500)
             .json({ message: "Error adding review", error: error.message });
