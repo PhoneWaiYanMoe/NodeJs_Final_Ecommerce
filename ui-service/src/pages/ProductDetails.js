@@ -100,83 +100,63 @@ const ProductDetails = () => {
         }
         
         try {
-            // Always create a local review for immediate feedback
-            const localReview = {
-                userName: user ? user.name : 'Anonymous',
-                comment: newReview.comment,
-                rating: user && newReview.rating ? Number(newReview.rating) : null,
-                createdAt: new Date().toISOString(),
-                isLocal: true
-            };
-            
-            // Add to local reviews and save to localStorage
-            const updatedLocalReviews = [...localReviews, localReview];
-            setLocalReviews(updatedLocalReviews);
-            localStorage.setItem(`local_reviews_${id}`, JSON.stringify(updatedLocalReviews));
-            
-            // Reset form
-            setNewReview({ comment: '', rating: 0 });
-            setReviewSuccess('Review submitted!');
-            
-            // Clear success message after 3 seconds
-            setTimeout(() => {
-                setReviewSuccess('');
-            }, 3000);
-            
-            // Try to send to server in background
-            if (user) {
+            // For authenticated reviews with rating
+            if (user && newReview.rating) {
                 const token = localStorage.getItem('token');
+                if (!token) {
+                    setReviewError('Authentication token not found. Please log in again.');
+                    return;
+                }
                 
-                if (token) {
-                    // For authenticated reviews with rating
-                    try {
-                        const reviewPayload = {
-                            comment: newReview.comment,
-                            rating: Number(newReview.rating) || null
-                        };
-                        
-                        await axios.post(
-                            `${API_URL}/api/products/${id}/review`,
-                            reviewPayload,
-                            {
-                                headers: {
-                                    'Authorization': `Bearer ${token}`,
-                                    'Content-Type': 'application/json'
-                                }
-                            }
-                        );
-                        
-                        // If successful, update success message
-                        setReviewSuccess('Review submitted and saved to server!');
-                        setTimeout(() => setReviewSuccess(''), 3000);
-                    } catch (serverError) {
-                        console.error('Server review submission failed, but saved locally:', serverError);
-                        // No need to show error as we already have a local review
+                const reviewPayload = {
+                    comment: newReview.comment,
+                    rating: Number(newReview.rating)
+                };
+                
+                const response = await axios.post(
+                    `${API_URL}/api/products/${id}/review`,
+                    reviewPayload,
+                    {
+                        headers: {
+                            'Authorization': `Bearer ${token}`,
+                            'Content-Type': 'application/json'
+                        }
                     }
+                );
+                
+                if (response.data && response.data.review) {
+                    setReviews([...reviews, response.data.review]);
+                    setNewReview({ comment: '', rating: 0 });
+                    setReviewSuccess('Review submitted successfully!');
+                    setTimeout(() => setReviewSuccess(''), 3000);
                 }
             } else {
-                // Anonymous review attempt
-                try {
-                    const anonymousReview = {
-                        comment: newReview.comment
-                    };
-                    
-                    await axios.post(
-                        `${API_URL}/api/products/${id}/review`,
-                        anonymousReview
-                    );
-                    
-                    // If successful, update success message
-                    setReviewSuccess('Review submitted and saved to server!');
+                // For anonymous reviews (no rating)
+                const reviewPayload = {
+                    comment: newReview.comment,
+                    userName: user ? user.name : 'Anonymous'
+                };
+                
+                const response = await axios.post(
+                    `${API_URL}/api/products/${id}/review`,
+                    reviewPayload
+                );
+                
+                if (response.data && response.data.review) {
+                    setReviews([...reviews, response.data.review]);
+                    setNewReview({ comment: '', rating: 0 });
+                    setReviewSuccess('Comment submitted successfully!');
                     setTimeout(() => setReviewSuccess(''), 3000);
-                } catch (anonError) {
-                    console.error('Anonymous review failed, but saved locally:', anonError);
-                    // No need to show error as we already have a local review
                 }
             }
         } catch (error) {
-            console.error('Error handling review:', error);
-            setReviewError('There was a problem saving your review.');
+            console.error('Error submitting review:', error);
+            
+            if (error.response?.status === 401) {
+                setReviewError('Authentication failed. Please log in again to submit a rated review.');
+            } else {
+                setReviewError(`Failed to submit review: ${error.message}`);
+            }
         }
     };
 
