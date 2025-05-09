@@ -439,47 +439,54 @@ router.put('/profile', verifyToken, userSessionRequired, async (req, res) => {
 });
 
 // Add this route to help with token verification for other services
-router.get('/verify-token', async (req, res) => {
+router.get('/verify-token', (req, res) => {
     const token = req.headers.authorization?.split(' ')[1];
     if (!token) {
+        console.log("No token provided in request");
         return res.status(401).json({ message: 'No token provided' });
     }
     
     try {
+        console.log("Verifying token in account service:", token.substring(0, 10) + "...");
         const decoded = jwt.verify(token, SECRET_KEY);
+        console.log("Decoded token:", decoded);
         
         // First check if admin
         if (decoded.role === 'admin') {
-            return res.status(200).json({
+            const adminResponse = {
                 userId: decoded.id,
                 fullName: 'Admin',
+                name: 'Admin', // Adding name field for consistency
                 role: 'admin'
-            });
+            };
+            console.log("Returning admin response:", adminResponse);
+            return res.status(200).json(adminResponse);
         }
         
-        // Verify user in database using async/await
-        try {
-            const user = await User.findById(decoded.id);
-            if (!user) {
-                return res.status(404).json({ message: 'User not found' });
-            }
-            
-            return res.status(200).json({
-                userId: user._id.toString(),
-                fullName: user.name,
-                role: user.role
+        // Verify user in database
+        User.findById(decoded.id)
+            .then(user => {
+                if (!user) {
+                    console.log("User not found for id:", decoded.id);
+                    return res.status(404).json({ message: 'User not found' });
+                }
+                
+                const userResponse = {
+                    userId: user._id.toString(),
+                    fullName: user.name,
+                    name: user.name, // Adding name field for consistency
+                    role: user.role
+                };
+                console.log("Returning user response:", userResponse);
+                return res.status(200).json(userResponse);
+            })
+            .catch(err => {
+                console.error("Database error in verify-token:", err);
+                return res.status(500).json({ message: 'Database error', error: err.message });
             });
-        } catch (dbError) {
-            return res.status(500).json({ 
-                message: 'Database error', 
-                error: dbError.message 
-            });
-        }
     } catch (err) {
-        return res.status(401).json({ 
-            message: 'Invalid token', 
-            error: err.message 
-        });
+        console.error("Token verification error:", err);
+        res.status(401).json({ message: 'Invalid token', error: err.message });
     }
 });
 
