@@ -28,7 +28,8 @@ mongoose.connect(process.env.MONGO_URI, {
 const allowedOrigins = [
     'https://a46f-2402-800-62a9-bd95-5d7f-313e-f077-afe4.ngrok-free.app',
     'https://frontend-u30c.onrender.com',
-    'http://localhost:3000'
+    'http://localhost:3000',
+    'https://product-management-soyo.onrender.com'  // Added product service domain
 ];
 
 // Explicitly handle OPTIONS requests for CORS preflight
