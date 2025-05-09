@@ -29,34 +29,36 @@ const allowedOrigins = [
     'https://a46f-2402-800-62a9-bd95-5d7f-313e-f077-afe4.ngrok-free.app',
     'https://frontend-u30c.onrender.com',
     'http://localhost:3000',
-    'https://product-management-soyo.onrender.com'  // Added product service domain
+    'https://product-management-soyo.onrender.com',
+    'https://nodejs-final-ecommerce-1.onrender.com'
 ];
 
 // Explicitly handle OPTIONS requests for CORS preflight
 app.use((req, res, next) => {
     if (req.method === 'OPTIONS') {
         console.log('Handling OPTIONS request for:', req.url);
-        res.header('Access-Control-Allow-Origin', allowedOrigins.includes(req.headers.origin) ? req.headers.origin : '');
-        res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-        res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization');
-        res.header('Access-Control-Allow-Credentials', 'true');
-        return res.status(200).json({});
+        const origin = req.headers.origin;
+        if (allowedOrigins.includes(origin)) {
+            res.header('Access-Control-Allow-Origin', origin);
+            res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+            res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+            res.header('Access-Control-Allow-Credentials', 'true');
+            return res.status(200).json({});
+        }
     }
     next();
 });
 
 app.use(cors({
     origin: (origin, callback) => {
-        console.log('CORS check - Origin:', origin);
         if (!origin || allowedOrigins.includes(origin)) {
-            callback(null, true);
+            callback(null, origin);
         } else {
-            console.log('CORS rejected - Origin not allowed:', origin);
             callback(new Error('Not allowed by CORS'));
         }
     },
     credentials: true,
-    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    methods: ['GET', POST, 'PUT', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization']
 }));
 app.use(express.json());
