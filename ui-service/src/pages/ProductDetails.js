@@ -48,7 +48,7 @@ const ProductDetails = () => {
     const [cartMessage, setCartMessage] = useState('');
     const [reviewError, setReviewError] = useState('');
     const [reviewSuccess, setReviewSuccess] = useState('');
-    const [localReviews, setLocalReviews] = useState([]);
+    const [submitting, setSubmitting] = useState(false);
 
     const API_URL = 'https://product-management-soyo.onrender.com';
     const CART_API_URL = 'https://nodejs-final-ecommerce-1.onrender.com';
@@ -64,25 +64,26 @@ const ProductDetails = () => {
             }
         };
         fetchProduct();
-        
-        // Load any locally stored reviews from localStorage
-        const storedReviews = localStorage.getItem(`local_reviews_${id}`);
-        if (storedReviews) {
-            setLocalReviews(JSON.parse(storedReviews));
-        }
     }, [id]);
 
     useEffect(() => {
         const newSocket = io(API_URL);
         newSocket.on(`product:${id}:review`, (review) => {
-            setReviews((prevReviews) => [...prevReviews, review]);
+            setReviews((prevReviews) => {
+                // Check if this review already exists to prevent duplicates
+                const exists = prevReviews.some(r => 
+                    r.userName === review.userName && 
+                    r.comment === review.comment && 
+                    r.rating === review.rating
+                );
+                
+                if (exists) return prevReviews;
+                return [...prevReviews, review];
+            });
         });
 
         return () => newSocket.close();
     }, [id]);
-
-    // Combine server reviews and local reviews for display
-    const displayReviews = [...reviews, ...localReviews];
 
     const handleReviewSubmit = async (e) => {
         e.preventDefault();
@@ -99,56 +100,62 @@ const ProductDetails = () => {
             return;
         }
         
+        // Prevent duplicate submissions
+        if (submitting) {
+            return;
+        }
+        
+        setSubmitting(true);
+        
         try {
-            let reviewPayload;
-            let headers = {};
+            let reviewPayload = {
+                comment: newReview.comment
+            };
             
-            // For authenticated reviews with rating
+            // If user is logged in and has provided a rating
             if (user && newReview.rating) {
                 const token = localStorage.getItem('token');
                 if (!token) {
                     setReviewError('Authentication token not found. Please log in again.');
+                    setSubmitting(false);
                     return;
                 }
                 
-                reviewPayload = {
-                    comment: newReview.comment,
-                    rating: Number(newReview.rating)
-                };
+                reviewPayload.rating = Number(newReview.rating);
                 
-                headers = {
-                    'Authorization': `Bearer ${token}`,
-                    'Content-Type': 'application/json'
-                };
+                const response = await axios.post(
+                    `${API_URL}/api/products/${id}/review`,
+                    reviewPayload,
+                    {
+                        headers: {
+                            'Authorization': `Bearer ${token}`,
+                            'Content-Type': 'application/json'
+                        }
+                    }
+                );
+                
+                if (response.data && response.data.review) {
+                    // Don't update the state directly - the socket will handle this
+                    // to prevent duplicates
+                    setNewReview({ comment: '', rating: 0 });
+                    setReviewSuccess('Review submitted successfully!');
+                    setTimeout(() => setReviewSuccess(''), 3000);
+                }
             } else {
-                // For anonymous reviews (no rating)
-                reviewPayload = {
-                    comment: newReview.comment,
-                    userName: user ? user.name : 'Anonymous'
-                };
-            }
-            
-            const response = await axios.post(
-                `${API_URL}/api/products/${id}/review`,
-                reviewPayload,
-                headers.Authorization ? { headers } : undefined
-            );
-            
-            if (response.data && response.data.review) {
-                setReviews([...reviews, response.data.review]);
-                setNewReview({ comment: '', rating: 0 });
-                setReviewSuccess(user && newReview.rating ? 'Review submitted successfully!' : 'Comment submitted successfully!');
-                setTimeout(() => setReviewSuccess(''), 3000);
+                // For anonymous reviews
+                reviewPayload.userName = user ? user.name : 'Anonymous';
                 
-                // Store review locally if needed
-                if (!response.data.review.userId) {
-                    const newLocalReview = {
-                        ...response.data.review,
-                        createdAt: new Date().toISOString()
-                    };
-                    const updatedLocalReviews = [...localReviews, newLocalReview];
-                    setLocalReviews(updatedLocalReviews);
-                    localStorage.setItem(`local_reviews_${id}`, JSON.stringify(updatedLocalReviews));
+                const response = await axios.post(
+                    `${API_URL}/api/products/${id}/review`,
+                    reviewPayload
+                );
+                
+                if (response.data && response.data.review) {
+                    // Don't update the state directly - the socket will handle this
+                    // to prevent duplicates  
+                    setNewReview({ comment: '', rating: 0 });
+                    setReviewSuccess('Comment submitted successfully!');
+                    setTimeout(() => setReviewSuccess(''), 3000);
                 }
             }
         } catch (error) {
@@ -156,34 +163,11 @@ const ProductDetails = () => {
             
             if (error.response?.status === 401) {
                 setReviewError('Authentication failed. Please log in again to submit a rated review.');
-                
-                // If it was a rated review, offer to submit as anonymous
-                if (newReview.rating) {
-                    try {
-                        const anonPayload = {
-                            comment: newReview.comment,
-                            userName: 'Anonymous'
-                        };
-                        
-                        const anonResponse = await axios.post(
-                            `${API_URL}/api/products/${id}/review`,
-                            anonPayload
-                        );
-                        
-                        if (anonResponse.data && anonResponse.data.review) {
-                            setReviews([...reviews, anonResponse.data.review]);
-                            setNewReview({ comment: '', rating: 0 });
-                            setReviewSuccess('Comment submitted anonymously due to authentication failure.');
-                            setTimeout(() => setReviewSuccess(''), 3000);
-                        }
-                    } catch (fallbackError) {
-                        console.error('Fallback submission failed:', fallbackError);
-                        setReviewError('Failed to submit review, even as anonymous.');
-                    }
-                }
             } else {
                 setReviewError(`Failed to submit review: ${error.message}`);
             }
+        } finally {
+            setSubmitting(false);
         }
     };
 
@@ -509,17 +493,16 @@ const ProductDetails = () => {
                 }}>
                     Reviews:
                 </h3>
-                {displayReviews.length === 0 ? (
+                {reviews.length === 0 ? (
                     <p style={{ color: '#E0E0E0' }}>No reviews yet.</p>
                 ) : (
                     <ul style={{ listStyle: 'none', padding: 0, marginBottom: '30px' }}>
-                        {displayReviews.map((review, index) => (
+                        {reviews.map((review, index) => (
                             <li key={index} style={{
-                                backgroundColor: review.isLocal ? '#2A2A1A' : '#1A1A1A',
+                                backgroundColor: '#1A1A1A',
                                 padding: '15px',
                                 borderRadius: '10px',
-                                marginBottom: '10px',
-                                border: review.isLocal ? '1px solid #D4AF37' : 'none'
+                                marginBottom: '10px'
                             }}>
                                 <div style={{
                                     display: 'flex',
@@ -533,7 +516,6 @@ const ProductDetails = () => {
                                         margin: 0
                                     }}>
                                         <strong>{review.userName}</strong>
-                                        {review.isLocal && <span style={{ fontSize: '12px', marginLeft: '8px' }}>(Your review)</span>}
                                     </p>
                                     {renderStarRating(review.rating || 0)}
                                 </div>
@@ -619,20 +601,29 @@ const ProductDetails = () => {
                     <button
                         type="submit"
                         onClick={handleReviewSubmit}
+                        disabled={submitting}
                         style={{
                             padding: '10px 20px',
-                            backgroundColor: '#D4AF37',
+                            backgroundColor: submitting ? '#666666' : '#D4AF37',
                             color: '#000000',
                             border: 'none',
                             borderRadius: '5px',
                             fontFamily: "'Roboto', sans-serif",
-                            cursor: 'pointer',
+                            cursor: submitting ? 'not-allowed' : 'pointer',
                             transition: 'background-color 0.3s'
                         }}
-                        onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#E0E0E0')}
-                        onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = '#D4AF37')}
+                        onMouseEnter={(e) => {
+                            if (!submitting) {
+                                e.currentTarget.style.backgroundColor = '#E0E0E0';
+                            }
+                        }}
+                        onMouseLeave={(e) => {
+                            if (!submitting) {
+                                e.currentTarget.style.backgroundColor = '#D4AF37';
+                            }
+                        }}
                     >
-                        Submit Review
+                        {submitting ? 'Submitting...' : 'Submit Review'}
                     </button>
                 </div>
             </main>
