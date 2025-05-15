@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const mongoose = require('mongoose');
 const jwt = require('jsonwebtoken');
+const { v4: uuidv4 } = require('uuid');
 const CartItem = require('../models/CartItem');
 const Order = require('../models/Order');
 const DiscountCode = require('../models/DiscountCode');
@@ -46,22 +47,23 @@ const userRequired = (req, res, next) => {
 
 // Middleware that allows either a logged-in user or a guest session
 const userOrGuestAllowed = (req, res, next) => {
+  console.log('userOrGuestAllowed middleware called');
+  
   // If there's a valid token, process it
   const token = req.headers.authorization?.split(' ')[1];
   if (token) {
     try {
       const decoded = jwt.verify(token, SECRET_KEY);
       req.user = decoded;
+      console.log('User authenticated:', req.user.id);
       next();
     } catch (err) {
-      // If token is invalid, treat as guest
-      req.sessionId = req.body.sessionId || require('uuid').v4();
-      next();
+      console.log('Invalid token, treating as guest');
+      handleGuestSession(req, res, next);
     }
   } else {
-    // No token, treat as guest
-    req.sessionId = req.body.sessionId || require('uuid').v4();
-    next();
+    console.log('No token, treating as guest');
+    handleGuestSession(req, res, next);
   }
 };
 
@@ -72,6 +74,29 @@ const getCartIdentifier = (req) => {
   } else {
     return { sessionId: req.sessionId };
   }
+};
+
+// Helper function to handle guest sessions
+const handleGuestSession = (req, res, next) => {
+  // Get sessionId from query params, body, or create a new one
+  let sessionId = req.query.sessionId || req.body.sessionId;
+  
+  // If no sessionId provided, generate a new one
+  if (!sessionId) {
+    sessionId = uuidv4();
+    console.log('Generated new sessionId:', sessionId);
+  } else {
+    console.log('Using provided sessionId:', sessionId);
+  }
+  
+  // Store in request for use in route handlers
+  req.sessionId = sessionId;
+  next();
+};
+
+// Determine if a request is from a guest
+const isGuest = (req) => {
+  return !req.user;
 };
 
 // Add to Cart - Allow both logged-in users and guests
@@ -597,6 +622,8 @@ router.post('/migrate-cart', [verifyToken, userRequired], async (req, res) => {
   }
 
   try {
+    console.log(`Migrating cart from sessionId: ${sessionId} to userId: ${req.user.id}`);
+    
     // Find all items in the guest cart
     const guestCartItems = await CartItem.find({ sessionId });
     
@@ -608,8 +635,8 @@ router.post('/migrate-cart', [verifyToken, userRequired], async (req, res) => {
     let migratedCount = 0;
     for (const guestItem of guestCartItems) {
       // Check if the user already has this item in their cart
-      let userItem = await CartItem.findOne({ 
-        userId: req.user.id, 
+      let userItem = await CartItem.findOne({
+        userId: req.user.id,
         productId: guestItem.productId,
         variantName: guestItem.variantName
       });
@@ -636,7 +663,7 @@ router.post('/migrate-cart', [verifyToken, userRequired], async (req, res) => {
       migratedCount++;
     }
 
-    res.status(200).json({ 
+    res.status(200).json({
       message: `Cart migration successful. ${migratedCount} items migrated.`,
       migratedCount
     });

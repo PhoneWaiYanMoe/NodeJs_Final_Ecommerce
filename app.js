@@ -14,16 +14,30 @@ const app = express();
 
 // Middleware
 app.use(cors({
-    origin: 'https://frontend-u30c.onrender.com', // Allow requests from any origin for now
+    origin: 'https://frontend-u30c.onrender.com',
     credentials: true // Allow cookies/sessions
 }));
 app.use(express.json());
+
+// Update session configuration
 app.use(session({
-    secret: process.env.SESSION_SECRET,
+    secret: process.env.SESSION_SECRET || 'your-session-secret',
     resave: false,
-    saveUninitialized: false,
-    cookie: { secure: process.env.NODE_ENV === 'production' }, // Secure cookies in production
+    saveUninitialized: true, // Set to true to create a session for guests
+    cookie: {
+        secure: process.env.NODE_ENV === 'production',
+        maxAge: 24 * 60 * 60 * 1000 // 24 hours
+    },
 }));
+
+// Add logging middleware for debugging
+app.use((req, res, next) => {
+    console.log(`${req.method} ${req.url}`);
+    console.log('Session ID:', req.session.id);
+    console.log('User ID:', req.session.userId);
+    console.log('Session ID (guest):', req.session.sessionId);
+    next();
+});
 
 // Connect to MongoDB
 mongoose.connect(process.env.MONGO_URI, {
