@@ -1,12 +1,38 @@
 import React, { useState, useContext } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { AuthContext } from '../App';
+import axios from 'axios';
+import { useLocation } from 'react-router-dom';
+
+const CART_API_URL = "https://nodejs-final-ecommerce-1.onrender.com/cart";
 
 const Login = () => {
   const [formData, setFormData] = useState({ email: '', password: '' });
   const [error, setError] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
   const navigate = useNavigate();
   const { login } = useContext(AuthContext);
+
+  // Check if we came from checkout
+  const checkoutRedirect = localStorage.getItem('checkoutRedirect') === 'true';
+
+  const migrateGuestCart = async (token) => {
+    try {
+      const sessionId = localStorage.getItem('guestSessionId');
+      if (!sessionId) return;
+
+      // Migrate cart items from guest session to user account
+      await axios.post(`${CART_API_URL}/migrate-cart`, 
+        { sessionId },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+
+      // Clear guest session ID after migration
+      localStorage.removeItem('guestSessionId');
+    } catch (error) {
+      console.error('Error migrating cart:', error);
+    }
+  };
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
@@ -15,18 +41,33 @@ const Login = () => {
 
   const handleLogin = async (e) => {
     e.preventDefault();
+    setIsLoading(true);
+
     try {
       const response = await login(formData.email, formData.password);
       const user = response.user;
+      const token = response.token;
+
+      // Try to migrate the guest cart if we have a session ID
+      await migrateGuestCart(token);
+      
+      // Clear checkout redirect flag
+      localStorage.removeItem('checkoutRedirect');
+
       // Redirect based on role
       if (user.role === 'admin') {
         navigate('/admin/dashboard');
+      } else if (checkoutRedirect) {
+        // If we came from checkout, go back to checkout
+        navigate('/checkout');
       } else {
         navigate('/products');
       }
     } catch (error) {
       console.error('Error logging in:', error);
       setError(error.message || 'Invalid credentials. Please try again.');
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -61,6 +102,17 @@ const Login = () => {
         >
           Login
         </h2>
+        {checkoutRedirect && (
+          <p
+            style={{
+              color: '#D4AF37',
+              textAlign: 'center',
+              marginBottom: '15px',
+            }}
+          >
+            Please log in to complete your checkout
+          </p>
+        )}
         {error && (
           <p
             style={{

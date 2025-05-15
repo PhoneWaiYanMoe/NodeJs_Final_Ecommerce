@@ -13,29 +13,39 @@ const Cart = () => {
   const CART_API_URL = "https://nodejs-final-ecommerce-1.onrender.com/cart";
 
   useEffect(() => {
-    if (!user) {
-      navigate("/login");
-      return;
-    }
+    // Don't redirect, just fetch cart summary for both guests and logged-in users
     fetchCartSummary();
-  }, [user, navigate]);
+  }, [user]);
 
   const fetchCartSummary = async () => {
     try {
+      // Get token if available (for logged-in users)
       const token = localStorage.getItem("token");
-      if (!token) throw new Error("No token found");
-
+      const sessionId = localStorage.getItem("guestSessionId");
+      
+      // Prepare headers
+      const headers = token ? { Authorization: `Bearer ${token}` } : {};
+      
+      // If not logged in and we have a sessionId, add it to the request body
+      const params = { discountCode };
+      if (!token && sessionId) {
+        params.sessionId = sessionId;
+      }
+      
       const response = await axios.get(`${CART_API_URL}/summary`, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-        params: { discountCode },
+        headers,
+        params,
       });
 
       if (response.data.message === "Cart is empty") {
         setCartSummary({ items: [] });
       } else {
         setCartSummary(response.data);
+        
+        // If this is a guest and we get a sessionId back, store it
+        if (!token && response.data.sessionId) {
+          localStorage.setItem("guestSessionId", response.data.sessionId);
+        }
       }
     } catch (error) {
       console.error("Error fetching cart summary:", error);
