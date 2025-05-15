@@ -44,13 +44,38 @@ const userRequired = (req, res, next) => {
   next();
 };
 
-// Helper to get cart identifier (userId only, no sessionId for guests)
-const getCartIdentifier = (req) => {
-  return { userId: req.user.id };
+// Middleware that allows either a logged-in user or a guest session
+const userOrGuestAllowed = (req, res, next) => {
+  // If there's a valid token, process it
+  const token = req.headers.authorization?.split(' ')[1];
+  if (token) {
+    try {
+      const decoded = jwt.verify(token, SECRET_KEY);
+      req.user = decoded;
+      next();
+    } catch (err) {
+      // If token is invalid, treat as guest
+      req.sessionId = req.body.sessionId || require('uuid').v4();
+      next();
+    }
+  } else {
+    // No token, treat as guest
+    req.sessionId = req.body.sessionId || require('uuid').v4();
+    next();
+  }
 };
 
-// Add to Cart
-router.post('/add', [verifyToken, userRequired], async (req, res) => {
+// Helper to get cart identifier (userId for logged-in users, sessionId for guests)
+const getCartIdentifier = (req) => {
+  if (req.user) {
+    return { userId: req.user.id };
+  } else {
+    return { sessionId: req.sessionId };
+  }
+};
+
+// Add to Cart - Allow both logged-in users and guests
+router.post('/add', userOrGuestAllowed, async (req, res) => {
   const { product_id, variantName = null, quantity = 1, price } = req.body;
 
   if (!product_id || !price) {
@@ -79,15 +104,21 @@ router.post('/add', [verifyToken, userRequired], async (req, res) => {
       await cartItem.save();
     }
 
-    res.status(201).json({ message: 'Item added to cart' });
+    // Return the sessionId for guest users to use in future requests
+    const responseData = { message: 'Item added to cart' };
+    if (!req.user) {
+      responseData.sessionId = req.sessionId;
+    }
+
+    res.status(201).json(responseData);
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Server error' });
   }
 });
 
-// Update Cart Item Quantity
-router.put('/update/:itemId', [verifyToken, userRequired], async (req, res) => {
+// Update Cart Item Quantity - Allow both logged-in users and guests
+router.put('/update/:itemId', userOrGuestAllowed, async (req, res) => {
   const { itemId } = req.params;
   const { quantity } = req.body;
 
@@ -113,8 +144,8 @@ router.put('/update/:itemId', [verifyToken, userRequired], async (req, res) => {
   }
 });
 
-// Remove Item from Cart
-router.delete('/remove/:itemId', [verifyToken, userRequired], async (req, res) => {
+// Remove Item from Cart - Allow both logged-in users and guests
+router.delete('/remove/:itemId', userOrGuestAllowed, async (req, res) => {
   const { itemId } = req.params;
 
   try {
@@ -132,14 +163,17 @@ router.delete('/remove/:itemId', [verifyToken, userRequired], async (req, res) =
   }
 });
 
-// Cart Summary
-router.get('/summary', [verifyToken, userRequired], async (req, res) => {
+// Cart Summary - Allow both logged-in users and guests
+router.get('/summary', userOrGuestAllowed, async (req, res) => {
   try {
     const cartIdentifier = getCartIdentifier(req);
     const cartItems = await CartItem.find(cartIdentifier);
 
     if (!cartItems.length) {
-      return res.status(200).json({ message: 'Cart is empty' });
+      return res.status(200).json({ 
+        message: 'Cart is empty',
+        isGuest: !req.user // Add flag to indicate if user is guest
+      });
     }
 
     const subtotal = cartItems.reduce((sum, item) => sum + item.price * item.quantity, 0);
@@ -175,6 +209,7 @@ router.get('/summary', [verifyToken, userRequired], async (req, res) => {
       taxes: parseFloat(taxes.toFixed(2)),
       shippingFee: SHIPPING_FEE,
       total: parseFloat(total.toFixed(2)),
+      isGuest: !req.user // Add flag to indicate if user is guest
     });
   } catch (err) {
     console.error(err);
@@ -182,8 +217,8 @@ router.get('/summary', [verifyToken, userRequired], async (req, res) => {
   }
 });
 
-// Apply Discount Code
-router.post('/apply-discount', [verifyToken, userRequired], async (req, res) => {
+// Apply Discount Code - Allow both logged-in users and guests
+router.post('/apply-discount', userOrGuestAllowed, async (req, res) => {
   const { code } = req.body;
 
   if (!code) {
@@ -224,6 +259,7 @@ router.post('/apply-discount', [verifyToken, userRequired], async (req, res) => 
       total: parseFloat(total.toFixed(2)),
       discountCode: code,
       discountPercentage: discount.discountPercentage,
+      isGuest: !req.user // Add flag to indicate if user is guest
     });
   } catch (err) {
     console.error(err);
@@ -231,7 +267,7 @@ router.post('/apply-discount', [verifyToken, userRequired], async (req, res) => 
   }
 });
 
-// Checkout Process
+// Checkout Process - Require user login
 router.post('/checkout', [verifyToken, userRequired], async (req, res) => {
   const { paymentDetails, discountCode } = req.body;
 
@@ -301,7 +337,7 @@ router.post('/checkout', [verifyToken, userRequired], async (req, res) => {
   }
 });
 
-// Fetch User's Order History
+// Fetch User's Order History - Require user login
 router.get('/orders', [verifyToken, userRequired], async (req, res) => {
   try {
     const orders = await Order.find({ userId: req.user.id }).sort({ createdAt: -1 }).lean();
@@ -549,6 +585,64 @@ router.get('/admin/discount/:code/orders', [verifyToken, adminRequired], async (
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// Helper endpoint to migrate guest cart to user cart after login
+router.post('/migrate-cart', [verifyToken, userRequired], async (req, res) => {
+  const { sessionId } = req.body;
+
+  if (!sessionId) {
+    return res.status(400).json({ error: 'Session ID is required' });
+  }
+
+  try {
+    // Find all items in the guest cart
+    const guestCartItems = await CartItem.find({ sessionId });
+    
+    if (guestCartItems.length === 0) {
+      return res.status(200).json({ message: 'No items to migrate' });
+    }
+
+    // For each item in the guest cart, either add it to the user cart or update quantity
+    let migratedCount = 0;
+    for (const guestItem of guestCartItems) {
+      // Check if the user already has this item in their cart
+      let userItem = await CartItem.findOne({ 
+        userId: req.user.id, 
+        productId: guestItem.productId,
+        variantName: guestItem.variantName
+      });
+
+      if (userItem) {
+        // Update quantity of existing item
+        userItem.quantity += guestItem.quantity;
+        await userItem.save();
+      } else {
+        // Create new cart item for user
+        userItem = new CartItem({
+          userId: req.user.id,
+          sessionId: null,
+          productId: guestItem.productId,
+          variantName: guestItem.variantName,
+          quantity: guestItem.quantity,
+          price: guestItem.price
+        });
+        await userItem.save();
+      }
+      
+      // Delete the guest cart item
+      await CartItem.findByIdAndDelete(guestItem._id);
+      migratedCount++;
+    }
+
+    res.status(200).json({ 
+      message: `Cart migration successful. ${migratedCount} items migrated.`,
+      migratedCount
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Server error', details: err.message });
   }
 });
 
