@@ -188,6 +188,7 @@ const ProductDetails = () => {
             // Prepare request body
             const requestBody = {
                 product_id: product._id,
+                variantName: selectedVariant,
                 quantity,
                 price
             };
@@ -200,6 +201,13 @@ const ProductDetails = () => {
             // Prepare headers
             const headers = token ? { Authorization: `Bearer ${token}` } : {};
             
+            // Log the request details for debugging
+            console.log('Add to cart request:', {
+                url: `${CART_API_URL}/cart/add`,
+                body: requestBody,
+                headers
+            });
+            
             // Make the API call
             const response = await axios.post(
                 `${CART_API_URL}/cart/add`,
@@ -207,16 +215,27 @@ const ProductDetails = () => {
                 { headers }
             );
             
+            console.log('Add to cart response:', response.data);
+            
             // If this is a guest and we got a sessionId back, store it
             if (!token && response.data.sessionId) {
                 localStorage.setItem("guestSessionId", response.data.sessionId);
+                console.log('Saved guest sessionId:', response.data.sessionId);
             }
 
             setCartMessage('Item added to cart successfully!');
             setTimeout(() => setCartMessage(''), 3000);
         } catch (error) {
             console.error('Error adding to cart:', error);
-            setCartMessage('Failed to add item to cart.');
+            if (error.response) {
+                console.error('Error response:', error.response.data);
+                setCartMessage(`Failed to add item: ${error.response.data.error || 'Server error'}`);
+            } else if (error.request) {
+                console.error('No response received');
+                setCartMessage('Failed to add item: No response from server');
+            } else {
+                setCartMessage(`Failed to add item: ${error.message}`);
+            }
         }
     };
 
@@ -283,21 +302,19 @@ const ProductDetails = () => {
                     <span style={{ color: '#D4AF37' }}>
                         {user ? `Welcome, ${user.name}` : 'Guest'}
                     </span>
-                    {user && (
-                        <button 
-                            onClick={() => navigate('/cart')}
-                            style={{
-                                padding: '10px 20px',
-                                backgroundColor: '#D4AF37',
-                                color: '#000000',
-                                border: 'none',
-                                borderRadius: '5px',
-                                cursor: 'pointer'
-                            }}
-                        >
-                            Cart
-                        </button>
-                    )}
+                    <button 
+                        onClick={() => navigate('/cart')}
+                        style={{
+                            padding: '10px 20px',
+                            backgroundColor: '#D4AF37',
+                            color: '#000000',
+                            border: 'none',
+                            borderRadius: '5px',
+                            cursor: 'pointer'
+                        }}
+                    >
+                        Cart
+                    </button>
                     <button 
                         onClick={() => navigate('/products')}
                         style={{

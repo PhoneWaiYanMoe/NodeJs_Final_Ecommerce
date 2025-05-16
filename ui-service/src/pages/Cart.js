@@ -19,21 +19,40 @@ const Cart = () => {
 
   const fetchCartSummary = async () => {
     try {
+      setMessage(""); // Clear any previous messages
+      
       // Get token if available (for logged-in users)
       const token = localStorage.getItem("token");
       const sessionId = localStorage.getItem("guestSessionId");
       
+      // For debugging
+      console.log("Fetching cart summary:", {
+        hasToken: !!token,
+        sessionId: sessionId
+      });
+      
       // Prepare headers and params
       const headers = token ? { Authorization: `Bearer ${token}` } : {};
       const params = { discountCode };
+      
+      // If guest session, include the sessionId in params
       if (!token && sessionId) {
         params.sessionId = sessionId;
+      }
+      
+      // If neither token nor sessionId, we're a new guest with empty cart
+      if (!token && !sessionId) {
+        console.log("New guest user, will create session on first add");
+        setCartSummary({ items: [] });
+        return;
       }
       
       const response = await axios.get(`${CART_API_URL}/summary`, {
         headers,
         params,
       });
+
+      console.log("Cart summary response:", response.data);
 
       if (response.data.message === "Cart is empty") {
         setCartSummary({ items: [] });
@@ -43,11 +62,19 @@ const Cart = () => {
         // If this is a guest and we get a sessionId back, store it
         if (!token && response.data.sessionId) {
           localStorage.setItem("guestSessionId", response.data.sessionId);
+          console.log("Saved guest sessionId:", response.data.sessionId);
         }
       }
     } catch (error) {
       console.error("Error fetching cart summary:", error);
-      setMessage("Failed to load cart. Please try again.");
+      if (error.response) {
+        console.error("Server error:", error.response.data);
+        setMessage(`Failed to load cart: ${error.response.data.error || 'Server error'}`);
+      } else if (error.request) {
+        setMessage("Failed to load cart: No response from server");
+      } else {
+        setMessage(`Failed to load cart: ${error.message}`);
+      }
     }
   };
   
@@ -562,3 +589,20 @@ const Cart = () => {
 };
 
 export default Cart;
+
+
+const handleProceedToCheckout = () => {
+  if (!user) {
+    // If guest, redirect to login with a flag to return to checkout
+    localStorage.setItem('checkoutRedirect', 'true');
+    navigate('/login');
+  } else {
+    // If logged in user, proceed directly to checkout
+    navigate('/checkout', {
+      state: {
+        cartSummary,
+        discountCode: cartSummary.discountCode
+      }
+    });
+  }
+};
