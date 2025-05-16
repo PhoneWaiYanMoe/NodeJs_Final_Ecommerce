@@ -384,12 +384,15 @@ router.post('/checkout', [verifyToken, userRequired], async (req, res) => {
   }
 
   try {
-    console.log(`Checkout - User ID: ${req.user.id}, Discount Code: ${discountCode}, Points: ${pointsToApply}`);
+    console.log('Checkout process started for user:', req.user.id);
 
+    // Get user data and make a copy of original points for debugging
     const user = await User.findById(req.user.id);
     if (!user) {
       return res.status(400).json({ error: 'User not found' });
     }
+    const userBeforeUpdate = { ...user._doc }; // Make a copy for debugging
+    console.log('Initial user points:', user.points || 0);
 
     // Validate points if applying them
     if (pointsToApply > 0 && pointsToApply > (user.points || 0)) {
@@ -411,6 +414,7 @@ router.post('/checkout', [verifyToken, userRequired], async (req, res) => {
     }));
 
     const subtotal = cartItems.reduce((sum, item) => sum + item.price * item.quantity, 0);
+    
     let discountAmount = 0;
     let appliedDiscountCode = null;
 
@@ -422,6 +426,7 @@ router.post('/checkout', [verifyToken, userRequired], async (req, res) => {
         appliedDiscountCode = discount.code;
         discount.timesUsed += 1;
         await discount.save();
+        console.log('Applied discount code:', discountCode, 'Amount:', discountAmount);
       }
     }
 
@@ -432,25 +437,51 @@ router.post('/checkout', [verifyToken, userRequired], async (req, res) => {
       const maxPointsValue = subtotal - discountAmount;
       const maxPointsToApply = Math.floor(maxPointsValue / POINTS_VALUE);
       pointsUsed = Math.min(pointsToApply, maxPointsToApply, user.points || 0);
-      
-      // Subtract points from user's account
-      user.points -= pointsUsed;
+      console.log('Points to apply:', pointsToApply, 'Actually applying:', pointsUsed);
     }
 
     // Calculate points discount value
     const pointsDiscountValue = pointsUsed * POINTS_VALUE;
+    console.log('Points discount value:', pointsDiscountValue);
     
     // Calculate totals
     const afterDiscounts = subtotal - discountAmount - pointsDiscountValue;
     const taxes = afterDiscounts * TAX_RATE;
     const total = afterDiscounts + taxes + SHIPPING_FEE;
 
-    // Calculate points earned from this purchase
+    // Calculate points earned from this purchase - based on after-discount amount
     const pointsEarned = Math.floor(afterDiscounts * POINTS_RATE);
     
-    // Add earned points to user's account
+    // Log checkout data
+    console.log('Checkout data:', {
+      subtotal,
+      discountAmount,
+      pointsUsed,
+      afterDiscounts,
+      taxes,
+      total,
+      pointsEarned
+    });
+
+    // Subtract points used
+    if (pointsUsed > 0) {
+      user.points = Math.max(0, (user.points || 0) - pointsUsed);
+      console.log('Subtracted points used. New balance:', user.points);
+    }
+    
+    // Add earned points
     user.points = (user.points || 0) + pointsEarned;
+    console.log('Added points earned. Final balance:', user.points);
+    
+    // Save user with updated points - IMPORTANT: await this to ensure it completes
     await user.save();
+
+    // Log updated points
+    console.log('Updated user points:', user.points);
+
+    // Verify points were actually updated
+    const updatedUser = await User.findById(req.user.id);
+    console.log('Verified user points after save:', updatedUser.points);
 
     const order = new Order({
       userId: req.user.id,
@@ -467,17 +498,27 @@ router.post('/checkout', [verifyToken, userRequired], async (req, res) => {
       paymentDetails,
     });
     const savedOrder = await order.save();
+    console.log('Order saved with ID:', savedOrder._id.toString());
 
     await CartItem.deleteMany(cartIdentifier);
+    console.log('Cart items deleted');
 
     res.status(201).json({ 
       message: 'Checkout successful', 
       orderId: savedOrder._id.toString(),
       pointsEarned,
-      currentPoints: user.points
+      pointsUsed,
+      previousPoints: userBeforeUpdate ? userBeforeUpdate.points : 0,
+      currentPoints: user.points,
+      debug: {
+        subtotal,
+        discountAmount,
+        pointsDiscountValue,
+        afterDiscounts
+      }
     });
   } catch (err) {
-    console.error(err);
+    console.error('Error during checkout:', err);
     res.status(500).json({ error: 'Server error', details: err.message });
   }
 });
@@ -714,4 +755,16 @@ router.get('/admin/discounts', [verifyToken, adminRequired], async (req, res) =>
         code: discount.code,
         discountPercentage: discount.discountPercentage,
         usageLimit: discount.usageLimit,
-        timesUsed: discount.times
+        timesUsed: discount.timesUsed,
+        appliedOrders,
+      };
+    }));
+
+    res.status(200).json(discountDetails);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+module.exports = router;
