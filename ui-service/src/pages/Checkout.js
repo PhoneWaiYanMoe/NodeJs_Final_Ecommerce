@@ -4,7 +4,7 @@ import axios from 'axios';
 import { AuthContext } from '../App';
 
 const Checkout = () => {
-  const { user, logout } = useContext(AuthContext);
+  const { user, setUser, logout } = useContext(AuthContext);
   const navigate = useNavigate();
   const location = useLocation();
   const { cartSummary: initialCartSummary, discountCode } = location.state || {};
@@ -133,6 +133,8 @@ const Checkout = () => {
     try {
       const token = localStorage.getItem('token');
       if (!token) throw new Error('No token found');
+      
+      setMessage('Processing your order...');
 
       const checkoutResponse = await axios.post(
         `${CART_API_URL}/checkout`,
@@ -143,6 +145,8 @@ const Checkout = () => {
         },
         { headers: { Authorization: `Bearer ${token}` } }
       );
+
+      console.log('Checkout response:', checkoutResponse.data);
 
       const updatePromises = cartSummary.items.map(async (item) => {
         try {
@@ -175,16 +179,33 @@ const Checkout = () => {
 
       await Promise.all(updatePromises);
 
-      setMessage(`Checkout successful! Order ID: ${checkoutResponse.data.orderId}`);
-      
-      // Show points earned message if applicable
-      if (checkoutResponse.data.pointsEarned) {
-        setMessage(prev => `${prev} You earned ${checkoutResponse.data.pointsEarned} loyalty points!`);
+      // Update user data in context to reflect new points balance
+      if (user && checkoutResponse.data.currentPoints !== undefined) {
+        setUser({
+          ...user,
+          points: checkoutResponse.data.currentPoints
+        });
       }
+
+      let successMessage = `Checkout successful! Order ID: ${checkoutResponse.data.orderId}`;
+      
+      // Show points transaction details
+      if (checkoutResponse.data.pointsEarned) {
+        successMessage += ` You earned ${checkoutResponse.data.pointsEarned} loyalty points!`;
+      }
+      
+      if (checkoutResponse.data.pointsUsed) {
+        successMessage += ` You redeemed ${checkoutResponse.data.pointsUsed} loyalty points.`;
+      }
+      
+      setMessage(successMessage);
+      
+      // Refresh points info from server
+      fetchUserPoints();
       
       setTimeout(() => {
         navigate('/');
-      }, 3000);
+      }, 5000); // Give them 5 seconds to see the points message
     } catch (error) {
       console.error('Error during checkout:', error);
       setMessage(error.response?.data?.error || 'Checkout failed. Please try again.');
