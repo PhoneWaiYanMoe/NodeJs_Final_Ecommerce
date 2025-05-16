@@ -101,14 +101,38 @@ const Checkout = () => {
   };
 
   const applyPoints = async () => {
+    if (pointsInfo.toApply <= 0) {
+      setMessage('Please enter a valid number of points to apply');
+      return;
+    }
+    
     setIsApplyingPoints(true);
     try {
-      await fetchCartSummary();
-      setMessage(`Applied ${pointsInfo.toApply} points to your order`);
+      const token = localStorage.getItem('token');
+      if (!token) throw new Error('No token found');
+      
+      // Make a specific API call to apply points
+      const response = await axios.post(
+        `${CART_API_URL}/apply-points`,
+        { pointsToApply: pointsInfo.toApply },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      
+      // Update the cart summary with the response that includes points discount
+      if (response.data) {
+        setCartSummary(prevSummary => ({
+          ...prevSummary,
+          pointsApplied: pointsInfo.toApply,
+          pointsDiscountValue: response.data.pointsDiscountValue || 0,
+          total: response.data.total
+        }));
+      }
+      
+      setMessage(`Applied ${pointsInfo.toApply} points to your order (-$${(pointsInfo.toApply * 0.01).toFixed(2)})`);
       setTimeout(() => setMessage(''), 3000);
     } catch (error) {
       console.error('Error applying points:', error);
-      setMessage('Failed to apply points. Please try again.');
+      setMessage(error.response?.data?.error || 'Failed to apply points. Please try again.');
     } finally {
       setIsApplyingPoints(false);
     }
@@ -210,7 +234,7 @@ const Checkout = () => {
       console.error('Error during checkout:', error);
       setMessage(error.response?.data?.error || 'Checkout failed. Please try again.');
       if (error.response?.status === 401) {
-        navigate('/login', { state: { from: '/checkout', cartSummary, discountCode } });
+        navigate stairway('/login', { state: { from: '/checkout', cartSummary, discountCode } });
       }
     }
   };
