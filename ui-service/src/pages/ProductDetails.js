@@ -172,10 +172,6 @@ const ProductDetails = () => {
     };
 
     const handleAddToCart = async () => {
-        if (!user) {
-            navigate('/login');
-            return;
-        }
         if (!selectedVariant) {
             setCartMessage('Please select a variant.');
             return;
@@ -185,22 +181,36 @@ const ProductDetails = () => {
         const price = variant.price;
 
         try {
-            const token = localStorage.getItem('token');
-            if (!token) throw new Error('No token found');
-
-            await axios.post(
+            // Get token if available (for logged-in users)
+            const token = localStorage.getItem("token");
+            const sessionId = localStorage.getItem("guestSessionId");
+            
+            // Prepare request body
+            const requestBody = {
+                product_id: product._id,
+                quantity,
+                price
+            };
+            
+            // If this is a guest and we have a sessionId, include it
+            if (!token && sessionId) {
+                requestBody.sessionId = sessionId;
+            }
+            
+            // Prepare headers
+            const headers = token ? { Authorization: `Bearer ${token}` } : {};
+            
+            // Make the API call
+            const response = await axios.post(
                 `${CART_API_URL}/cart/add`,
-                {
-                    product_id: product._id,
-                    quantity,
-                    price
-                },
-                {
-                    headers: {
-                        Authorization: `Bearer ${token}`
-                    }
-                }
+                requestBody,
+                { headers }
             );
+            
+            // If this is a guest and we got a sessionId back, store it
+            if (!token && response.data.sessionId) {
+                localStorage.setItem("guestSessionId", response.data.sessionId);
+            }
 
             setCartMessage('Item added to cart successfully!');
             setTimeout(() => setCartMessage(''), 3000);
