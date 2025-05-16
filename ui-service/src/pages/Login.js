@@ -284,30 +284,39 @@ const Login = () => {
             >
               Login
             </button>
-          <p
-            style={{
-              textAlign: 'center',
-              marginTop: '15px',
-              color: '#E0E0E0',
-            }}
-          >
-            {forgotPasswordMode ? (
-              <span>
-                Remember your password? <a href="#" onClick={toggleForgotPasswordMode} style={{ color: '#D4AF37' }}>Back to Login</a>
-              </span>
-            ) : (
-              <>
+            <p
+              style={{
+                textAlign: 'center',
+                marginTop: '15px',
+                color: '#E0E0E0',
+              }}
+            >
+              {forgotPasswordMode ? (
                 <span>
-                  <a href="#" onClick={toggleForgotPasswordMode} style={{ color: '#D4AF37' }}>Forgot Password?</a>
+                  Remember your password?{' '}
+                  <a href="#" onClick={toggleForgotPasswordMode} style={{ color: '#D4AF37' }}>
+                    Back to Login
+                  </a>
                 </span>
-                <br />
-                <span>
-                  Don't have an account? <Link to="/register" style={{ color: '#D4AF37' }}>Register</Link>
-                </span>
-              </>
-            )}
-          </p>
-        </div>
+              ) : (
+                <>
+                  <span>
+                    <a href="#" onClick={toggleForgotPasswordMode} style={{ color: '#D4AF37' }}>
+                      Forgot Password?
+                    </a>
+                  </span>
+                  <br />
+                  <span>
+                    Don't have an account?{' '}
+                    <Link to="/register" style={{ color: '#D4AF37' }}>
+                      Register
+                    </Link>
+                  </span>
+                </>
+              )}
+            </p>
+          </div>
+        )}
       </div>
     </div>
   );
