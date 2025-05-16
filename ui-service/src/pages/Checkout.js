@@ -19,9 +19,10 @@ const Checkout = () => {
     available: 0,
     toApply: 0,
     value: 0,
-    isApplied: false // Track whether points have been applied
+    isApplied: false
   });
   const [isApplyingPoints, setIsApplyingPoints] = useState(false);
+  const [confirmingPoints, setConfirmingPoints] = useState(false);
 
   const CART_API_URL = 'https://nodejs-final-ecommerce-1.onrender.com/cart';
   const PRODUCTS_API_URL = 'https://product-management-soyo.onrender.com/api/products';
@@ -65,7 +66,6 @@ const Checkout = () => {
       const token = localStorage.getItem("token");
       const headers = token ? { Authorization: `Bearer ${token}` } : {};
       
-      // Add pointsToApply to the query if points have been applied
       const params = { 
         discountCode,
         ...(pointsInfo.isApplied ? { pointsToApply: pointsInfo.toApply } : {})
@@ -82,7 +82,6 @@ const Checkout = () => {
         setCartSummary({ items: [] });
         setMessage("Your cart is empty. Please add items to proceed.");
       } else {
-        // Make sure the points data is preserved
         setCartSummary(prev => ({
           ...response.data,
           pointsApplied: pointsInfo.isApplied ? pointsInfo.toApply : 0,
@@ -110,33 +109,35 @@ const Checkout = () => {
     }
   };
 
-  const applyPoints = async () => {
+  const handleApplyPoints = () => {
     if (pointsInfo.toApply <= 0) {
       setMessage('Please enter a valid number of points to apply');
       return;
     }
     
+    setConfirmingPoints(true);
+  };
+
+  const confirmApplyPoints = async () => {
     setIsApplyingPoints(true);
     try {
       const token = localStorage.getItem('token');
       if (!token) throw new Error('No token found');
       
-      // Make a specific API call to apply points
       const response = await axios.post(
         `${CART_API_URL}/apply-points`,
         { pointsToApply: pointsInfo.toApply },
         { headers: { Authorization: `Bearer ${token}` } }
       );
       
-      console.log("Apply points response:", response.data);
+      console.log("Points application response:", response.data);
       
-      // Update state to reflect points being applied
       setPointsInfo(prev => ({
         ...prev,
-        isApplied: true
+        isApplied: true,
+        available: prev.available - pointsInfo.toApply
       }));
       
-      // Update cart summary with the new totals from the response
       if (response.data) {
         setCartSummary(prev => ({
           ...prev,
@@ -152,14 +153,10 @@ const Checkout = () => {
     } catch (error) {
       console.error('Error applying points:', error);
       setMessage(error.response?.data?.error || 'Failed to apply points. Please try again.');
-      
-      // Reset points applied status on error
-      setPointsInfo(prev => ({
-        ...prev,
-        isApplied: false
-      }));
+      setPointsInfo(prev => ({ ...prev, isApplied: false }));
     } finally {
       setIsApplyingPoints(false);
+      setConfirmingPoints(false);
     }
   };
 
@@ -185,13 +182,11 @@ const Checkout = () => {
       
       setMessage('Processing your order...');
 
-      // Include pointsToApply only if points have been applied
       const checkoutData = { 
         paymentDetails, 
         discountCode
       };
       
-      // Only include points if they have been applied
       if (pointsInfo.isApplied && pointsInfo.toApply > 0) {
         checkoutData.pointsToApply = pointsInfo.toApply;
       }
@@ -237,7 +232,6 @@ const Checkout = () => {
 
       await Promise.all(updatePromises);
 
-      // Update user data in context to reflect new points balance
       if (user && checkoutResponse.data.currentPoints !== undefined) {
         setUser({
           ...user,
@@ -245,7 +239,6 @@ const Checkout = () => {
         });
       }
 
-      // Build success message with points information
       let successMessage = `Checkout successful! Order ID: ${checkoutResponse.data.orderId}`;
       
       if (checkoutResponse.data.pointsUsed > 0) {
@@ -258,7 +251,6 @@ const Checkout = () => {
       
       setMessage(successMessage);
       
-      // Reset points state
       setPointsInfo({
         available: checkoutResponse.data.currentPoints || 0,
         toApply: 0,
@@ -266,7 +258,6 @@ const Checkout = () => {
         isApplied: false
       });
       
-      // Wait before redirect to show success message
       setTimeout(() => {
         navigate('/orders');
       }, 5000);
@@ -382,194 +373,110 @@ const Checkout = () => {
               fontFamily: "'Roboto', sans-serif",
               cursor: 'pointer',
               transition: 'background-color 0.3s'
-              }}
-              onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#E0E0E0')}
-              onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = '#D4AF37')}
-            >
-              {user ? 'Logout' : 'Login'}
-            </button>
-          </div>
-        </header>
+            }}
+            onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#E0E0E0')}
+            onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = '#D4AF37')}
+          >
+            {user ? 'Logout' : 'Login'}
+          </button>
+        </div>
+      </header>
   
-        <main style={{ padding: '40px' }}>
-          <h1 style={{
-            fontSize: '36px',
-            fontWeight: 'bold',
-            color: '#D4AF37',
+      <main style={{ padding: '40px' }}>
+        <h1 style={{
+          fontSize: '36px',
+          fontWeight: 'bold',
+          color: '#D4AF37',
+          textAlign: 'center',
+          marginBottom: '40px'
+        }}>
+          Checkout
+        </h1>
+  
+        {message && (
+          <p style={{
+            fontSize: '16px',
+            color: message.includes('failed') ? '#FF5555' : '#D4AF37',
             textAlign: 'center',
-            marginBottom: '40px'
+            marginBottom: '20px'
           }}>
-            Checkout
-          </h1>
+            {message}
+          </p>
+        )}
   
-          {message && (
-            <p style={{
-              fontSize: '16px',
-              color: message.includes('failed') ? '#FF5555' : '#D4AF37',
-              textAlign: 'center',
-              marginBottom: '20px'
-            }}>
-              {message}
-            </p>
-          )}
-  
+        {confirmingPoints && (
           <div style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            width: '100%',
+            height: '100%',
+            backgroundColor: 'rgba(0, 0, 0, 0.7)',
             display: 'flex',
-            flexDirection: 'column',
-            gap: '30px',
-            maxWidth: '600px',
-            margin: '0 auto'
+            justifyContent: 'center',
+            alignItems: 'center',
+            zIndex: 1000
           }}>
-            {cartSummary && cartSummary.items && cartSummary.items.length > 0 && (
-              <div style={{
-                backgroundColor: '#1A1A1A',
-                padding: '20px',
-                borderRadius: '10px'
-              }}>
-                <h3 style={{
-                  fontSize: '24px',
-                  color: '#D4AF37',
-                  marginBottom: '15px'
-                }}>
-                  Order Summary
-                </h3>
-                <table style={{
-                  width: '100%',
-                  borderCollapse: 'collapse',
-                  color: '#FFFFFF',
-                  fontFamily: "'Roboto', sans-serif",
-                  marginBottom: '15px'
-                }}>
-                  <thead>
-                    <tr style={{ borderBottom: '1px solid #D4AF37' }}>
-                      <th style={{ padding: '10px', textAlign: 'left' }}>
-                        Product (Variant)
-                      </th>
-                      <th style={{ padding: '10px', textAlign: 'left' }}>
-                        Quantity
-                      </th>
-                      <th style={{ padding: '10px', textAlign: 'left' }}>
-                        Price
-                      </th>
-                      <th style={{ padding: '10px', textAlign: 'left' }}>
-                        Total
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {cartSummary.items.map((item, index) => (
-                      <tr key={index} style={{ borderBottom: '1px solid #333333' }}>
-                        <td style={{ padding: '10px' }}>
-                          {formatProductDisplay(item)}
-                        </td>
-                        <td style={{ padding: '10px' }}>
-                          {item.quantity}
-                        </td>
-                        <td style={{ padding: '10px' }}>
-                          ${item.price.toFixed(2)}
-                        </td>
-                        <td style={{ padding: '10px' }}>
-                          ${(item.price * item.quantity).toFixed(2)}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-                <p style={{ fontSize: '16px', color: '#E0E0E0', marginBottom: '15px' }}>
-                  Subtotal: ${cartSummary.subtotal?.toFixed(2) || '0.00'}
-                </p>
-                {cartSummary.discountApplied > 0 && (
-                  <p style={{ fontSize: '16px', color: '#D4AF37', marginBottom: '15px' }}>
-                    Discount ({cartSummary.discountCode} - {cartSummary.discountPercentage}%): -$
-                    {cartSummary.discountApplied?.toFixed(2) || '0.00'}
-                  </p>
-                )}
-                
-                {user && (
-                  <div style={{ 
-                    backgroundColor: '#222222', 
-                    padding: '15px', 
-                    borderRadius: '8px', 
-                    marginBottom: '15px',
-                    border: '1px solid #D4AF37' 
-                  }}>
-                    <h4 style={{ fontSize: '18px', color: '#D4AF37', marginBottom: '10px' }}>
-                      Loyalty Points
-                    </h4>
-                    <p style={{ fontSize: '14px', color: '#E0E0E0', marginBottom: '10px' }}>
-                      Available Points: {pointsInfo.available} (Value: ${pointsInfo.value.toFixed(2)})
-                    </p>
-                    <div style={{ display: 'flex', alignItems: 'center', marginBottom: '10px' }}>
-                      <input
-                        type="number"
-                        min="0"
-                        max={pointsInfo.available}
-                        value={pointsInfo.toApply}
-                        onChange={handlePointsChange}
-                        style={{
-                          width: '80px',
-                          padding: '8px',
-                          backgroundColor: '#E0E0E0',
-                          border: 'none',
-                          borderRadius: '5px',
-                          color: '#000000',
-                          fontFamily: "'Roboto', sans-serif",
-                          marginRight: '10px'
-                        }}
-                      />
-                      <button
-                        onClick={applyPoints}
-                        disabled={isApplyingPoints || pointsInfo.toApply === 0}
-                        style={{
-                          padding: '8px 15px',
-                          backgroundColor: (isApplyingPoints || pointsInfo.toApply === 0) ? '#666666' : '#D4AF37',
-                          color: '#000000',
-                          border: 'none',
-                          borderRadius: '5px',
-                          fontFamily: "'Roboto', sans-serif",
-                          cursor: (isApplyingPoints || pointsInfo.toApply === 0) ? 'not-allowed' : 'pointer',
-                          transition: 'background-color 0.3s'
-                        }}
-                        onMouseEnter={(e) => {
-                          if (!isApplyingPoints && pointsInfo.toApply > 0) {
-                            e.currentTarget.style.backgroundColor = '#E0E0E0';
-                          }
-                        }}
-                        onMouseLeave={(e) => {
-                          if (!isApplyingPoints && pointsInfo.toApply > 0) {
-                            e.currentTarget.style.backgroundColor = '#D4AF37';
-                          }
-                        }}
-                      >
-                        {isApplyingPoints ? 'Applying...' : 'Apply Points'}
-                      </button>
-                    </div>
-                    {cartSummary.pointsApplied > 0 && (
-                      <p style={{ fontSize: '16px', color: '#55FF55', marginBottom: '0' }}>
-                        Points Discount: -${cartSummary.pointsDiscountValue?.toFixed(2) || '0.00'} ({cartSummary.pointsApplied} points)
-                      </p>
-                    )}
-                  </div>
-                )}
-                
-                <p style={{ fontSize: '16px', color: '#E0E0E0', marginBottom: '15px' }}>
-                  Taxes: ${cartSummary.taxes?.toFixed(2) || '0.00'}
-                </p>
-                <p style={{ fontSize: '16px', color: '#E0E0E0', marginBottom: '15px' }}>
-                  Shipping Fee: ${cartSummary.shippingFee?.toFixed(2) || '0.00'}
-                </p>
-                <p style={{ fontSize: '18px', fontWeight: 'bold', color: '#D4AF37', marginBottom: '20px' }}>
-                  Total: ${cartSummary.total?.toFixed(2) || '0.00'}
-                </p>
-  
-                {user && (
-                  <p style={{ fontSize: '14px', color: '#55FF55', fontStyle: 'italic', marginBottom: '0' }}>
-                    You'll earn approximately {Math.floor(cartSummary.total * 0.1)} points from this purchase!
-                  </p>
-                )}
+            <div style={{
+              backgroundColor: '#1A1A1A',
+              padding: '30px',
+              borderRadius: '10px',
+              maxWidth: '500px',
+              width: '90%',
+              border: '1px solid #D4AF37'
+            }}>
+              <h3 style={{ fontSize: '20px', color: '#D4AF37', marginBottom: '20px', textAlign: 'center' }}>
+                Confirm Points Redemption
+              </h3>
+              <p style={{ fontSize: '16px', color: '#E0E0E0', marginBottom: '20px', textAlign: 'center' }}>
+                Are you sure you want to use <span style={{ color: '#55FF55', fontWeight: 'bold' }}>{pointsInfo.toApply} points</span> to
+                reduce your order by <span style={{ color: '#D4AF37', fontWeight: 'bold' }}>${(pointsInfo.toApply * 0.01).toFixed(2)}</span>?
+              </p>
+              <p style={{ fontSize: '14px', color: '#FF5555', marginBottom: '20px', textAlign: 'center' }}>
+                This will immediately deduct the points from your account.
+              </p>
+              <div style={{ display: 'flex', justifyContent: 'space-between', gap: '15px' }}>
+                <button
+                  onClick={() => setConfirmingPoints(false)}
+                  style={{
+                    flex: 1,
+                    padding: '10px',
+                    backgroundColor: '#333333',
+                    color: '#FFFFFF',
+                    border: 'none',
+                    borderRadius: '5px',
+                    cursor: 'pointer'
+                  }}
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={confirmApplyPoints}
+                  style={{
+                    flex: 1,
+                    padding: '10px',
+                    backgroundColor: '#D4AF37',
+                    color: '#000000',
+                    border: 'none',
+                    borderRadius: '5px',
+                    cursor: 'pointer'
+                  }}
+                >
+                  Confirm
+                </button>
               </div>
-            )}
+            </div>
+          </div>
+        )}
   
+        <div style={{
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '30px',
+          maxWidth: '600px',
+          margin: '0 auto'
+        }}>
+          {cartSummary && cartSummary.items && cartSummary.items.length > 0 && (
             <div style={{
               backgroundColor: '#1A1A1A',
               padding: '20px',
@@ -580,82 +487,229 @@ const Checkout = () => {
                 color: '#D4AF37',
                 marginBottom: '15px'
               }}>
-                Payment Details
+                Order Summary
               </h3>
-              <input
-                type="text"
-                name="cardNumber"
-                placeholder="Card Number"
-                value={paymentDetails.cardNumber}
-                onChange={handlePaymentChange}
-                style={{
-                  width: '100%',
-                  padding: '10px',
-                  backgroundColor: '#E0E0E0',
-                  border: 'none',
-                  borderRadius: '5px',
-                  color: '#000000',
-                  fontFamily: "'Roboto', sans-serif",
-                  marginBottom: '10px'
-                }}
-              />
-              <input
-                type="text"
-                name="expiryDate"
-                placeholder="Expiry Date (MM/YY)"
-                value={paymentDetails.expiryDate}
-                onChange={handlePaymentChange}
-                style={{
-                  width: '100%',
-                  padding: '10px',
-                  backgroundColor: '#E0E0E0',
-                  border: 'none',
-                  borderRadius: '5px',
-                  color: '#000000',
-                  fontFamily: "'Roboto', sans-serif",
-                  marginBottom: '10px'
-                }}
-              />
-              <input
-                type="text"
-                name="cvv"
-                placeholder="CVV"
-                value={paymentDetails.cvv}
-                onChange={handlePaymentChange}
-                style={{
-                  width: '100%',
-                  padding: '10px',
-                  backgroundColor: '#E0E0E0',
-                  border: 'none',
-                  borderRadius: '5px',
-                  color: '#000000',
-                  fontFamily: "'Roboto', sans-serif",
-                  marginBottom: '10px'
-                }}
-              />
-            </div>
+              <table style={{
+                width: '100%',
+                borderCollapse: 'collapse',
+                color: '#FFFFFF',
+                fontFamily: "'Roboto', sans-serif",
+                marginBottom: '15px'
+              }}>
+                <thead>
+                  <tr style={{ borderBottom: '1px solid #D4AF37' }}>
+                    <th style={{ padding: '10px', textAlign: 'left' }}>
+                      Product (Variant)
+                    </th>
+                    <th style={{ padding: '10px', textAlign: 'left' }}>
+                      Quantity
+                    </th>
+                    <th style={{ padding: '10px', textAlign: 'left' }}>
+                      Price
+                    </th>
+                    <th style={{ padding: '10px', textAlign: 'left' }}>
+                      Total
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {cartSummary.items.map((item, index) => (
+                    <tr key={index} style={{ borderBottom: '1px solid #333333' }}>
+                      <td style={{ padding: '10px' }}>
+                        {formatProductDisplay(item)}
+                      </td>
+                      <td style={{ padding: '10px' }}>
+                        {item.quantity}
+                      </td>
+                      <td style={{ padding: '10px' }}>
+                        ${item.price.toFixed(2)}
+                      </td>
+                      <td style={{ padding: '10px' }}>
+                        ${(item.price * item.quantity).toFixed(2)}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              <p style={{ fontSize: '16px', color: '#E0E0E0', marginBottom: '15px' }}>
+                Subtotal: ${cartSummary.subtotal?.toFixed(2) || '0.00'}
+              </p>
+              {cartSummary.discountApplied > 0 && (
+                <p style={{ fontSize: '16px', color: '#D4AF37', marginBottom: '15px' }}>
+                  Discount ({cartSummary.discountCode} - {cartSummary.discountPercentage}%): -$
+                  {cartSummary.discountApplied?.toFixed(2) || '0.00'}
+                </p>
+              )}
+              
+              {user && (
+                <div style={{ 
+                  backgroundColor: '#222222', 
+                  padding: '15px', 
+                  borderRadius: '8px', 
+                  marginBottom: '15px',
+                  border: '1px solid #D4AF37' 
+                }}>
+                  <h4 style={{ fontSize: '18px', color: '#D4AF37', marginBottom: '10px' }}>
+                    Loyalty Points
+                  </h4>
+                  <p style={{ fontSize: '14px', color: '#E0E0E0', marginBottom: '10px' }}>
+                    Available Points: {pointsInfo.available} (Value: ${pointsInfo.value.toFixed(2)})
+                  </p>
+                  <div style={{ display: 'flex', alignItems: 'center', marginBottom: '10px' }}>
+                    <input
+                      type="number"
+                      min="0"
+                      max={pointsInfo.available}
+                      value={pointsInfo.toApply}
+                      onChange={handlePointsChange}
+                      style={{
+                        width: '80px',
+                        padding: '8px',
+                        backgroundColor: '#E0E0E0',
+                        border: 'none',
+                        borderRadius: '5px',
+                        color: '#000000',
+                        fontFamily: "'Roboto', sans-serif",
+                        marginRight: '10px'
+                      }}
+                    />
+                    <button
+                      onClick={handleApplyPoints}
+                      disabled={isApplyingPoints || pointsInfo.toApply === 0 || pointsInfo.isApplied}
+                      style={{
+                        padding: '8px 15px',
+                        backgroundColor: (isApplyingPoints || pointsInfo.toApply === 0 || pointsInfo.isApplied) 
+                          ? '#666666' 
+                          : '#D4AF37',
+                        color: '#000000',
+                        border: 'none',
+                        borderRadius: '5px',
+                        fontFamily: "'Roboto', sans-serif",
+                        cursor: (isApplyingPoints || pointsInfo.toApply === 0 || pointsInfo.isApplied) 
+                          ? 'not-allowed' 
+                          : 'pointer',
+                        transition: 'background-color 0.3s'
+                      }}
+                    >
+                      {isApplyingPoints 
+                        ? 'Applying...' 
+                        : pointsInfo.isApplied 
+                          ? 'Points Applied' 
+                          : 'Apply Points'}
+                    </button>
+                  </div>
+                  {cartSummary.pointsApplied > 0 && (
+                    <p style={{ fontSize: '16px', color: '#55FF55', marginBottom: '0' }}>
+                      Points Discount: -${cartSummary.pointsDiscountValue?.toFixed(2) || '0.00'} ({cartSummary.pointsApplied} points)
+                    </p>
+                  )}
+                </div>
+              )}
+              
+              <p style={{ fontSize: '16px', color: '#E0E0E0', marginBottom: '15px' }}>
+                Taxes: ${cartSummary.taxes?.toFixed(2) || '0.00'}
+              </p>
+              <p style={{ fontSize: '16px', color: '#E0E0E0', marginBottom: '15px' }}>
+                Shipping Fee: ${cartSummary.shippingFee?.toFixed(2) || '0.00'}
+              </p>
+              <p style={{ fontSize: '18px', fontWeight: 'bold', color: '#D4AF37', marginBottom: '20px' }}>
+                Total: ${cartSummary.total?.toFixed(2) || '0.00'}
+              </p>
   
-            <button
-              onClick={handleCheckout}
+              {user && (
+                <p style={{ fontSize: '14px', color: '#55FF55', fontStyle: 'italic', marginBottom: '0' }}>
+                  You'll earn approximately {Math.floor(cartSummary.total * 0.1)} points from this purchase!
+                </p>
+              )}
+            </div>
+          )}
+  
+          <div style={{
+            backgroundColor: '#1A1A1A',
+            padding: '20px',
+            borderRadius: '10px'
+          }}>
+            <h3 style={{
+              fontSize: '24px',
+              color: '#D4AF37',
+              marginBottom: '15px'
+            }}>
+              Payment Details
+            </h3>
+            <input
+              type="text"
+              name="cardNumber"
+              placeholder="Card Number"
+              value={paymentDetails.cardNumber}
+              onChange={handlePaymentChange}
               style={{
-                padding: '10px 20px',
-                backgroundColor: '#D4AF37',
-                color: '#000000',
+                width: '100%',
+                padding: '10px',
+                backgroundColor: '#E0E0E0',
                 border: 'none',
                 borderRadius: '5px',
+                color: '#000000',
                 fontFamily: "'Roboto', sans-serif",
-                cursor: 'pointer',
-                transition: 'background-color 0.3s'
+                marginBottom: '10px'
               }}
-              onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#E0E0E0')}
-              onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = '#D4AF37')}
-            >
-              Complete Checkout
-            </button>
+            />
+            <input
+              type="text"
+              name="expiryDate"
+              placeholder="Expiry Date (MM/YY)"
+              value={paymentDetails.expiryDate}
+              onChange={handlePaymentChange}
+              style={{
+                width: '100%',
+                padding: '10px',
+                backgroundColor: '#E0E0E0',
+                border: 'none',
+                borderRadius: '5px',
+                color: '#000000',
+                fontFamily: "'Roboto', sans-serif",
+                marginBottom: '10px'
+              }}
+            />
+            <input
+              type="text"
+              name="cvv"
+              placeholder="CVV"
+              value={paymentDetails.cvv}
+              onChange={handlePaymentChange}
+              style={{
+                width: '100%',
+                padding: '10px',
+                backgroundColor: '#E0E0E0',
+                border: 'none',
+                borderRadius: '5px',
+                color: '#000000',
+                fontFamily: "'Roboto', sans-serif",
+                marginBottom: '10px'
+              }}
+            />
           </div>
-        </main>
-      </div>
-    );
+  
+          <button
+            onClick={handleCheckout}
+            style={{
+              padding: '10px 20px',
+              backgroundColor: '#D4AF37',
+              color: '#000000',
+              border: 'none',
+              borderRadius: '5px',
+              fontFamily: "'Roboto', sans-serif",
+              cursor: 'pointer',
+              transition: 'background-color 0.3s'
+            }}
+            onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#E0E0E0')}
+            onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = '#D4AF37')}
+          >
+            Complete Checkout
+          </button>
+        </div>
+      </main>
+    </div>
+  );
 };
   
 export default Checkout;
