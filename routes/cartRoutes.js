@@ -7,6 +7,7 @@ const CartItem = require('../models/CartItem');
 const Order = require('../models/Order');
 const DiscountCode = require('../models/DiscountCode');
 const User = require('../models/User');
+const PointsTransaction = require('../models/PointsTransaction');
 
 // Constants
 const TAX_RATE = 0.1; // 10% tax
@@ -94,6 +95,26 @@ const handleGuestSession = (req, res, next) => {
   // Store in request for use in route handlers
   req.sessionId = sessionId;
   next();
+};
+
+// Helper function to record points transactions
+const recordPointsTransaction = async (userId, points, reason, orderId = null) => {
+  try {
+    const transaction = new PointsTransaction({
+      userId,
+      points,
+      reason,
+      orderId: orderId || null
+    });
+    
+    await transaction.save();
+    console.log(`Recorded points transaction: ${points} points for user ${userId}`);
+    return transaction;
+  } catch (err) {
+    console.error('Error recording points transaction:', err);
+    // Don't throw error - this is a non-critical operation
+    return null;
+  }
 };
 
 // Determine if a request is from a guest
@@ -423,17 +444,29 @@ router.post('/apply-points', [verifyToken, userRequired], async (req, res) => {
     const taxes = afterDiscounts * TAX_RATE;
     const total = afterDiscounts + taxes + SHIPPING_FEE;
     
-    // Log the calculations
-    console.log('Points application calculation:', {
-      subtotal,
-      discountAmount,
-      pointsToApply,
-      actualPointsApplied,
-      pointsDiscountValue,
-      afterDiscounts,
-      taxes,
-      total
+    // Store in session that these points are applied to this cart
+    req.session.appliedPoints = {
+      points: actualPointsApplied,
+      discountValue: pointsDiscountValue
+    };
+    
+    // Save the session
+    await new Promise((resolve, reject) => {
+      req.session.save(err => {
+        if (err) reject(err);
+        else resolve();
+      });
     });
+    
+    // Record the pending points reservation
+    if (actualPointsApplied > 0) {
+      await recordPointsTransaction(
+        req.user.id, 
+        -actualPointsApplied, 
+        'Points reserved for order', 
+        null
+      );
+    }
     
     // Return the updated cart summary with points applied
     res.status(200).json({
@@ -460,7 +493,7 @@ router.post('/checkout', [verifyToken, userRequired], async (req, res) => {
   }
 
   try {
-    console.log(`Checkout - User ID: ${req.user.id}, Discount Code: ${discountCode}, Points to Apply: ${pointsToApply}`);
+    console.log(`Checkout - User ID: ${req.user.id}, Discount Code: ${discountCode}, Points: ${pointsToApply}`);
 
     // Get user data
     const user = await User.findById(req.user.id);
@@ -471,12 +504,24 @@ router.post('/checkout', [verifyToken, userRequired], async (req, res) => {
     const originalPoints = user.points || 0;
     console.log('User found with original points:', originalPoints);
 
-    // Validate points if applying them
-    if (pointsToApply > 0) {
-      if (pointsToApply > originalPoints) {
-        return res.status(400).json({ error: `Not enough points available. You have ${originalPoints} points.` });
+    // Get points to use - either from request or session
+    let pointsUsed = parseInt(pointsToApply) || 0;
+    
+    // Check if there are applied points in session
+    if (req.session && req.session.appliedPoints && req.session.appliedPoints.points > 0) {
+      console.log('Found applied points in session:', req.session.appliedPoints);
+      // Use the points stored in session if available
+      pointsUsed = req.session.appliedPoints.points;
+    }
+    
+    // Final validation of points
+    if (pointsUsed > 0) {
+      if (pointsUsed > originalPoints) {
+        return res.status(400).json({ 
+          error: `Not enough points available. You have ${originalPoints} points but trying to use ${pointsUsed}.` 
+        });
       }
-      console.log(`User is redeeming ${pointsToApply} points worth $${(pointsToApply * POINTS_VALUE).toFixed(2)}`);
+      console.log(`User is redeeming ${pointsUsed} points worth $${(pointsUsed * POINTS_VALUE).toFixed(2)}`);
     }
 
     const cartIdentifier = getCartIdentifier(req);
@@ -511,28 +556,9 @@ router.post('/checkout', [verifyToken, userRequired], async (req, res) => {
       }
     }
 
-    // Apply points discount if requested
-    let pointsUsed = 0;
-    let pointsDiscountValue = 0;
-    
-    if (pointsToApply > 0) {
-      // Calculate maximum points that can be applied (can't reduce total below zero)
-      const maxPointsValue = subtotal - discountAmount;
-      const maxPointsToApply = Math.floor(maxPointsValue / POINTS_VALUE);
-      
-      // Use the minimum of requested points, max applicable points, and available points
-      pointsUsed = Math.min(parseInt(pointsToApply), maxPointsToApply, originalPoints);
-      
-      // Calculate the actual discount value
-      pointsDiscountValue = pointsUsed * POINTS_VALUE;
-      
-      console.log('Points redemption:', {
-        pointsToApply,
-        maxPointsToApply,
-        pointsUsed,
-        pointsDiscountValue
-      });
-    }
+    // Calculate points discount value
+    const pointsDiscountValue = pointsUsed * POINTS_VALUE;
+    console.log('Points discount:', pointsDiscountValue);
     
     // Calculate final totals
     const afterDiscounts = subtotal - discountAmount - pointsDiscountValue;
@@ -552,31 +578,32 @@ router.post('/checkout', [verifyToken, userRequired], async (req, res) => {
     const pointsEarned = Math.floor(afterDiscounts * POINTS_RATE);
     console.log('Points earned from purchase:', pointsEarned);
     
-    // Update user points: subtract points used and add points earned
+    // Update user points: subtract points used 
     if (pointsUsed > 0) {
+      // Make a copy of current points for verification
+      const beforePoints = user.points;
+      
+      // Subtract the used points
       user.points = Math.max(0, originalPoints - pointsUsed);
-      console.log('After subtracting points used, new balance:', user.points);
+      
+      console.log('Points deduction:', {
+        before: beforePoints,
+        deducted: pointsUsed,
+        after: user.points
+      });
     }
     
-    // Add earned points
-    user.points = (user.points || 0) + pointsEarned;
-    console.log('After adding points earned, final balance:', user.points);
-    
-    // Save user with updated points
-    await user.save();
-    console.log('User saved with updated points balance');
-
-    // Create and save the order
+    // Create and save the order with the correct pointsUsed value
     const order = new Order({
       userId: req.user.id,
       items: orderItems,
-      totalPrice: total,
+      totalPrice: total, // This reflects the price AFTER points discount
       taxes,
       shippingFee: SHIPPING_FEE,
       discountApplied: discountAmount + pointsDiscountValue,
       discountCode: appliedDiscountCode,
-      pointsUsed, // Explicitly set the points used
-      pointsEarned, // Set points earned
+      pointsUsed, // Make sure this is set correctly
+      pointsEarned,
       statusHistory: [{ status: 'ordered', updatedAt: new Date() }],
       shippingAddress: user.shippingAddress,
       paymentDetails,
@@ -584,6 +611,70 @@ router.post('/checkout', [verifyToken, userRequired], async (req, res) => {
     
     const savedOrder = await order.save();
     console.log('Order saved with ID:', savedOrder._id.toString());
+    
+    // Record points transactions
+    if (pointsUsed > 0) {
+      await recordPointsTransaction(
+        req.user.id,
+        -pointsUsed,
+        'Points redeemed for order discount',
+        savedOrder._id.toString()
+      );
+    }
+    
+    if (pointsEarned > 0) {
+      await recordPointsTransaction(
+        req.user.id,
+        pointsEarned,
+        'Points earned from purchase',
+        savedOrder._id.toString()
+      );
+    }
+    
+    // Add earned points
+    const afterDeduction = user.points;
+    user.points = (user.points || 0) + pointsEarned;
+    
+    console.log('Points update summary:', {
+      originalPoints,
+      pointsUsed,
+      afterDeduction,
+      pointsEarned,
+      finalPoints: user.points
+    });
+    
+    // Save user with updated points - CRITICAL step
+    await user.save();
+    
+    // Double-check the user's points were updated
+    const updatedUser = await User.findById(req.user.id);
+    console.log('Verified user points after save:', updatedUser.points);
+    
+    if (updatedUser.points !== user.points) {
+      console.error('POINTS MISMATCH DETECTED!', {
+        calculated: user.points,
+        actual: updatedUser.points
+      });
+    }
+    
+    // Verify order was saved with correct points values
+    const verifyOrder = await Order.findById(savedOrder._id);
+    console.log('Verify order points:', {
+      pointsUsed: verifyOrder.pointsUsed,
+      pointsEarned: verifyOrder.pointsEarned,
+      totalPrice: verifyOrder.totalPrice
+    });
+    
+    // Clear the session applied points
+    if (req.session && req.session.appliedPoints) {
+      delete req.session.appliedPoints;
+      await new Promise((resolve, reject) => {
+        req.session.save(err => {
+          if (err) reject(err);
+          else resolve();
+        });
+      });
+    }
     
     // Clear the cart
     await CartItem.deleteMany(cartIdentifier);
@@ -596,7 +687,7 @@ router.post('/checkout', [verifyToken, userRequired], async (req, res) => {
       pointsEarned,
       pointsUsed,
       originalPoints,
-      currentPoints: user.points,
+      currentPoints: updatedUser.points,
       totalPrice: total
     });
   } catch (err) {
@@ -619,6 +710,32 @@ router.get('/points', [verifyToken, userRequired], async (req, res) => {
     });
   } catch (err) {
     console.error(err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// Fetch Points Transaction History - Require user login
+router.get('/points-history', [verifyToken, userRequired], async (req, res) => {
+  try {
+    const transactions = await PointsTransaction.find({ userId: req.user.id })
+      .sort({ createdAt: -1 })
+      .lean();
+      
+    const user = await User.findById(req.user.id);
+    
+    res.status(200).json({
+      currentPoints: user?.points || 0,
+      pointsValue: parseFloat(((user?.points || 0) * POINTS_VALUE).toFixed(2)),
+      transactions: transactions.map(t => ({
+        id: t._id.toString(),
+        points: t.points,
+        reason: t.reason,
+        orderId: t.orderId,
+        date: t.createdAt
+      }))
+    });
+  } catch (err) {
+    console.error('Error fetching points history:', err);
     res.status(500).json({ error: 'Server error' });
   }
 });
@@ -749,7 +866,7 @@ router.put('/admin/orders/:orderId/status', [verifyToken, adminRequired], async 
   }
 
   try {
-    const order = await Order_DEVICES.findById(orderId);
+    const order = await Order.findById(orderId);
     if (!order) {
       return res.status(404).json({ error: 'Order not found' });
     }
