@@ -54,6 +54,31 @@ const OrderHistory = () => {
     }
   };
 
+  const formattedOrders = orders.map(order => ({
+    orderId: order._loid.toString(),
+    items: Array.isArray(order.items) ? order.items.map(item => ({
+      productId: item.productId.toString(),
+      variantName: item.variantName || 'Default',
+      quantity: item.quantity,
+      price: item.price,
+    })) : [],
+    totalPrice: order.totalPrice,
+    taxes: order.taxes,
+    shippingFee: order.shippingFee,
+    discountApplied: order.discountApplied,
+    discountCode: order.discountCode,
+    pointsEarned: order.pointsEarned || 0,  // Added this line
+    pointsUsed: order.pointsUsed || 0,      // Added this line
+    statusHistory: order.statusHistory || [],
+    currentStatus: order.statusHistory && order.statusHistory.length > 0 ? order.statusHistory[order.statusHistory.length - 1].status : 'ordered',
+    shippingAddress: order.shippingAddress || {},
+    paymentDetails: order.paymentDetails ? {
+      cardNumber: `**** **** **** ${order.paymentDetails.cardNumber.slice(-4)}`,
+      expiryDate: order.paymentDetails.expiryDate,
+    } : { cardNumber: 'N/A', expiryDate: 'N/A' },
+    createdAt: order.createdAt,
+  }));
+
   return (
     <div style={{
       backgroundColor: '#000000',
@@ -194,7 +219,7 @@ const OrderHistory = () => {
             maxWidth: '800px',
             margin: '0 auto',
           }}>
-            {orders.map((order) => (
+            {formattedOrders.map((order) => (
               <div
                 key={order.orderId}
                 style={{
@@ -312,6 +337,31 @@ const OrderHistory = () => {
             <p style={{ fontSize: '18px', fontWeight: 'bold', color: '#D4AF37', marginBottom: '20px' }}>
               <strong>Total:</strong> ${selectedOrder.totalPrice.toFixed(2)}
             </p>
+
+            {/* Points Information */}
+            {selectedOrder.pointsEarned > 0 || selectedOrder.pointsUsed > 0 ? (
+              <div style={{ 
+                backgroundColor: '#222222', 
+                padding: '15px', 
+                borderRadius: '8px', 
+                marginBottom: '20px' 
+              }}>
+                <h3 style={{ fontSize: '18px', color: '#D4AF37', marginBottom: '10px' }}>
+                  Loyalty Points
+                </h3>
+                {selectedOrder.pointsEarned > 0 && (
+                  <p style={{ fontSize: '16px', color: '#55FF55', marginBottom: '5px' }}>
+                    <strong>Points Earned:</strong> +{selectedOrder.pointsEarned}
+                  </p>
+                )}
+                {selectedOrder.pointsUsed > 0 && (
+                  <p style={{ fontSize: '16px', color: '#FF7F7F', marginBottom: '5px' }}>
+                    <strong>Points Used:</strong> -{selectedOrder.pointsUsed}
+                  </p>
+                )}
+              </div>
+            ) : null}
+
             <h3 style={{ fontSize: '18px', color: '#D4AF37', marginBottom: '10px' }}>
               Shipping Address
             </h3>
