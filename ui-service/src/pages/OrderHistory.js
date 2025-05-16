@@ -36,7 +36,20 @@ const OrderHistory = () => {
   };
 
   const handleOrderClick = (order) => {
-    setSelectedOrder(order);
+    // Create a safe version of the order with null checking
+    const safeOrder = {
+      ...order,
+      orderId: order.orderId || '',
+      items: Array.isArray(order.items) 
+        ? order.items.map(item => ({
+            ...item,
+            productId: item.productId ? item.productId.toString() : 'unknown',
+          })) 
+        : [],
+      // Add other properties with null checks as needed
+    };
+    
+    setSelectedOrder(safeOrder);
     setModalOpen(true);
   };
 
@@ -55,28 +68,30 @@ const OrderHistory = () => {
   };
 
   const formattedOrders = orders.map(order => ({
-    orderId: order._loid.toString(),
+    orderId: order._id ? order._id.toString() : '',
     items: Array.isArray(order.items) ? order.items.map(item => ({
-      productId: item.productId.toString(),
+      productId: item.productId ? item.productId.toString() : 'unknown',  // Add null check here
       variantName: item.variantName || 'Default',
-      quantity: item.quantity,
-      price: item.price,
+      quantity: item.quantity || 0,
+      price: item.price || 0,
     })) : [],
-    totalPrice: order.totalPrice,
-    taxes: order.taxes,
-    shippingFee: order.shippingFee,
-    discountApplied: order.discountApplied,
-    discountCode: order.discountCode,
-    pointsEarned: order.pointsEarned || 0,  // Added this line
-    pointsUsed: order.pointsUsed || 0,      // Added this line
+    totalPrice: order.totalPrice || 0,
+    taxes: order.taxes || 0,
+    shippingFee: order.shippingFee || 0,
+    discountApplied: order.discountApplied || 0,
+    discountCode: order.discountCode || '',
+    pointsEarned: order.pointsEarned || 0,
+    pointsUsed: order.pointsUsed || 0,
     statusHistory: order.statusHistory || [],
-    currentStatus: order.statusHistory && order.statusHistory.length > 0 ? order.statusHistory[order.statusHistory.length - 1].status : 'ordered',
+    currentStatus: order.statusHistory && order.statusHistory.length > 0 
+      ? order.statusHistory[order.statusHistory.length - 1].status 
+      : 'ordered',
     shippingAddress: order.shippingAddress || {},
     paymentDetails: order.paymentDetails ? {
       cardNumber: `**** **** **** ${order.paymentDetails.cardNumber.slice(-4)}`,
       expiryDate: order.paymentDetails.expiryDate,
     } : { cardNumber: 'N/A', expiryDate: 'N/A' },
-    createdAt: order.createdAt,
+    createdAt: order.createdAt || new Date(),
   }));
 
   return (
