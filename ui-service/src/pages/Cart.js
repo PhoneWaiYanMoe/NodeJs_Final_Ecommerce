@@ -12,11 +12,6 @@ const Cart = () => {
 
   const CART_API_URL = "https://nodejs-final-ecommerce-1.onrender.com/cart";
 
-  useEffect(() => {
-    // Don't redirect, just fetch cart summary for both guests and logged-in users
-    fetchCartSummary();
-  }, [user]);
-
   const fetchCartSummary = async () => {
     try {
       setMessage(""); // Clear any previous messages
@@ -33,26 +28,30 @@ const Cart = () => {
       
       // Prepare headers and params
       const headers = token ? { Authorization: `Bearer ${token}` } : {};
-      const params = { discountCode };
+      const params = {};
       
-      // If guest session, include the sessionId in params
+      // Add discount code if exists
+      if (discountCode) {
+        params.discountCode = discountCode;
+      }
+      
+      // Add sessionId for guests
       if (!token && sessionId) {
         params.sessionId = sessionId;
       }
       
-      // If neither token nor sessionId, we're a new guest with empty cart
-      if (!token && !sessionId) {
-        console.log("New guest user, will create session on first add");
-        setCartSummary({ items: [] });
-        return;
-      }
+      console.log("Cart request:", {
+        url: `${CART_API_URL}/summary`,
+        headers,
+        params
+      });
       
       const response = await axios.get(`${CART_API_URL}/summary`, {
         headers,
         params,
       });
 
-      console.log("Cart summary response:", response.data);
+      console.log("Cart response:", response.data);
 
       if (response.data.message === "Cart is empty") {
         setCartSummary({ items: [] });
@@ -126,44 +125,81 @@ const Cart = () => {
       const sessionId = localStorage.getItem("guestSessionId");
       
       const requestBody = { quantity: newQuantity };
+      
+      // Add sessionId for guests
       if (!token && sessionId) {
         requestBody.sessionId = sessionId;
       }
       
+      // Prepare headers
       const headers = token ? { Authorization: `Bearer ${token}` } : {};
-
+      
+      // Make the API call
       await axios.put(
         `${CART_API_URL}/update/${itemId}`,
         requestBody,
         { headers }
       );
 
+      // Refresh cart after updating
       fetchCartSummary();
     } catch (error) {
       console.error("Error updating quantity:", error);
-      setMessage("Failed to update quantity.");
+      if (error.response) {
+        console.error("Server error:", error.response.data);
+        setMessage(`Failed to update quantity: ${error.response.data.error || 'Server error'}`);
+      } else if (error.request) {
+        setMessage("Failed to update quantity: No response from server");
+      } else {
+        setMessage(`Failed to update quantity: ${error.message}`);
+      }
     }
   };
 
   const handleRemoveItem = async (itemId) => {
     try {
+      // Get token if available (for logged-in users)
       const token = localStorage.getItem("token");
       const sessionId = localStorage.getItem("guestSessionId");
       
+      console.log("Removing item:", {
+        itemId,
+        hasToken: !!token,
+        sessionId
+      });
+      
+      // Prepare headers
       const headers = token ? { Authorization: `Bearer ${token}` } : {};
-      const params = !token && sessionId ? { sessionId } : {};
-
-      await axios.delete(`${CART_API_URL}/remove/${itemId}`, {
+      
+      // Prepare URL and params
+      let url = `${CART_API_URL}/remove/${itemId}`;
+      const params = {};
+      
+      // Add sessionId for guests
+      if (!token && sessionId) {
+        params.sessionId = sessionId;
+      }
+      
+      // Make the API call
+      await axios.delete(url, {
         headers,
         params
       });
 
+      // Refresh cart after removing
       fetchCartSummary();
       setMessage("Item removed from cart.");
       setTimeout(() => setMessage(""), 3000);
     } catch (error) {
       console.error("Error removing item:", error);
-      setMessage("Failed to remove item.");
+      if (error.response) {
+        console.error("Server error:", error.response.data);
+        setMessage(`Failed to remove item: ${error.response.data.error || 'Server error'}`);
+      } else if (error.request) {
+        setMessage("Failed to remove item: No response from server");
+      } else {
+        setMessage(`Failed to remove item: ${error.message}`);
+      }
     }
   };
 
@@ -172,26 +208,39 @@ const Cart = () => {
       const token = localStorage.getItem("token");
       const sessionId = localStorage.getItem("guestSessionId");
       
+      // Prepare request body
       const requestBody = { code: discountCode };
+      
+      // Add sessionId for guests
       if (!token && sessionId) {
         requestBody.sessionId = sessionId;
       }
       
+      // Prepare headers
       const headers = token ? { Authorization: `Bearer ${token}` } : {};
-
+      
+      // Make the API call
       await axios.post(
         `${CART_API_URL}/apply-discount`,
         requestBody,
         { headers }
       );
 
+      // Refresh cart after applying discount
       await fetchCartSummary();
       setMessage(`Discount applied successfully! (${discountCode})`);
       setTimeout(() => setMessage(""), 3000);
       setDiscountCode("");
     } catch (error) {
       console.error("Error applying discount:", error);
-      setMessage(error.response?.data?.error || "Invalid or expired discount code.");
+      if (error.response) {
+        console.error("Server error:", error.response.data);
+        setMessage(error.response.data.error || "Invalid or expired discount code.");
+      } else if (error.request) {
+        setMessage("Failed to apply discount: No response from server");
+      } else {
+        setMessage(`Failed to apply discount: ${error.message}`);
+      }
     }
   };
 

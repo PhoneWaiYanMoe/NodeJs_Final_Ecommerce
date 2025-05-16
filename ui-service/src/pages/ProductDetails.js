@@ -185,6 +185,16 @@ const ProductDetails = () => {
             const token = localStorage.getItem("token");
             const sessionId = localStorage.getItem("guestSessionId");
             
+            // For debugging
+            console.log("Adding to cart with:", {
+                hasToken: !!token,
+                sessionId,
+                product: product._id,
+                variant: selectedVariant,
+                price,
+                quantity
+            });
+            
             // Prepare request body
             const requestBody = {
                 product_id: product._id,
@@ -223,6 +233,7 @@ const ProductDetails = () => {
                 console.log('Saved guest sessionId:', response.data.sessionId);
             }
 
+            // Show success message
             setCartMessage('Item added to cart successfully!');
             setTimeout(() => setCartMessage(''), 3000);
         } catch (error) {
@@ -231,7 +242,7 @@ const ProductDetails = () => {
                 console.error('Error response:', error.response.data);
                 setCartMessage(`Failed to add item: ${error.response.data.error || 'Server error'}`);
             } else if (error.request) {
-                console.error('No response received');
+                console.error('No response received:', error.request);
                 setCartMessage('Failed to add item: No response from server');
             } else {
                 setCartMessage(`Failed to add item: ${error.message}`);
