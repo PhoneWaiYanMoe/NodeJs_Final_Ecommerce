@@ -360,6 +360,7 @@ export const getReviews = async (req, res) => {
 
 // POST /api/products/update-stock - Update stock (update for variants)
 export const updateStock = async (req, res) => {
+  console.log("Update Stock Request Body:", req.body);
   const { items } = req.body; // items: [{ productId, variantName, quantity }]
 
   if (!items || !Array.isArray(items)) {
@@ -368,8 +369,9 @@ export const updateStock = async (req, res) => {
 
   try {
     for (const item of items) {
-      const { productId, variantName, quantity } = item;
-      if (!productId || !variantName || !quantity || quantity <= 0) {
+      console.log("Processing item:", item);
+      const { productId, variantName = 'Default', quantity } = item; // Add default value here too
+      if (!productId || !quantity || quantity <= 0) {
         return res
           .status(400)
           .json({ message: "Invalid productId, variantName, or quantity" });
@@ -377,13 +379,40 @@ export const updateStock = async (req, res) => {
 
       const product = await Product.findById(productId);
       if (!product) {
+        console.log(`Product not found: ${productId}`);
         return res
           .status(404)
           .json({ message: `Product not found: ${productId}` });
       }
 
+      console.log("Product variants:", product.variants);
+      console.log("Looking for variant name:", variantName);
+      
       const variant = product.variants.find((v) => v.name === variantName);
       if (!variant) {
+        console.log(`Variant ${variantName} not found for product ${product.name}`);
+        
+        // If variantName not found, try using the first variant as fallback
+        if (product.variants.length > 0) {
+          const firstVariant = product.variants[0];
+          console.log(`Using first variant as fallback: ${firstVariant.name}`);
+          
+          if (firstVariant.stock < quantity) {
+            return res
+              .status(400)
+              .json({
+                message: `Insufficient stock for variant ${firstVariant.name} of product ${product.name}. Available: ${firstVariant.stock}, Requested: ${quantity}`,
+              });
+          }
+          
+          firstVariant.stock -= quantity;
+          product.salesCount += quantity;
+          await product.save();
+          
+          console.log(`Updated stock for variant ${firstVariant.name} of product ${product.name}`);
+          continue; // Skip to next item
+        }
+        
         return res
           .status(404)
           .json({
@@ -392,6 +421,7 @@ export const updateStock = async (req, res) => {
       }
 
       if (variant.stock < quantity) {
+        console.log(`Insufficient stock for variant ${variantName} of product ${product.name}. Available: ${variant.stock}, Requested: ${quantity}`);
         return res
           .status(400)
           .json({
@@ -402,16 +432,17 @@ export const updateStock = async (req, res) => {
       variant.stock -= quantity;
       product.salesCount += quantity; // Track sales for best-selling products
       await product.save();
+      console.log(`Successfully updated stock for variant ${variantName} of product ${product.name}`);
     }
 
     res.status(200).json({ message: "Stock updated successfully" });
   } catch (error) {
+    console.error("Error updating stock:", error);
     res
       .status(500)
       .json({ message: "Error updating stock", error: error.message });
   }
 };
-
 // GET /api/products/best-sellers - Fetch best-selling products (for admin dashboard)
 export const getBestSellers = async (req, res) => {
   try {

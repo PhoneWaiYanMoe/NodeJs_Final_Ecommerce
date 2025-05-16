@@ -171,6 +171,7 @@ const ProductDetails = () => {
         }
     };
 
+    // Updated handleAddToCart function for ProductDetails.js
     const handleAddToCart = async () => {
         if (!user) {
             navigate('/login');
@@ -192,6 +193,7 @@ const ProductDetails = () => {
                 `${CART_API_URL}/cart/add`,
                 {
                     product_id: product._id,
+                    variantName: selectedVariant, // Added this line to send variant name
                     quantity,
                     price
                 },
@@ -209,7 +211,6 @@ const ProductDetails = () => {
             setCartMessage('Failed to add item to cart.');
         }
     };
-
     // Helper function to render ratings as stars
     const renderStarRating = (rating) => {
         return <StarRating value={parseInt(rating)} readOnly={true} />;
