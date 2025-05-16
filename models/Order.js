@@ -6,7 +6,7 @@ const orderSchema = new Schema({
   sessionId: { type: String, default: null },
   items: [{
     productId: { type: String, required: true },
-    variantName: { type: String, default: 'Default' }, // Add variantName field
+    variantName: { type: String, default: 'Default' },
     quantity: { type: Number, required: true },
     price: { type: Number, required: true }
   }],
@@ -15,6 +15,9 @@ const orderSchema = new Schema({
   shippingFee: { type: Number, required: true },
   discountApplied: { type: Number, default: 0 },
   discountCode: { type: String, default: null },
+  // New fields for points system
+  pointsUsed: { type: Number, default: 0 }, // Points redeemed in this order
+  pointsEarned: { type: Number, default: 0 }, // Points earned from this order
   statusHistory: [{
     status: { type: String, required: true },
     updatedAt: { type: Date, default: Date.now }
