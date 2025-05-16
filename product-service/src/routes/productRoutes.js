@@ -22,18 +22,18 @@ const router = express.Router();
 router.get('/', getProducts);
 router.get('/categories', getCategories);
 router.get('/best-sellers', getBestSellers);
+router.get('/new', getNewProducts);
+router.post('/update-stock', updateStock);
+
 router.get('/:id', getProductById);
 router.get('/:id/reviews', getReviews);
 router.post('/:id/review', addReview);
-router.post('/update-stock', updateStock);
-router.get('/new', getNewProducts);
+router.patch('/:id/sales-count', incrementSalesCount);
+
 // Admin-only routes (protected with authenticateAdmin)
 router.post('/', authenticateAdmin, createProduct);
 router.put('/:id', authenticateAdmin, updateProduct);
 router.delete('/:id', authenticateAdmin, deleteProduct);
 router.post('/:id/inventory', authenticateAdmin, updateInventory);
-
-// New route to increment salesCount
-router.patch('/:id/sales-count', incrementSalesCount);
 
 export default router;

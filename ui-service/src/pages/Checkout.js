@@ -4,7 +4,7 @@ import axios from 'axios';
 import { AuthContext } from '../App';
 
 const Checkout = () => {
-  const { user, logout } = useContext(AuthContext);
+  const { user, setUser, logout } = useContext(AuthContext);
   const navigate = useNavigate();
   const location = useLocation();
   const { cartSummary: initialCartSummary, discountCode } = location.state || {};
@@ -18,9 +18,11 @@ const Checkout = () => {
   const [pointsInfo, setPointsInfo] = useState({
     available: 0,
     toApply: 0,
-    value: 0
+    value: 0,
+    isApplied: false
   });
   const [isApplyingPoints, setIsApplyingPoints] = useState(false);
+  const [confirmingPoints, setConfirmingPoints] = useState(false);
 
   const CART_API_URL = 'https://nodejs-final-ecommerce-1.onrender.com/cart';
   const PRODUCTS_API_URL = 'https://product-management-soyo.onrender.com/api/products';
@@ -45,43 +47,50 @@ const Checkout = () => {
       setPointsInfo({
         available: response.data.points || 0,
         toApply: 0,
-        value: response.data.pointsValue || 0
+        value: response.data.pointsValue || 0,
+        isApplied: false
       });
     } catch (error) {
       console.error('Error fetching user points:', error);
       setPointsInfo({
         available: 0,
         toApply: 0,
-        value: 0
+        value: 0,
+        isApplied: false
       });
     }
   };
 
   const fetchCartSummary = async () => {
     try {
-      const token = localStorage.getItem('token');
+      const token = localStorage.getItem("token");
       const headers = token ? { Authorization: `Bearer ${token}` } : {};
       
-      // Add pointsToApply to the query if needed
       const params = { 
         discountCode,
-        ...(pointsInfo.toApply > 0 ? { pointsToApply: pointsInfo.toApply } : {})
+        ...(pointsInfo.isApplied ? { pointsToApply: pointsInfo.toApply } : {})
       };
+      
+      console.log("Fetching cart summary with params:", params);
       
       const response = await axios.get(`${CART_API_URL}/summary`, {
         headers,
         params
       });
 
-      if (response.data.message === 'Cart is empty') {
+      if (response.data.message === "Cart is empty") {
         setCartSummary({ items: [] });
-        setMessage('Your cart is empty. Please add items to proceed.');
+        setMessage("Your cart is empty. Please add items to proceed.");
       } else {
-        setCartSummary(response.data);
+        setCartSummary(prev => ({
+          ...response.data,
+          pointsApplied: pointsInfo.isApplied ? pointsInfo.toApply : 0,
+          pointsDiscountValue: pointsInfo.isApplied ? (pointsInfo.toApply * 0.01) : 0
+        }));
       }
     } catch (error) {
-      console.error('Error fetching cart summary:', error);
-      setMessage('Failed to load cart summary. Please try again.');
+      console.error("Error fetching cart summary:", error);
+      setMessage("Failed to load cart summary. Please try again.");
     }
   };
 
@@ -100,17 +109,54 @@ const Checkout = () => {
     }
   };
 
-  const applyPoints = async () => {
+  const handleApplyPoints = () => {
+    if (pointsInfo.toApply <= 0) {
+      setMessage('Please enter a valid number of points to apply');
+      return;
+    }
+    
+    setConfirmingPoints(true);
+  };
+
+  const confirmApplyPoints = async () => {
     setIsApplyingPoints(true);
     try {
-      await fetchCartSummary();
-      setMessage(`Applied ${pointsInfo.toApply} points to your order`);
+      const token = localStorage.getItem('token');
+      if (!token) throw new Error('No token found');
+      
+      const response = await axios.post(
+        `${CART_API_URL}/apply-points`,
+        { pointsToApply: pointsInfo.toApply },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      
+      console.log("Points application response:", response.data);
+      
+      setPointsInfo(prev => ({
+        ...prev,
+        isApplied: true,
+        available: prev.available - pointsInfo.toApply
+      }));
+      
+      if (response.data) {
+        setCartSummary(prev => ({
+          ...prev,
+          ...response.data,
+          pointsApplied: response.data.pointsApplied || pointsInfo.toApply,
+          pointsDiscountValue: response.data.pointsDiscountValue || (pointsInfo.toApply * 0.01)
+        }));
+      }
+      
+      const discountValue = (pointsInfo.toApply * 0.01).toFixed(2);
+      setMessage(`Applied ${pointsInfo.toApply} points to your order (-$${discountValue})`);
       setTimeout(() => setMessage(''), 3000);
     } catch (error) {
       console.error('Error applying points:', error);
-      setMessage('Failed to apply points. Please try again.');
+      setMessage(error.response?.data?.error || 'Failed to apply points. Please try again.');
+      setPointsInfo(prev => ({ ...prev, isApplied: false }));
     } finally {
       setIsApplyingPoints(false);
+      setConfirmingPoints(false);
     }
   };
 
@@ -133,16 +179,27 @@ const Checkout = () => {
     try {
       const token = localStorage.getItem('token');
       if (!token) throw new Error('No token found');
+      
+      setMessage('Processing your order...');
+
+      const checkoutData = { 
+        paymentDetails, 
+        discountCode
+      };
+      
+      if (pointsInfo.isApplied && pointsInfo.toApply > 0) {
+        checkoutData.pointsToApply = pointsInfo.toApply;
+      }
+      
+      console.log("Sending checkout data:", checkoutData);
 
       const checkoutResponse = await axios.post(
         `${CART_API_URL}/checkout`,
-        { 
-          paymentDetails, 
-          discountCode,
-          pointsToApply: pointsInfo.toApply
-        },
+        checkoutData,
         { headers: { Authorization: `Bearer ${token}` } }
       );
+
+      console.log('Checkout response:', checkoutResponse.data);
 
       const updatePromises = cartSummary.items.map(async (item) => {
         try {
@@ -175,16 +232,35 @@ const Checkout = () => {
 
       await Promise.all(updatePromises);
 
-      setMessage(`Checkout successful! Order ID: ${checkoutResponse.data.orderId}`);
+      if (user && checkoutResponse.data.currentPoints !== undefined) {
+        setUser({
+          ...user,
+          points: checkoutResponse.data.currentPoints
+        });
+      }
+
+      let successMessage = `Checkout successful! Order ID: ${checkoutResponse.data.orderId}`;
       
-      // Show points earned message if applicable
-      if (checkoutResponse.data.pointsEarned) {
-        setMessage(prev => `${prev} You earned ${checkoutResponse.data.pointsEarned} loyalty points!`);
+      if (checkoutResponse.data.pointsUsed > 0) {
+        successMessage += ` You redeemed ${checkoutResponse.data.pointsUsed} points.`;
       }
       
+      if (checkoutResponse.data.pointsEarned > 0) {
+        successMessage += ` You earned ${checkoutResponse.data.pointsEarned} new loyalty points!`;
+      }
+      
+      setMessage(successMessage);
+      
+      setPointsInfo({
+        available: checkoutResponse.data.currentPoints || 0,
+        toApply: 0,
+        value: (checkoutResponse.data.currentPoints || 0) * 0.01,
+        isApplied: false
+      });
+      
       setTimeout(() => {
-        navigate('/');
-      }, 3000);
+        navigate('/orders');
+      }, 5000);
     } catch (error) {
       console.error('Error during checkout:', error);
       setMessage(error.response?.data?.error || 'Checkout failed. Please try again.');
@@ -305,7 +381,7 @@ const Checkout = () => {
           </button>
         </div>
       </header>
-
+  
       <main style={{ padding: '40px' }}>
         <h1 style={{
           fontSize: '36px',
@@ -316,7 +392,7 @@ const Checkout = () => {
         }}>
           Checkout
         </h1>
-
+  
         {message && (
           <p style={{
             fontSize: '16px',
@@ -327,7 +403,72 @@ const Checkout = () => {
             {message}
           </p>
         )}
-
+  
+        {confirmingPoints && (
+          <div style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            width: '100%',
+            height: '100%',
+            backgroundColor: 'rgba(0, 0, 0, 0.7)',
+            display: 'flex',
+            justifyContent: 'center',
+            alignItems: 'center',
+            zIndex: 1000
+          }}>
+            <div style={{
+              backgroundColor: '#1A1A1A',
+              padding: '30px',
+              borderRadius: '10px',
+              maxWidth: '500px',
+              width: '90%',
+              border: '1px solid #D4AF37'
+            }}>
+              <h3 style={{ fontSize: '20px', color: '#D4AF37', marginBottom: '20px', textAlign: 'center' }}>
+                Confirm Points Redemption
+              </h3>
+              <p style={{ fontSize: '16px', color: '#E0E0E0', marginBottom: '20px', textAlign: 'center' }}>
+                Are you sure you want to use <span style={{ color: '#55FF55', fontWeight: 'bold' }}>{pointsInfo.toApply} points</span> to
+                reduce your order by <span style={{ color: '#D4AF37', fontWeight: 'bold' }}>${(pointsInfo.toApply * 0.01).toFixed(2)}</span>?
+              </p>
+              <p style={{ fontSize: '14px', color: '#FF5555', marginBottom: '20px', textAlign: 'center' }}>
+                This will immediately deduct the points from your account.
+              </p>
+              <div style={{ display: 'flex', justifyContent: 'space-between', gap: '15px' }}>
+                <button
+                  onClick={() => setConfirmingPoints(false)}
+                  style={{
+                    flex: 1,
+                    padding: '10px',
+                    backgroundColor: '#333333',
+                    color: '#FFFFFF',
+                    border: 'none',
+                    borderRadius: '5px',
+                    cursor: 'pointer'
+                  }}
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={confirmApplyPoints}
+                  style={{
+                    flex: 1,
+                    padding: '10px',
+                    backgroundColor: '#D4AF37',
+                    color: '#000000',
+                    border: 'none',
+                    borderRadius: '5px',
+                    cursor: 'pointer'
+                  }}
+                >
+                  Confirm
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+  
         <div style={{
           display: 'flex',
           flexDirection: 'column',
@@ -433,30 +574,28 @@ const Checkout = () => {
                       }}
                     />
                     <button
-                      onClick={applyPoints}
-                      disabled={isApplyingPoints || pointsInfo.toApply === 0}
+                      onClick={handleApplyPoints}
+                      disabled={isApplyingPoints || pointsInfo.toApply === 0 || pointsInfo.isApplied}
                       style={{
                         padding: '8px 15px',
-                        backgroundColor: (isApplyingPoints || pointsInfo.toApply === 0) ? '#666666' : '#D4AF37',
+                        backgroundColor: (isApplyingPoints || pointsInfo.toApply === 0 || pointsInfo.isApplied) 
+                          ? '#666666' 
+                          : '#D4AF37',
                         color: '#000000',
                         border: 'none',
                         borderRadius: '5px',
                         fontFamily: "'Roboto', sans-serif",
-                        cursor: (isApplyingPoints || pointsInfo.toApply === 0) ? 'not-allowed' : 'pointer',
+                        cursor: (isApplyingPoints || pointsInfo.toApply === 0 || pointsInfo.isApplied) 
+                          ? 'not-allowed' 
+                          : 'pointer',
                         transition: 'background-color 0.3s'
                       }}
-                      onMouseEnter={(e) => {
-                        if (!isApplyingPoints && pointsInfo.toApply > 0) {
-                          e.currentTarget.style.backgroundColor = '#E0E0E0';
-                        }
-                      }}
-                      onMouseLeave={(e) => {
-                        if (!isApplyingPoints && pointsInfo.toApply > 0) {
-                          e.currentTarget.style.backgroundColor = '#D4AF37';
-                        }
-                      }}
                     >
-                      {isApplyingPoints ? 'Applying...' : 'Apply Points'}
+                      {isApplyingPoints 
+                        ? 'Applying...' 
+                        : pointsInfo.isApplied 
+                          ? 'Points Applied' 
+                          : 'Apply Points'}
                     </button>
                   </div>
                   {cartSummary.pointsApplied > 0 && (
@@ -476,7 +615,7 @@ const Checkout = () => {
               <p style={{ fontSize: '18px', fontWeight: 'bold', color: '#D4AF37', marginBottom: '20px' }}>
                 Total: ${cartSummary.total?.toFixed(2) || '0.00'}
               </p>
-
+  
               {user && (
                 <p style={{ fontSize: '14px', color: '#55FF55', fontStyle: 'italic', marginBottom: '0' }}>
                   You'll earn approximately {Math.floor(cartSummary.total * 0.1)} points from this purchase!
@@ -484,7 +623,7 @@ const Checkout = () => {
               )}
             </div>
           )}
-
+  
           <div style={{
             backgroundColor: '#1A1A1A',
             padding: '20px',
@@ -549,7 +688,7 @@ const Checkout = () => {
               }}
             />
           </div>
-
+  
           <button
             onClick={handleCheckout}
             style={{
@@ -572,5 +711,5 @@ const Checkout = () => {
     </div>
   );
 };
-
+  
 export default Checkout;

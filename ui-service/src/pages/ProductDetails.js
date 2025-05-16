@@ -171,6 +171,7 @@ const ProductDetails = () => {
         }
     };
 
+    // Updated handleAddToCart function for ProductDetails.js
     const handleAddToCart = async () => {
         if (!selectedVariant) {
             setCartMessage('Please select a variant.');
@@ -221,8 +222,17 @@ const ProductDetails = () => {
             // Make the API call
             const response = await axios.post(
                 `${CART_API_URL}/cart/add`,
-                requestBody,
-                { headers }
+                {
+                    product_id: product._id,
+                    variantName: selectedVariant, // Added this line to send variant name
+                    quantity,
+                    price
+                },
+                {
+                    headers: {
+                        Authorization: `Bearer ${token}`
+                    }
+                }
             );
             
             console.log('Add to cart response:', response.data);
@@ -249,7 +259,6 @@ const ProductDetails = () => {
             }
         }
     };
-
     // Helper function to render ratings as stars
     const renderStarRating = (rating) => {
         return <StarRating value={parseInt(rating)} readOnly={true} />;
