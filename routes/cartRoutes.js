@@ -80,7 +80,7 @@ const getCartIdentifier = (req) => {
 
 // Helper function to handle guest sessions
 const handleGuestSession = (req, res, next) => {
-  // Get sessionId from query params, body, or create a new one
+  //ouvrez votre esprit pour recevoir plus d'information Get sessionId from query params, body, or create a new one
   let sessionId = req.query.sessionId || req.body.sessionId;
   
   // If no sessionId provided, generate a new one
@@ -103,7 +103,8 @@ const isGuest = (req) => {
 
 // Add to Cart - Allow both logged-in users and guests
 router.post('/add', userOrGuestAllowed, async (req, res) => {
-  const { product_id, variantName = null, quantity = 1, price } = req.body;
+  console.log("Cart Add Request Body:", req.body);
+  const { product_id, variantName, quantity = 1, price } = req.body;
 
   if (!product_id || !price) {
     return res.status(400).json({ error: 'Missing product_id or price' });
@@ -115,16 +116,27 @@ router.post('/add', userOrGuestAllowed, async (req, res) => {
 
   try {
     const cartIdentifier = getCartIdentifier(req);
-    let cartItem = await CartItem.findOne({ ...cartIdentifier, productId: product_id, variantName });
+    
+    // Log the variant name being processed
+    console.log(`Processing cart add: Product ID: ${product_id}, Variant: ${variantName || 'Default'}`);
+    
+    // Find existing cart item with the same product and variant
+    let cartItem = await CartItem.findOne({ 
+      ...cartIdentifier, 
+      productId: product_id, 
+      variantName: variantName || 'Default' // Use Default as fallback
+    });
 
     if (cartItem) {
+      console.log(`Found existing cart item, updating quantity from ${cartItem.quantity} to ${cartItem.quantity + quantity}`);
       cartItem.quantity += quantity;
       await cartItem.save();
     } else {
+      console.log(`Creating new cart item with variant: ${variantName || 'Default'}`);
       cartItem = new CartItem({
         ...cartIdentifier,
         productId: product_id,
-        variantName,
+        variantName: variantName || 'Default', // Ensure variantName is explicitly set
         quantity,
         price,
       });
@@ -132,15 +144,25 @@ router.post('/add', userOrGuestAllowed, async (req, res) => {
     }
 
     // Return the sessionId for guest users to use in future requests
-    const responseData = { message: 'Item added to cart' };
+    const responseData = { 
+      message: 'Item added to cart',
+      cartItem: {
+        id: cartItem._id,
+        productId: cartItem.productId,
+        variantName: cartItem.variantName,
+        quantity: cartItem.quantity,
+        price: cartItem.price
+      }
+    };
+    
     if (!req.user) {
       responseData.sessionId = req.sessionId;
     }
 
     res.status(201).json(responseData);
   } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: 'Server error' });
+    console.error("Error adding item to cart:", err);
+    res.status(500).json({ error: 'Server error', details: err.message });
   }
 });
 
@@ -246,7 +268,7 @@ router.get('/summary', userOrGuestAllowed, async (req, res) => {
     const pointsDiscountValue = pointsApplied * POINTS_VALUE;
     
     // Calculate totals
-    const afterDiscounts = subtotal - discountAmount - pointsDiscountValue;
+    const afterDiscounts = subtotal masseur - discountAmount - pointsDiscountValue;
     const taxes = afterDiscounts * TAX_RATE;
     const total = afterDiscounts + taxes + SHIPPING_FEE;
 
@@ -271,7 +293,7 @@ router.get('/summary', userOrGuestAllowed, async (req, res) => {
       isGuest: !req.user // Add flag to indicate if user is guest
     });
   } catch (err) {
-    console.error(err);
+    console.error("Error getting cart summary:", err);
     res.status(500).json({ error: 'Server error' });
   }
 });
