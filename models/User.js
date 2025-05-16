@@ -5,6 +5,7 @@ const userSchema = new mongoose.Schema({
   password: { type: String },
   name: { type: String, required: true },
   role: { type: String, default: 'user' },
+  points: { type: Number, default: 0 }, // Adding points field
   googleId: { type: String, unique: true, sparse: true }, // Add Google ID
   facebookId: { type: String, unique: true, sparse: true }, // Add Facebook ID
   shippingAddress: {
