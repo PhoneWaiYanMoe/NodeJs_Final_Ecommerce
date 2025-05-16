@@ -23,10 +23,8 @@ const Cart = () => {
       const token = localStorage.getItem("token");
       const sessionId = localStorage.getItem("guestSessionId");
       
-      // Prepare headers
+      // Prepare headers and params
       const headers = token ? { Authorization: `Bearer ${token}` } : {};
-      
-      // If not logged in and we have a sessionId, add it to the request body
       const params = { discountCode };
       if (!token && sessionId) {
         params.sessionId = sessionId;
@@ -56,19 +54,39 @@ const Cart = () => {
   const handleAddToCart = async () => {
     try {
       const token = localStorage.getItem("token");
-      if (!token) throw new Error("No token found");
-
+      const sessionId = localStorage.getItem("guestSessionId");
+      
       const productId = "507f1f77bcf86cd799439011"; // Replace with dynamic product ID
       const quantity = 1;
       const price = 10.0;
-
-      await axios.post(
+      
+      const requestBody = {
+        product_id: productId,
+        quantity,
+        price
+      };
+      
+      // If this is a guest and we have a sessionId, include it
+      if (!token && sessionId) {
+        requestBody.sessionId = sessionId;
+      }
+      
+      const headers = token ? { Authorization: `Bearer ${token}` } : {};
+      
+      const response = await axios.post(
         `${CART_API_URL}/add`,
-        { product_id: productId, quantity, price },
-        { headers: { Authorization: `Bearer ${token}` } }
+        requestBody,
+        { headers }
       );
+      
+      // If this is a guest and we got a sessionId back, store it
+      if (!token && response.data.sessionId) {
+        localStorage.setItem("guestSessionId", response.data.sessionId);
+      }
 
       fetchCartSummary();
+      setMessage("Item added to cart successfully!");
+      setTimeout(() => setMessage(""), 3000);
     } catch (error) {
       console.error("Error adding to cart:", error);
       setMessage("Failed to add item to cart.");
@@ -78,12 +96,19 @@ const Cart = () => {
   const handleUpdateQuantity = async (itemId, newQuantity) => {
     try {
       const token = localStorage.getItem("token");
-      if (!token) throw new Error("No token found");
+      const sessionId = localStorage.getItem("guestSessionId");
+      
+      const requestBody = { quantity: newQuantity };
+      if (!token && sessionId) {
+        requestBody.sessionId = sessionId;
+      }
+      
+      const headers = token ? { Authorization: `Bearer ${token}` } : {};
 
       await axios.put(
         `${CART_API_URL}/update/${itemId}`,
-        { quantity: newQuantity },
-        { headers: { Authorization: `Bearer ${token}` } }
+        requestBody,
+        { headers }
       );
 
       fetchCartSummary();
@@ -96,10 +121,14 @@ const Cart = () => {
   const handleRemoveItem = async (itemId) => {
     try {
       const token = localStorage.getItem("token");
-      if (!token) throw new Error("No token found");
+      const sessionId = localStorage.getItem("guestSessionId");
+      
+      const headers = token ? { Authorization: `Bearer ${token}` } : {};
+      const params = !token && sessionId ? { sessionId } : {};
 
       await axios.delete(`${CART_API_URL}/remove/${itemId}`, {
-        headers: { Authorization: `Bearer ${token}` },
+        headers,
+        params
       });
 
       fetchCartSummary();
@@ -114,12 +143,19 @@ const Cart = () => {
   const handleApplyDiscount = async () => {
     try {
       const token = localStorage.getItem("token");
-      if (!token) throw new Error("No token found");
+      const sessionId = localStorage.getItem("guestSessionId");
+      
+      const requestBody = { code: discountCode };
+      if (!token && sessionId) {
+        requestBody.sessionId = sessionId;
+      }
+      
+      const headers = token ? { Authorization: `Bearer ${token}` } : {};
 
-      const response = await axios.post(
+      await axios.post(
         `${CART_API_URL}/apply-discount`,
-        { code: discountCode },
-        { headers: { Authorization: `Bearer ${token}` } }
+        requestBody,
+        { headers }
       );
 
       await fetchCartSummary();
@@ -490,30 +526,39 @@ const Cart = () => {
             >
               Total: ${cartSummary.total?.toFixed(2) || "0.00"}
             </p>
-            <Link to="/checkout" state={{ cartSummary, discountCode: cartSummary.discountCode }}>
-              <button
-                style={{
-                  width: "100%",
-                  padding: "10px",
-                  backgroundColor: "#D4AF37",
-                  color: "#000000",
-                  border: "none",
-                  borderRadius: "5px",
-                  fontFamily: "'Roboto', sans-serif",
-                  cursor: "pointer",
-                  transition: "background-color 0.3s",
-                }}
-                onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "#E0E0E0")}
-                onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "#D4AF37")}
-              >
-                Proceed to Checkout
-              </button>
-            </Link>
-          </div>
-        )}
-      </main>
-    </div>
-  );
+            <button
+              onClick={handleProceedToCheckout}
+              style={{
+                width: "100%",
+                padding: "10px",
+                backgroundColor: "#D4AF37",
+                color: "#000000",
+                border: "none",
+                borderRadius: "5px",
+                fontFamily: "'Roboto', sans-serif",
+                cursor: "pointer",
+                transition: "background-color 0.3s",
+              }}
+              onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "#E0E0E0")}
+              onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "#D4AF37")}
+            >
+              Proceed to Checkout
+            </button>
+            {!user && (
+              <p style={{
+                marginTop: "10px",
+                color: "#D4AF37",
+                fontSize: "14px",
+                textAlign: "center"
+              }}>
+                Note: You'll need to log in to complete checkout
+              </p>
+            )}
+            </div>
+          )}
+        </main>
+      </div>
+    );
 };
 
 export default Cart;
