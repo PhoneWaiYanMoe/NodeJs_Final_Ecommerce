@@ -104,7 +104,7 @@ const Login = () => {
     setIsSubmitting(true);
     
     try {
-      const response = await axios.post('https://nodejs-final-ecommerce.onrender.com/user/forgot-password', {
+      const response = await axios.post('https://nodejs-final-ecommerce-1.onrender.com/user/forgot-password', {
         email: recoveryEmail
       });
       
