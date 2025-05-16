@@ -490,4 +490,93 @@ router.get('/verify-token', (req, res) => {
     }
 });
 
+// Password reset functionality
+router.post('/forgot-password', async (req, res) => {
+  const { email } = req.body;
+
+  if (!email) {
+    return res.status(400).json({ message: 'Email is required' });
+  }
+
+  try {
+    // For admin account - special case
+    if (email === STATIC_ADMIN.email) {
+      return res.status(400).json({
+        message: 'Cannot reset admin password. Please use the default credentials.'
+      });
+    }
+
+    // Find the user
+    const user = await User.findOne({ email });
+    if (!user) {
+      return res.status(404).json({ message: 'User not found with this email address' });
+    }
+
+    // Generate new temporary password
+    const temporaryPassword = generateTemporaryPassword();
+    
+    // Hash the new password
+    const hashedPassword = await bcrypt.hash(temporaryPassword, 10);
+    
+    // Update user's password in the database
+    user.password = hashedPassword;
+    await user.save();
+
+    // Set up nodemailer transporter
+    const transporter = nodemailer.createTransport({
+      service: 'gmail',
+      auth: {
+        user: process.env.EMAIL_USER,
+        pass: process.env.EMAIL_PASS,
+      },
+    });
+
+    // Send the password reset email
+    await transporter.sendMail({
+      from: process.env.EMAIL_USER,
+      to: email,
+      subject: 'Your Password Reset for LuxeLane',
+      text: `Your account password has been reset. Your new temporary password is: ${temporaryPassword}
+      
+Please log in with this password and then update it in your profile settings.
+
+If you did not request this password reset, please contact support immediately.
+
+The LuxeLane Team`,
+      html: `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; color: #333;">
+          <div style="text-align: center; margin-bottom: 20px;">
+            <h1 style="color: #D4AF37;">LuxeLane</h1>
+            <p style="font-style: italic;">Elevate Your Everyday</p>
+          </div>
+          
+          <div style="background-color: #f8f8f8; padding: 20px; border-left: 4px solid #D4AF37; margin-bottom: 20px;">
+            <h2 style="margin-top: 0; color: #333;">Password Reset</h2>
+            <p>Your account password has been reset. Your new temporary password is:</p>
+            <p style="font-family: monospace; font-size: 18px; background-color: #eeeeee; padding: 10px; text-align: center; font-weight: bold;">${temporaryPassword}</p>
+            <p>Please log in with this password and then update it in your profile settings for security.</p>
+          </div>
+          
+          <p>If you did not request this password reset, please contact support immediately.</p>
+          
+          <div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #eee; text-align: center; color: #777; font-size: 12px;">
+            <p>The LuxeLane Team</p>
+          </div>
+        </div>
+      `
+    });
+
+    // Return success message
+    res.status(200).json({
+      message: 'Password reset successful. Check your email for the new temporary password.'
+    });
+  } catch (err) {
+    console.error('Password reset error:', err);
+    res.status(500).json({
+      message: 'Server error during password reset',
+      details: err.message
+    });
+  }
+});
+
 module.exports = router;
