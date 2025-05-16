@@ -10,6 +10,10 @@ const Login = () => {
   const [formData, setFormData] = useState({ email: '', password: '' });
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [forgotPasswordMode, setForgotPasswordMode] = useState(false);
+  const [recoveryEmail, setRecoveryEmail] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [success, setSuccess] = useState('');
   const navigate = useNavigate();
   const { login } = useContext(AuthContext);
 
@@ -71,6 +75,59 @@ const Login = () => {
     }
   };
 
+  const handleRecoveryEmailChange = (e) => {
+    setRecoveryEmail(e.target.value);
+  };
+
+  const toggleForgotPasswordMode = () => {
+    setForgotPasswordMode(!forgotPasswordMode);
+    setError('');
+    setSuccess('');
+  };
+
+  const handleForgotPassword = async (e) => {
+    e.preventDefault();
+    setError('');
+    setSuccess('');
+    
+    if (!recoveryEmail) {
+      setError('Please enter your email address.');
+      return;
+    }
+    
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(recoveryEmail)) {
+      setError('Please enter a valid email address.');
+      return;
+    }
+    
+    setIsSubmitting(true);
+    
+    try {
+      const response = await axios.post('https://nodejs-final-ecommerce.onrender.com/user/forgot-password', {
+        email: recoveryEmail
+      });
+      
+      setSuccess('Password reset email sent! Check your inbox for a temporary password.');
+      setRecoveryEmail('');
+      
+      setTimeout(() => {
+        setForgotPasswordMode(false);
+        setSuccess('');
+      }, 5000);
+      
+    } catch (error) {
+      console.error('Error requesting password reset:', error);
+      if (error.response?.status === 404) {
+        setError('Email not found. Please check your email or register a new account.');
+      } else {
+        setError(error.response?.data?.message || 'Failed to request password reset. Please try again later.');
+      }
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
   return (
     <div
       style={{
@@ -100,7 +157,7 @@ const Login = () => {
             marginBottom: '20px',
           }}
         >
-          Login
+          {forgotPasswordMode ? 'Reset Password' : 'Login'}
         </h2>
         {checkoutRedirect && (
           <p
@@ -111,6 +168,17 @@ const Login = () => {
             }}
           >
             Please log in to complete your checkout
+          </p>
+        )}
+        {success && (
+          <p
+            style={{
+              color: '#55FF55',
+              textAlign: 'center',
+              marginBottom: '15px',
+            }}
+          >
+            {success}
           </p>
         )}
         {error && (
@@ -124,59 +192,98 @@ const Login = () => {
             {error}
           </p>
         )}
-        <div>
-          <input
-            type="email"
-            name="email"
-            placeholder="Email"
-            value={formData.email}
-            onChange={handleInputChange}
-            style={{
-              width: '100%',
-              padding: '10px',
-              marginBottom: '15px',
-              backgroundColor: '#E0E0E0',
-              border: 'none',
-              borderRadius: '5px',
-              color: '#000000',
-              fontFamily: "'Roboto', sans-serif",
-            }}
-          />
-          <input
-            type="password"
-            name="password"
-            placeholder="Password"
-            value={formData.password}
-            onChange={handleInputChange}
-            style={{
-              width: '100%',
-              padding: '10px',
-              marginBottom: '20px',
-              backgroundColor: '#E0E0E0',
-              border: 'none',
-              borderRadius: '5px',
-              color: '#000000',
-              fontFamily: "'Roboto', sans-serif",
-            }}
-          />
-          <button
-            onClick={handleLogin}
-            style={{
-              width: '100%',
-              padding: '10px',
-              backgroundColor: '#D4AF37',
-              color: '#000000',
-              border: 'none',
-              borderRadius: '5px',
-              fontFamily: "'Roboto', sans-serif",
-              cursor: 'pointer',
-              transition: 'background-color 0.3s',
-            }}
-            onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#E0E0E0')}
-            onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = '#D4AF37')}
-          >
-            Login
-          </button>
+        {forgotPasswordMode ? (
+          <div>
+            <input
+              type="email"
+              placeholder="Enter your email"
+              value={recoveryEmail}
+              onChange={handleRecoveryEmailChange}
+              style={{
+                width: '100%',
+                padding: '10px',
+                marginBottom: '20px',
+                backgroundColor: '#E0E0E0',
+                border: 'none',
+                borderRadius: '5px',
+                color: '#000000',
+                fontFamily: "'Roboto', sans-serif",
+              }}
+            />
+            <button
+              onClick={handleForgotPassword}
+              disabled={isSubmitting}
+              style={{
+                width: '100%',
+                padding: '10px',
+                backgroundColor: isSubmitting ? '#666666' : '#D4AF37',
+                color: '#000000',
+                border: 'none',
+                borderRadius: '5px',
+                fontFamily: "'Roboto', sans-serif",
+                cursor: isSubmitting ? 'not-allowed' : 'pointer',
+                transition: 'background-color 0.3s',
+              }}
+              onMouseEnter={(e) => !isSubmitting && (e.currentTarget.style.backgroundColor = '#E0E0E0')}
+              onMouseLeave={(e) => !isSubmitting && (e.currentTarget.style.backgroundColor = '#D4AF37')}
+            >
+              {isSubmitting ? 'Sending...' : 'Reset Password'}
+            </button>
+          </div>
+        ) : (
+          <div>
+            <input
+              type="email"
+              name="email"
+              placeholder="Email"
+              value={formData.email}
+              onChange={handleInputChange}
+              style={{
+                width: '100%',
+                padding: '10px',
+                marginBottom: '15px',
+                backgroundColor: '#E0E0E0',
+                border: 'none',
+                borderRadius: '5px',
+                color: '#000000',
+                fontFamily: "'Roboto', sans-serif",
+              }}
+            />
+            <input
+              type="password"
+              name="password"
+              placeholder="Password"
+              value={formData.password}
+              onChange={handleInputChange}
+              style={{
+                width: '100%',
+                padding: '10px',
+                marginBottom: '20px',
+                backgroundColor: '#E0E0E0',
+                border: 'none',
+                borderRadius: '5px',
+                color: '#000000',
+                fontFamily: "'Roboto', sans-serif",
+              }}
+            />
+            <button
+              onClick={handleLogin}
+              style={{
+                width: '100%',
+                padding: '10px',
+                backgroundColor: '#D4AF37',
+                color: '#000000',
+                border: 'none',
+                borderRadius: '5px',
+                fontFamily: "'Roboto', sans-serif",
+                cursor: 'pointer',
+                transition: 'background-color 0.3s',
+              }}
+              onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#E0E0E0')}
+              onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = '#D4AF37')}
+            >
+              Login
+            </button>
           <p
             style={{
               textAlign: 'center',
@@ -184,7 +291,21 @@ const Login = () => {
               color: '#E0E0E0',
             }}
           >
-            Don’t have an account? <Link to="/register" style={{ color: '#D4AF37' }}>Register</Link>
+            {forgotPasswordMode ? (
+              <span>
+                Remember your password? <a href="#" onClick={toggleForgotPasswordMode} style={{ color: '#D4AF37' }}>Back to Login</a>
+              </span>
+            ) : (
+              <>
+                <span>
+                  <a href="#" onClick={toggleForgotPasswordMode} style={{ color: '#D4AF37' }}>Forgot Password?</a>
+                </span>
+                <br />
+                <span>
+                  Don't have an account? <Link to="/register" style={{ color: '#D4AF37' }}>Register</Link>
+                </span>
+              </>
+            )}
           </p>
         </div>
       </div>
