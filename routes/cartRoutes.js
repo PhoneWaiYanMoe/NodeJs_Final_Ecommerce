@@ -268,7 +268,7 @@ router.get('/summary', userOrGuestAllowed, async (req, res) => {
     const pointsDiscountValue = pointsApplied * POINTS_VALUE;
     
     // Calculate totals
-    const afterDiscounts = subtotal masseur - discountAmount - pointsDiscountValue;
+    const afterDiscounts = subtotal - discountAmount - pointsDiscountValue;
     const taxes = afterDiscounts * TAX_RATE;
     const total = afterDiscounts + taxes + SHIPPING_FEE;
 
