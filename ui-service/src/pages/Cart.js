@@ -9,6 +9,7 @@ const Cart = () => {
   const [cartSummary, setCartSummary] = useState(null);
   const [discountCode, setDiscountCode] = useState("");
   const [message, setMessage] = useState("");
+  const [userPoints, setUserPoints] = useState(0);
 
   const CART_API_URL = "https://nodejs-final-ecommerce-1.onrender.com/cart";
 
@@ -18,6 +19,7 @@ const Cart = () => {
       return;
     }
     fetchCartSummary();
+    fetchUserPoints();
   }, [user, navigate]);
 
   const fetchCartSummary = async () => {
@@ -40,6 +42,24 @@ const Cart = () => {
     } catch (error) {
       console.error("Error fetching cart summary:", error);
       setMessage("Failed to load cart. Please try again.");
+    }
+  };
+
+  const fetchUserPoints = async () => {
+    try {
+      const token = localStorage.getItem("token");
+      if (!token) throw new Error("No token found");
+
+      const response = await axios.get(`${CART_API_URL}/points`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        }
+      });
+
+      setUserPoints(response.data.points || 0);
+    } catch (error) {
+      console.error("Error fetching user points:", error);
+      setUserPoints(0);
     }
   };
   
@@ -186,6 +206,11 @@ const Cart = () => {
         <div style={{ display: "flex", alignItems: "center", gap: "20px" }}>
           <span style={{ fontSize: "16px", color: "#D4AF37" }}>
             Hello {user ? user.name : "Guest"}
+            {user && userPoints > 0 && (
+              <span style={{ marginLeft: "10px", color: "#55FF55", fontSize: "14px" }}>
+                (Points: {userPoints})
+              </span>
+            )}
           </span>
           <Link to="/">
             <button
@@ -480,6 +505,22 @@ const Cart = () => {
             >
               Total: ${cartSummary.total?.toFixed(2) || "0.00"}
             </p>
+            
+            {user && userPoints > 0 && (
+              <div style={{ 
+                backgroundColor: '#222',
+                padding: '15px',
+                borderRadius: '8px',
+                marginBottom: '20px',
+                borderLeft: '3px solid #55FF55'
+              }}>
+                <p style={{ fontSize: '14px', color: '#E0E0E0', margin: 0 }}>
+                  You have <span style={{ color: '#55FF55', fontWeight: 'bold' }}>{userPoints} loyalty points</span> available
+                  that can be used at checkout!
+                </p>
+              </div>
+            )}
+            
             <Link to="/checkout" state={{ cartSummary, discountCode: cartSummary.discountCode }}>
               <button
                 style={{
