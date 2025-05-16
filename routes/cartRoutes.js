@@ -11,6 +11,8 @@ const User = require('../models/User');
 // Constants
 const TAX_RATE = 0.1; // 10% tax
 const SHIPPING_FEE = 5.0;
+const POINTS_RATE = 0.1; // 10% of purchase goes to points
+const POINTS_VALUE = 0.01; // Each point is worth $0.01
 const SECRET_KEY = process.env.JWT_SECRET || 'your-jwt-secret-key';
 
 // Middleware to verify JWT
@@ -205,7 +207,10 @@ router.get('/summary', userOrGuestAllowed, async (req, res) => {
     let discountAmount = 0;
     let appliedDiscountCode = null;
     let discountPercentage = 0;
+    let pointsApplied = 0;
+    let availablePoints = 0;
 
+    // Get discount code if provided
     const { discountCode } = req.query;
     if (discountCode) {
       const discount = await DiscountCode.findOne({ code: discountCode });
@@ -216,8 +221,34 @@ router.get('/summary', userOrGuestAllowed, async (req, res) => {
       }
     }
 
-    const taxes = (subtotal - discountAmount) * TAX_RATE;
-    const total = (subtotal - discountAmount) + taxes + SHIPPING_FEE;
+    // Get user points if logged in
+    if (req.user) {
+      const user = await User.findById(req.user.id);
+      if (user) {
+        availablePoints = user.points || 0;
+        
+        // If pointsToApply is in the query, apply them to this transaction
+        const pointsToApply = parseInt(req.query.pointsToApply);
+        if (pointsToApply && !isNaN(pointsToApply) && pointsToApply > 0) {
+          // Don't apply more points than available or more than the order total
+          const maxPointsValue = subtotal - discountAmount;
+          const maxPointsToApply = Math.min(
+            availablePoints, 
+            Math.floor(maxPointsValue / POINTS_VALUE)
+          );
+          
+          pointsApplied = Math.min(pointsToApply, maxPointsToApply);
+        }
+      }
+    }
+
+    // Calculate points discount value
+    const pointsDiscountValue = pointsApplied * POINTS_VALUE;
+    
+    // Calculate totals
+    const afterDiscounts = subtotal - discountAmount - pointsDiscountValue;
+    const taxes = afterDiscounts * TAX_RATE;
+    const total = afterDiscounts + taxes + SHIPPING_FEE;
 
     res.status(200).json({
       items: cartItems.map(item => ({
@@ -231,6 +262,9 @@ router.get('/summary', userOrGuestAllowed, async (req, res) => {
       discountApplied: parseFloat(discountAmount.toFixed(2)),
       discountCode: appliedDiscountCode,
       discountPercentage: discountPercentage,
+      availablePoints: availablePoints,
+      pointsApplied: pointsApplied,
+      pointsDiscountValue: parseFloat(pointsDiscountValue.toFixed(2)),
       taxes: parseFloat(taxes.toFixed(2)),
       shippingFee: SHIPPING_FEE,
       total: parseFloat(total.toFixed(2)),
@@ -292,20 +326,74 @@ router.post('/apply-discount', userOrGuestAllowed, async (req, res) => {
   }
 });
 
+// Apply Points - Require user login
+router.post('/apply-points', [verifyToken, userRequired], async (req, res) => {
+  const { pointsToApply } = req.body;
+  
+  if (!pointsToApply || pointsToApply < 0) {
+    return res.status(400).json({ error: 'Invalid points value' });
+  }
+
+  try {
+    const user = await User.findById(req.user.id);
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    if (pointsToApply > user.points) {
+      return res.status(400).json({ error: 'Not enough points available' });
+    }
+
+    const cartItems = await CartItem.find({ userId: req.user.id });
+    if (!cartItems.length) {
+      return res.status(400).json({ error: 'Cart is empty' });
+    }
+
+    const subtotal = cartItems.reduce((sum, item) => sum + item.price * item.quantity, 0);
+    
+    // Limit points to the value of the order
+    const maxPointsValue = subtotal;
+    const maxPointsToApply = Math.floor(maxPointsValue / POINTS_VALUE);
+    const actualPointsApplied = Math.min(pointsToApply, maxPointsToApply);
+    
+    const pointsDiscountValue = actualPointsApplied * POINTS_VALUE;
+    const afterDiscount = subtotal - pointsDiscountValue;
+    const taxes = afterDiscount * TAX_RATE;
+    const total = afterDiscount + taxes + SHIPPING_FEE;
+
+    res.status(200).json({
+      subtotal: parseFloat(subtotal.toFixed(2)),
+      pointsApplied: actualPointsApplied,
+      pointsDiscountValue: parseFloat(pointsDiscountValue.toFixed(2)),
+      taxes: parseFloat(taxes.toFixed(2)),
+      shippingFee: SHIPPING_FEE,
+      total: parseFloat(total.toFixed(2))
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
 // Checkout Process - Require user login
 router.post('/checkout', [verifyToken, userRequired], async (req, res) => {
-  const { paymentDetails, discountCode } = req.body;
+  const { paymentDetails, discountCode, pointsToApply = 0 } = req.body;
 
   if (!paymentDetails) {
     return res.status(400).json({ error: 'Missing paymentDetails' });
   }
 
   try {
-    console.log(`Checkout - User ID: ${req.user.id}, Discount Code: ${discountCode}`);
+    console.log(`Checkout - User ID: ${req.user.id}, Discount Code: ${discountCode}, Points: ${pointsToApply}`);
 
     const user = await User.findById(req.user.id);
     if (!user) {
       return res.status(400).json({ error: 'User not found' });
+    }
+
+    // Validate points if applying them
+    if (pointsToApply > 0 && pointsToApply > (user.points || 0)) {
+      return res.status(400).json({ error: 'Not enough points available' });
     }
 
     const cartIdentifier = getCartIdentifier(req);
@@ -326,6 +414,7 @@ router.post('/checkout', [verifyToken, userRequired], async (req, res) => {
     let discountAmount = 0;
     let appliedDiscountCode = null;
 
+    // Apply discount code if provided
     if (discountCode) {
       const discount = await DiscountCode.findOne({ code: discountCode });
       if (discount && discount.timesUsed < discount.usageLimit) {
@@ -336,8 +425,32 @@ router.post('/checkout', [verifyToken, userRequired], async (req, res) => {
       }
     }
 
-    const taxes = (subtotal - discountAmount) * TAX_RATE;
-    const total = (subtotal - discountAmount) + taxes + SHIPPING_FEE;
+    // Apply points discount if requested
+    let pointsUsed = 0;
+    if (pointsToApply > 0) {
+      // Don't apply more points than available or more than the order total after other discounts
+      const maxPointsValue = subtotal - discountAmount;
+      const maxPointsToApply = Math.floor(maxPointsValue / POINTS_VALUE);
+      pointsUsed = Math.min(pointsToApply, maxPointsToApply, user.points || 0);
+      
+      // Subtract points from user's account
+      user.points -= pointsUsed;
+    }
+
+    // Calculate points discount value
+    const pointsDiscountValue = pointsUsed * POINTS_VALUE;
+    
+    // Calculate totals
+    const afterDiscounts = subtotal - discountAmount - pointsDiscountValue;
+    const taxes = afterDiscounts * TAX_RATE;
+    const total = afterDiscounts + taxes + SHIPPING_FEE;
+
+    // Calculate points earned from this purchase
+    const pointsEarned = Math.floor(afterDiscounts * POINTS_RATE);
+    
+    // Add earned points to user's account
+    user.points = (user.points || 0) + pointsEarned;
+    await user.save();
 
     const order = new Order({
       userId: req.user.id,
@@ -345,8 +458,10 @@ router.post('/checkout', [verifyToken, userRequired], async (req, res) => {
       totalPrice: total,
       taxes,
       shippingFee: SHIPPING_FEE,
-      discountApplied: discountAmount,
+      discountApplied: discountAmount + pointsDiscountValue,
       discountCode: appliedDiscountCode,
+      pointsUsed,
+      pointsEarned,
       statusHistory: [{ status: 'ordered', updatedAt: new Date() }],
       shippingAddress: user.shippingAddress,
       paymentDetails,
@@ -355,10 +470,33 @@ router.post('/checkout', [verifyToken, userRequired], async (req, res) => {
 
     await CartItem.deleteMany(cartIdentifier);
 
-    res.status(201).json({ message: 'Checkout successful', orderId: savedOrder._id.toString() });
+    res.status(201).json({ 
+      message: 'Checkout successful', 
+      orderId: savedOrder._id.toString(),
+      pointsEarned,
+      currentPoints: user.points
+    });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Server error', details: err.message });
+  }
+});
+
+// Get User Points - Require user login
+router.get('/points', [verifyToken, userRequired], async (req, res) => {
+  try {
+    const user = await User.findById(req.user.id);
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    res.status(200).json({ 
+      points: user.points || 0,
+      pointsValue: parseFloat(((user.points || 0) * POINTS_VALUE).toFixed(2))
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Server error' });
   }
 });
 
@@ -379,6 +517,8 @@ router.get('/orders', [verifyToken, userRequired], async (req, res) => {
       shippingFee: order.shippingFee,
       discountApplied: order.discountApplied,
       discountCode: order.discountCode,
+      pointsUsed: order.pointsUsed || 0,
+      pointsEarned: order.pointsEarned || 0,
       statusHistory: order.statusHistory || [],
       currentStatus: order.statusHistory && order.statusHistory.length > 0 ? order.statusHistory[order.statusHistory.length - 1].status : 'ordered',
       shippingAddress: order.shippingAddress || {},
@@ -457,6 +597,8 @@ router.get('/admin/orders', [verifyToken, adminRequired], async (req, res) => {
       shippingFee: order.shippingFee,
       discountApplied: order.discountApplied,
       discountCode: order.discountCode,
+      pointsUsed: order.pointsUsed || 0,
+      pointsEarned: order.pointsEarned || 0,
       statusHistory: order.statusHistory || [],
       currentStatus: order.statusHistory && order.statusHistory.length > 0 ? order.statusHistory[order.statusHistory.length - 1].status : 'ordered',
       shippingAddress: order.shippingAddress || {},
@@ -487,6 +629,30 @@ router.put('/admin/orders/:orderId/status', [verifyToken, adminRequired], async 
     const order = await Order.findById(orderId);
     if (!order) {
       return res.status(404).json({ error: 'Order not found' });
+    }
+
+    // If the order is being cancelled, refund points
+    if (status === 'cancelled' && order.userId) {
+      const currentStatus = order.statusHistory[order.statusHistory.length - 1].status;
+      
+      // Only refund if not already cancelled
+      if (currentStatus !== 'cancelled') {
+        const user = await User.findById(order.userId);
+        
+        if (user) {
+          // Refund points used in the order
+          if (order.pointsUsed) {
+            user.points = (user.points || 0) + (order.pointsUsed || 0);
+          }
+          
+          // Remove points earned from the order
+          if (order.pointsEarned) {
+            user.points = Math.max(0, (user.points || 0) - (order.pointsEarned || 0));
+          }
+          
+          await user.save();
+        }
+      }
     }
 
     order.statusHistory.push({ status, updatedAt: new Date() });
@@ -548,129 +714,4 @@ router.get('/admin/discounts', [verifyToken, adminRequired], async (req, res) =>
         code: discount.code,
         discountPercentage: discount.discountPercentage,
         usageLimit: discount.usageLimit,
-        timesUsed: discount.timesUsed,
-        createdAt: discount.createdAt,
-        appliedOrders,
-      };
-    }));
-
-    res.status(200).json(discountDetails);
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: 'Server error' });
-  }
-});
-
-// Fetch Last Order for Loyalty Discount
-router.get('/orders/last', [verifyToken, userRequired], async (req, res) => {
-  try {
-    const lastOrder = await Order.findOne({ userId: req.user.id })
-      .sort({ createdAt: -1 })
-      .select('totalPrice')
-      .lean();
-
-    res.status(200).json({ total: lastOrder ? lastOrder.totalPrice || 0 : 0 });
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: 'Server error' });
-  }
-});
-
-// Admin: Get Detailed Order Information for a Specific Discount Code
-router.get('/admin/discount/:code/orders', [verifyToken, adminRequired], async (req, res) => {
-  const { code } = req.params;
-
-  try {
-    const discount = await DiscountCode.findOne({ code }).lean();
-    if (!discount) {
-      return res.status(404).json({ error: 'Discount code not found' });
-    }
-
-    const orders = await Order.find({ discountCode: code }).lean();
-    const relevantOrders = orders.map(order => ({
-      orderId: order._id.toString(),
-      userId: order.userId,
-      totalPrice: order.totalPrice,
-      taxes: order.taxes,
-      shippingFee: order.shippingFee,
-      discountApplied: order.discountApplied,
-      shippingAddress: order.shippingAddress,
-      paymentDetails: order.paymentDetails,
-      createdAt: order.createdAt,
-    }));
-
-    res.status(200).json({
-      code: discount.code,
-      discountPercentage: discount.discountPercentage,
-      usageLimit: discount.usageLimit,
-      timesUsed: discount.timesUsed,
-      createdAt: discount.createdAt,
-      orders: relevantOrders,
-    });
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: 'Server error' });
-  }
-});
-
-// Helper endpoint to migrate guest cart to user cart after login
-router.post('/migrate-cart', [verifyToken, userRequired], async (req, res) => {
-  const { sessionId } = req.body;
-
-  if (!sessionId) {
-    return res.status(400).json({ error: 'Session ID is required' });
-  }
-
-  try {
-    console.log(`Migrating cart from sessionId: ${sessionId} to userId: ${req.user.id}`);
-    
-    // Find all items in the guest cart
-    const guestCartItems = await CartItem.find({ sessionId });
-    
-    if (guestCartItems.length === 0) {
-      return res.status(200).json({ message: 'No items to migrate' });
-    }
-
-    // For each item in the guest cart, either add it to the user cart or update quantity
-    let migratedCount = 0;
-    for (const guestItem of guestCartItems) {
-      // Check if the user already has this item in their cart
-      let userItem = await CartItem.findOne({
-        userId: req.user.id,
-        productId: guestItem.productId,
-        variantName: guestItem.variantName
-      });
-
-      if (userItem) {
-        // Update quantity of existing item
-        userItem.quantity += guestItem.quantity;
-        await userItem.save();
-      } else {
-        // Create new cart item for user
-        userItem = new CartItem({
-          userId: req.user.id,
-          sessionId: null,
-          productId: guestItem.productId,
-          variantName: guestItem.variantName,
-          quantity: guestItem.quantity,
-          price: guestItem.price
-        });
-        await userItem.save();
-      }
-      
-      // Delete the guest cart item
-      await CartItem.findByIdAndDelete(guestItem._id);
-      migratedCount++;
-    }
-
-    res.status(200).json({
-      message: `Cart migration successful. ${migratedCount} items migrated.`,
-      migratedCount
-    });
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: 'Server error', details: err.message });
-  }
-});
-
-module.exports = router;
+        timesUsed: discount.times
