@@ -15,36 +15,45 @@ const Checkout = () => {
     cvv: ''
   });
   const [message, setMessage] = useState('');
-  const [previousOrderDiscount, setPreviousOrderDiscount] = useState(0);
+  const [pointsInfo, setPointsInfo] = useState({
+    available: 0,
+    toApply: 0,
+    value: 0
+  });
+  const [isApplyingPoints, setIsApplyingPoints] = useState(false);
 
   const CART_API_URL = 'https://nodejs-final-ecommerce-1.onrender.com/cart';
   const PRODUCTS_API_URL = 'https://product-management-soyo.onrender.com/api/products';
 
   useEffect(() => {
     if (user) {
-      fetchLastOrderPrice();
+      fetchUserPoints();
     }
     if (!cartSummary || !cartSummary.items || cartSummary.items.length === 0) {
       fetchCartSummary();
     }
   }, [user, cartSummary]);
 
-  const fetchLastOrderPrice = async () => {
+  const fetchUserPoints = async () => {
     try {
       const token = localStorage.getItem('token');
       if (!token) throw new Error('No token found');
-      const response = await axios.get(`${CART_API_URL}/orders`, {
+      const response = await axios.get(`${CART_API_URL}/points`, {
         headers: { Authorization: `Bearer ${token}` }
       });
-      const orders = response.data;
-      if (orders.length > 0) {
-        const lastOrderTotal = orders[0].totalPrice || 0;
-        const discount = lastOrderTotal * 0.1; // 10% of the last order's total
-        setPreviousOrderDiscount(discount);
-      }
+      
+      setPointsInfo({
+        available: response.data.points || 0,
+        toApply: 0,
+        value: response.data.pointsValue || 0
+      });
     } catch (error) {
-      console.error('Error fetching last order:', error);
-      setPreviousOrderDiscount(0);
+      console.error('Error fetching user points:', error);
+      setPointsInfo({
+        available: 0,
+        toApply: 0,
+        value: 0
+      });
     }
   };
 
@@ -52,9 +61,16 @@ const Checkout = () => {
     try {
       const token = localStorage.getItem('token');
       const headers = token ? { Authorization: `Bearer ${token}` } : {};
+      
+      // Add pointsToApply to the query if needed
+      const params = { 
+        discountCode,
+        ...(pointsInfo.toApply > 0 ? { pointsToApply: pointsInfo.toApply } : {})
+      };
+      
       const response = await axios.get(`${CART_API_URL}/summary`, {
         headers,
-        params: { discountCode },
+        params
       });
 
       if (response.data.message === 'Cart is empty') {
@@ -72,6 +88,30 @@ const Checkout = () => {
   const handlePaymentChange = (e) => {
     const { name, value } = e.target;
     setPaymentDetails({ ...paymentDetails, [name]: value });
+  };
+
+  const handlePointsChange = (e) => {
+    const value = parseInt(e.target.value);
+    if (isNaN(value) || value < 0) {
+      setPointsInfo({...pointsInfo, toApply: 0});
+    } else {
+      const pointsToApply = Math.min(value, pointsInfo.available);
+      setPointsInfo({...pointsInfo, toApply: pointsToApply});
+    }
+  };
+
+  const applyPoints = async () => {
+    setIsApplyingPoints(true);
+    try {
+      await fetchCartSummary();
+      setMessage(`Applied ${pointsInfo.toApply} points to your order`);
+      setTimeout(() => setMessage(''), 3000);
+    } catch (error) {
+      console.error('Error applying points:', error);
+      setMessage('Failed to apply points. Please try again.');
+    } finally {
+      setIsApplyingPoints(false);
+    }
   };
 
   const handleCheckout = async () => {
@@ -96,7 +136,11 @@ const Checkout = () => {
 
       const checkoutResponse = await axios.post(
         `${CART_API_URL}/checkout`,
-        { paymentDetails, discountCode },
+        { 
+          paymentDetails, 
+          discountCode,
+          pointsToApply: pointsInfo.toApply
+        },
         { headers: { Authorization: `Bearer ${token}` } }
       );
 
@@ -132,6 +176,12 @@ const Checkout = () => {
       await Promise.all(updatePromises);
 
       setMessage(`Checkout successful! Order ID: ${checkoutResponse.data.orderId}`);
+      
+      // Show points earned message if applicable
+      if (checkoutResponse.data.pointsEarned) {
+        setMessage(prev => `${prev} You earned ${checkoutResponse.data.pointsEarned} loyalty points!`);
+      }
+      
       setTimeout(() => {
         navigate('/');
       }, 3000);
@@ -156,8 +206,6 @@ const Checkout = () => {
   const formatProductDisplay = (item) => {
     return `${item.productId} (${item.variantName})`;
   };
-
-  const finalTotal = (cartSummary?.total || 0) - previousOrderDiscount;
 
   return (
     <div style={{
@@ -199,8 +247,8 @@ const Checkout = () => {
           </div>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
-          <span style={{ fontSize: '16px', color: '#D4AF37' }}>
-            Hello {user ? user.name : 'Guest'}
+          <span style={{ color: '#D4AF37' }}>
+            {user ? `Welcome, ${user.name}` : 'Guest'}
           </span>
           <Link to="/">
             <button
@@ -310,7 +358,7 @@ const Checkout = () => {
                 <thead>
                   <tr style={{ borderBottom: '1px solid #D4AF37' }}>
                     <th style={{ padding: '10px', textAlign: 'left' }}>
-                      Product ID (Variant)
+                      Product (Variant)
                     </th>
                     <th style={{ padding: '10px', textAlign: 'left' }}>
                       Quantity
@@ -351,11 +399,74 @@ const Checkout = () => {
                   {cartSummary.discountApplied?.toFixed(2) || '0.00'}
                 </p>
               )}
-              {previousOrderDiscount > 0 && (
-                <p style={{ fontSize: '16px', color: '#D4AF37', marginBottom: '15px' }}>
-                  Loyalty Discount (10% of last order): -${previousOrderDiscount.toFixed(2)}
-                </p>
+              
+              {user && (
+                <div style={{ 
+                  backgroundColor: '#222222', 
+                  padding: '15px', 
+                  borderRadius: '8px', 
+                  marginBottom: '15px',
+                  border: '1px solid #D4AF37' 
+                }}>
+                  <h4 style={{ fontSize: '18px', color: '#D4AF37', marginBottom: '10px' }}>
+                    Loyalty Points
+                  </h4>
+                  <p style={{ fontSize: '14px', color: '#E0E0E0', marginBottom: '10px' }}>
+                    Available Points: {pointsInfo.available} (Value: ${pointsInfo.value.toFixed(2)})
+                  </p>
+                  <div style={{ display: 'flex', alignItems: 'center', marginBottom: '10px' }}>
+                    <input
+                      type="number"
+                      min="0"
+                      max={pointsInfo.available}
+                      value={pointsInfo.toApply}
+                      onChange={handlePointsChange}
+                      style={{
+                        width: '80px',
+                        padding: '8px',
+                        backgroundColor: '#E0E0E0',
+                        border: 'none',
+                        borderRadius: '5px',
+                        color: '#000000',
+                        fontFamily: "'Roboto', sans-serif",
+                        marginRight: '10px'
+                      }}
+                    />
+                    <button
+                      onClick={applyPoints}
+                      disabled={isApplyingPoints || pointsInfo.toApply === 0}
+                      style={{
+                        padding: '8px 15px',
+                        backgroundColor: (isApplyingPoints || pointsInfo.toApply === 0) ? '#666666' : '#D4AF37',
+                        color: '#000000',
+                        border: 'none',
+                        borderRadius: '5px',
+                        fontFamily: "'Roboto', sans-serif",
+                        cursor: (isApplyingPoints || pointsInfo.toApply === 0) ? 'not-allowed' : 'pointer',
+                        transition: 'background-color 0.3s'
+                      }}
+                      onMouseEnter={(e) => {
+                        if (!isApplyingPoints && pointsInfo.toApply > 0) {
+                          e.currentTarget.style.backgroundColor = '#E0E0E0';
+                        }
+                      }}
+                      onMouseLeave={(e) => {
+                        if (!isApplyingPoints && pointsInfo.toApply > 0) {
+                          e.currentTarget.style.backgroundColor = '#D4AF37';
+                        }
+                      }}
+                    >
+                      {isApplyingPoints ? 'Applying...' : 'Apply Points'}
+                    </button>
+                  </div>
+                  {cartSummary.pointsApplied > 0 && (
+                    <p style={{ fontSize: '16px', color: '#55FF55', marginBottom: '0' }}>
+                      Points Discount: -${cartSummary.pointsDiscountValue?.toFixed(2) || '0.00'} ({cartSummary.pointsApplied} points)
+                    </p>
+                  )}
+                </div>
               )}
+              
               <p style={{ fontSize: '16px', color: '#E0E0E0', marginBottom: '15px' }}>
                 Taxes: ${cartSummary.taxes?.toFixed(2) || '0.00'}
               </p>
@@ -363,8 +474,14 @@ const Checkout = () => {
                 Shipping Fee: ${cartSummary.shippingFee?.toFixed(2) || '0.00'}
               </p>
               <p style={{ fontSize: '18px', fontWeight: 'bold', color: '#D4AF37', marginBottom: '20px' }}>
-                Total: ${finalTotal < 0 ? '0.00' : finalTotal.toFixed(2)}
+                Total: ${cartSummary.total?.toFixed(2) || '0.00'}
               </p>
+
+              {user && (
+                <p style={{ fontSize: '14px', color: '#55FF55', fontStyle: 'italic', marginBottom: '0' }}>
+                  You'll earn approximately {Math.floor(cartSummary.total * 0.1)} points from this purchase!
+                </p>
+              )}
             </div>
           )}
 

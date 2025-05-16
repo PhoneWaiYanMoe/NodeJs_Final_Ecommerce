@@ -1,6 +1,7 @@
 import React, { useState, useContext, useEffect } from 'react';
 import { AuthContext } from '../App';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
+import axios from 'axios';
 
 const Profile = () => {
   const { user, setUser } = useContext(AuthContext);
@@ -23,6 +24,11 @@ const Profile = () => {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [expandedAddressIndex, setExpandedAddressIndex] = useState(null);
+  const [loyaltyPoints, setLoyaltyPoints] = useState({
+    points: 0,
+    value: 0,
+    history: []
+  });
   const navigate = useNavigate();
 
   // Initialize state only once on mount
@@ -32,6 +38,7 @@ const Profile = () => {
         name: user.name || '',
         shippingAddressCollection: user.shippingAddressCollection || [],
       });
+      fetchUserPoints();
     }
   }, [user]);
 
@@ -223,6 +230,25 @@ const Profile = () => {
 
   const toggleAddressDetails = (index) => {
     setExpandedAddressIndex(expandedAddressIndex === index ? null : index);
+  };
+
+  const fetchUserPoints = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      if (!token) throw new Error('No token found');
+      
+      const response = await axios.get('https://nodejs-final-ecommerce-1.onrender.com/cart/points', {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      
+      setLoyaltyPoints({
+        points: response.data.points || 0,
+        value: response.data.pointsValue || 0,
+        history: [] // We'll populate this when showing order history
+      });
+    } catch (error) {
+      console.error('Error fetching loyalty points:', error);
+    }
   };
 
   return (
@@ -585,6 +611,73 @@ const Profile = () => {
         >
           Save Address
         </button>
+
+        {/* Loyalty Points Section */}
+        <div style={{
+          backgroundColor: '#222222',
+          padding: '20px',
+          borderRadius: '10px',
+          marginTop: '30px',
+          marginBottom: '30px',
+          border: '1px solid #D4AF37'
+        }}>
+          <h3 style={{ fontSize: '22px', color: '#D4AF37', marginBottom: '15px' }}>
+            Loyalty Points
+          </h3>
+          
+          <div style={{
+            backgroundColor: '#1A1A1A',
+            padding: '15px',
+            borderRadius: '8px',
+            marginBottom: '15px',
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center'
+          }}>
+            <div>
+              <p style={{ fontSize: '16px', color: '#E0E0E0', marginBottom: '5px' }}>
+                Available Points:
+              </p>
+              <p style={{ fontSize: '24px', color: '#55FF55', fontWeight: 'bold', marginBottom: '0' }}>
+                {loyaltyPoints.points}
+              </p>
+            </div>
+            <div>
+              <p style={{ fontSize: '16px', color: '#E0E0E0', marginBottom: '5px' }}>
+                Value:
+              </p>
+              <p style={{ fontSize: '24px', color: '#D4AF37', fontWeight: 'bold', marginBottom: '0' }}>
+                ${loyaltyPoints.value.toFixed(2)}
+              </p>
+            </div>
+          </div>
+          
+          <p style={{ fontSize: '14px', color: '#E0E0E0' }}>
+            You earn points on every purchase (10% of purchase value).
+            Points can be redeemed during checkout.
+          </p>
+          
+          <Link to="/orders">
+            <button
+              style={{
+                width: '100%',
+                padding: '10px',
+                marginTop: '10px',
+                backgroundColor: '#D4AF37',
+                color: '#000000',
+                border: 'none',
+                borderRadius: '5px',
+                fontFamily: "'Roboto', sans-serif",
+                cursor: 'pointer',
+                transition: 'background-color 0.3s'
+              }}
+              onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#E0E0E0')}
+              onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = '#D4AF37')}
+            >
+              View Points History
+            </button>
+          </Link>
+        </div>
 
         {/* Password Change Section */}
         <h3 style={{ color: '#D4AF37', marginBottom: '10px' }}>Change Password</h3>
