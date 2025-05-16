@@ -32,39 +32,18 @@ function App() {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  // Check session (token) on app load
-  useEffect(() => {
-    const checkSession = async () => {
-      try {
-        const token = localStorage.getItem('token');
-        if (token) {
-          const response = await axios.get('/session');
-          if (response.data.user) {
-            setUser(response.data.user);
-          } else {
-            localStorage.removeItem('token');
-            setUser(null);
-          }
-        } else {
-          setUser(null);
-        }
-      } catch (err) {
-        console.error('Session check failed:', err.message);
-        localStorage.removeItem('token');
-        setUser(null);
-      } finally {
-        setLoading(false);
-      }
-    };
-    checkSession();
-  }, []);
-
   // Login function
   const login = async (email, password) => {
     try {
       const loginUrl = email === 'admin@example.com' ? '/admin/login' : '/login';
       const response = await axios.post(loginUrl, { email, password });
       const { user, token } = response.data;
+      
+      // Make sure points is included
+      if (user && !user.points) {
+        user.points = 0;
+      }
+      
       if (token) {
         localStorage.setItem('token', token);
         setUser(user);
@@ -86,6 +65,61 @@ function App() {
     }
   };
 
+  // Function to update user points
+  const updateUserPoints = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      if (!token || !user) return;
+      
+      const response = await axios.get('https://nodejs-final-ecommerce-1.onrender.com/cart/points', {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      
+      if (response.data && response.data.points !== undefined) {
+        setUser(prevUser => ({
+          ...prevUser,
+          points: response.data.points
+        }));
+      }
+    } catch (error) {
+      console.error('Error updating user points:', error);
+    }
+  };
+
+  // Check session (token) on app load
+  useEffect(() => {
+    const checkSession = async () => {
+      try {
+        const token = localStorage.getItem('token');
+        if (token) {
+          const response = await axios.get('/session');
+          if (response.data.user) {
+            // Make sure points is included
+            if (!response.data.user.points) {
+              response.data.user.points = 0;
+            }
+            setUser(response.data.user);
+            
+            // Also fetch the latest points
+            updateUserPoints();
+          } else {
+            localStorage.removeItem('token');
+            setUser(null);
+          }
+        } else {
+          setUser(null);
+        }
+      } catch (err) {
+        console.error('Session check failed:', err.message);
+        localStorage.removeItem('token');
+        setUser(null);
+      } finally {
+        setLoading(false);
+      }
+    };
+    checkSession();
+  }, []);
+
   // Protected Route Component
   const ProtectedRoute = ({ children, adminOnly }) => {
     if (loading) return <div>Loading...</div>;
@@ -97,7 +131,7 @@ function App() {
   };
 
   return (
-    <AuthContext.Provider value={{ user, setUser, login, logout }}>
+    <AuthContext.Provider value={{ user, setUser, login, logout, updateUserPoints }}>
       <Router>
         <Routes>
           <Route path="/" element={<LandingPage />} />
