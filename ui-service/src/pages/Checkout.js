@@ -238,7 +238,7 @@ const Checkout = () => {
       }
 
       let successMessage = `Checkout successful! Order ID: ${checkoutResponse.data.orderId}`;
-      
+       
       if (checkoutResponse.data.pointsUsed > 0) {
         successMessage += ` You redeemed ${checkoutResponse.data.pointsUsed} points.`;
       }
@@ -246,6 +246,9 @@ const Checkout = () => {
       if (checkoutResponse.data.pointsEarned > 0) {
         successMessage += ` You earned ${checkoutResponse.data.pointsEarned} new loyalty points!`;
       }
+      
+      // Add confirmation email notification
+      successMessage += ` A confirmation email has been sent to your email address (${user.email}).`;
       
       setMessage(successMessage);
       
