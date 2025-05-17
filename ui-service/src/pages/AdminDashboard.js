@@ -197,7 +197,7 @@ const AdminDashboard = () => {
                         productStats.uniqueProductTypes || 0
                     ],
                     backgroundColor: ['rgba(212, 175, 55, 0.6)', 'rgba(54, 162, 235, 0.6)', 'rgba(255, 99, 132, 0.6)'],
-                    borderColor: ['rgba(212, 175, 55, 1)', 'rgba( Eastman, 235, 1)', 'rgba(255, 99, 132, 1)'],
+                    borderColor: ['rgba(212, 175, 55, 1)', 'rgba(54, 162, 235, 1)', 'rgba(255, 99, 132, 1)'],
                     borderWidth: 1
                 }]
             },
@@ -230,23 +230,37 @@ const AdminDashboard = () => {
         if (lineChartInstance.current) {
             lineChartInstance.current.destroy();
         }
+        
+        // Get time period labels based on interval
+        const periodLabels = Object.keys(stats).sort();
+        const revenueData = periodLabels.map(period => stats[period].totalRevenue || 0);
+        const profitData = periodLabels.map(period => stats[period].totalProfit || 0);
+        
         const ctx = lineChartRef.current.getContext('2d');
         lineChartInstance.current = new Chart(ctx, {
             type: 'line',
             data: {
-                labels: ['Total Revenue', 'Total Profit'],
-                datasets: [{
-                    label: 'Financial Metrics ($)',
-                    data: [
-                        Object.values(stats).reduce((sum, s) => sum + (s.totalRevenue || 0), 0),
-                        Object.values(stats).reduce((sum, s) => sum + (s.totalProfit || 0), 0)
-                    ],
-                    backgroundColor: 'rgba(75, 192, 192, 0.2)',
-                    borderColor: 'rgba(75, 192, 192, 1)',
-                    borderWidth: 2,
-                    fill: true,
-                    tension: 0.1
-                }]
+                labels: periodLabels,
+                datasets: [
+                    {
+                        label: 'Revenue',
+                        data: revenueData,
+                        backgroundColor: 'rgba(255, 206, 86, 0.2)',
+                        borderColor: 'rgba(255, 206, 86, 1)',
+                        borderWidth: 2,
+                        tension: 0.1,
+                        yAxisID: 'y'
+                    },
+                    {
+                        label: 'Profit',
+                        data: profitData,
+                        backgroundColor: 'rgba(75, 192, 192, 0.2)',
+                        borderColor: 'rgba(75, 192, 192, 1)',
+                        borderWidth: 2,
+                        tension: 0.1,
+                        yAxisID: 'y'
+                    }
+                ]
             },
             options: {
                 responsive: true,
@@ -254,43 +268,86 @@ const AdminDashboard = () => {
                 scales: {
                     y: {
                         beginAtZero: true,
-                        title: { display: true, text: 'Amount ($)', color: '#FFFFFF' },
+                        title: { display: true, text: 'Amount (₫)', color: '#FFFFFF' },
                         ticks: {
                             color: '#FFFFFF',
                             callback: function(value) {
-                                return '$' + value.toLocaleString();
+                                return '₫' + value.toLocaleString();
                             }
+                        },
+                        grid: {
+                            color: 'rgba(255, 255, 255, 0.1)'
                         }
                     },
-                    x: { ticks: { color: '#FFFFFF' } }
+                    x: { 
+                        ticks: { color: '#FFFFFF' },
+                        grid: {
+                            color: 'rgba(255, 255, 255, 0.1)'
+                        }
+                    }
                 },
                 plugins: {
                     legend: { labels: { color: '#FFFFFF' } },
                     title: {
                         display: true,
-                        text: 'Revenue and Profit Overview',
+                        text: `Revenue and Profit Over ${timeInterval.charAt(0).toUpperCase() + timeInterval.slice(1)}`,
                         color: '#D4AF37',
                         font: { size: 18 }
+                    },
+                    tooltip: {
+                        callbacks: {
+                            label: function(context) {
+                                let label = context.dataset.label || '';
+                                if (label) {
+                                    label += ': ';
+                                }
+                                if (context.parsed.y !== null) {
+                                    label += '₫' + context.parsed.y.toLocaleString();
+                                }
+                                return label;
+                            }
+                        }
                     }
                 }
             }
         });
-    }, [stats]);
+    }, [stats, timeInterval]);
 
-    const renderPieChart = useCallback(() => {
+    const renderOrderCountChart = useCallback(() => {
         if (!pieChartRef.current) return;
         if (pieChartInstance.current) {
             pieChartInstance.current.destroy();
         }
+        
+        // Get time period labels based on interval
+        const periodLabels = Object.keys(stats).sort();
+        const ordersData = periodLabels.map(period => stats[period].ordersCount || 0);
+        
         const ctx = pieChartRef.current.getContext('2d');
         pieChartInstance.current = new Chart(ctx, {
-            type: 'pie',
+            type: 'doughnut',
             data: {
-                labels: ['Total Products Sold', 'Unique Product Types'],
+                labels: periodLabels,
                 datasets: [{
-                    data: [productStats.totalProducts || 0, productStats.uniqueProductTypes || 0],
-                    backgroundColor: ['rgba(255, 206, 86, 0.6)', 'rgba(75, 192, 192, 0.6)'],
-                    borderColor: ['rgba(255, 206, 86, 1)', 'rgba(75, 192, 192, 1)'],
+                    data: ordersData,
+                    backgroundColor: [
+                        'rgba(255, 99, 132, 0.6)',
+                        'rgba(54, 162, 235, 0.6)',
+                        'rgba(255, 206, 86, 0.6)',
+                        'rgba(75, 192, 192, 0.6)',
+                        'rgba(153, 102, 255, 0.6)',
+                        'rgba(255, 159, 64, 0.6)',
+                        'rgba(199, 199, 199, 0.6)'
+                    ],
+                    borderColor: [
+                        'rgba(255, 99, 132, 1)',
+                        'rgba(54, 162, 235, 1)',
+                        'rgba(255, 206, 86, 1)',
+                        'rgba(75, 192, 192, 1)',
+                        'rgba(153, 102, 255, 1)',
+                        'rgba(255, 159, 64, 1)',
+                        'rgba(199, 199, 199, 1)'
+                    ],
                     borderWidth: 1
                 }]
             },
@@ -298,17 +355,32 @@ const AdminDashboard = () => {
                 responsive: true,
                 maintainAspectRatio: false,
                 plugins: {
-                    legend: { labels: { color: '#FFFFFF' } },
+                    legend: { 
+                        position: 'right',
+                        labels: { color: '#FFFFFF' } 
+                    },
                     title: {
                         display: true,
-                        text: 'Product Distribution',
+                        text: `Orders by ${timeInterval.charAt(0).toUpperCase() + timeInterval.slice(1)}`,
                         color: '#D4AF37',
                         font: { size: 18 }
+                    },
+                    tooltip: {
+                        callbacks: {
+                            label: function(context) {
+                                let label = context.label || '';
+                                if (label) {
+                                    label += ': ';
+                                }
+                                label += context.formattedValue + ' orders';
+                                return label;
+                            }
+                        }
                     }
                 }
             }
         });
-    }, [productStats]);
+    }, [stats, timeInterval]);
 
     const fetchData = useCallback(async () => {
         await Promise.all([
@@ -330,15 +402,11 @@ const AdminDashboard = () => {
                 renderBarChart();
             } else if (chartType === 'line') {
                 renderLineChart();
+            } else if (chartType === 'pie') {
+                renderOrderCountChart();
             }
         }
-    }, [stats, chartType, renderBarChart, renderLineChart]);
-
-    useEffect(() => {
-        if (Object.keys(productStats).length > 0 && chartType === 'pie') {
-            renderPieChart();
-        }
-    }, [productStats, chartType, renderPieChart]);
+    }, [stats, chartType, renderBarChart, renderLineChart, renderOrderCountChart]);
 
     // Verify admin role and initialize token on mount
     useEffect(() => {
@@ -595,13 +663,13 @@ const AdminDashboard = () => {
         }
     };
 
-    if (!user) return null;
-
     const formatDate = (dateString) => {
         if (!dateString) return 'N/A';
         const date = new Date(dateString);
         return isNaN(date.getTime()) ? 'N/A' : date.toLocaleString();
     };
+
+    if (!user) return null;
 
     return (
         <div style={{
@@ -750,9 +818,9 @@ const AdminDashboard = () => {
                                 color: '#000000'
                             }}
                         >
-                            <option value="bar">Bar Chart (Counts)</option>
-                            <option value="line">Line Chart (Finance)</option>
-                            <option value="pie">Pie Chart (Products)</option>
+                            <option value="bar">Bar Chart (Key Metrics)</option>
+                            <option value="line">Line Chart (Revenue & Profit Trend)</option>
+                            <option value="pie">Pie Chart (Order Distribution)</option>
                         </select>
                         <button
                             onClick={handleGetData}
@@ -769,19 +837,17 @@ const AdminDashboard = () => {
                             onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#E0E0E0'}
                             onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#D4AF37'}
                         >
-                            Get Data
+                            Generate Report
                         </button>
                     </div>
                     <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '20px' }}>
-                        <div style={{ width: '48%', height: '400px' }}>
+                        <div style={{ width: '48%', height: '400px', backgroundColor: '#222', borderRadius: '10px', padding: '10px' }}>
                             <canvas ref={barChartRef} style={{ display: chartType === 'bar' ? 'block' : 'none', width: '100%', height: '100%' }}></canvas>
-                        </div>
-                        <div style={{ width: '48%', height: '400px' }}>
                             <canvas ref={lineChartRef} style={{ display: chartType === 'line' ? 'block' : 'none', width: '100%', height: '100%' }}></canvas>
                         </div>
-                    </div>
-                    <div style={{ width: '48%', height: '400px', marginLeft: 'auto' }}>
-                        <canvas ref={pieChartRef} style={{ display: chartType === 'pie' ? 'block' : 'none', width: '100%', height: '100%' }}></canvas>
+                        <div style={{ width: '48%', height: '400px', backgroundColor: '#222', borderRadius: '10px', padding: '10px' }}>
+                            <canvas ref={pieChartRef} style={{ display: chartType === 'pie' ? 'block' : 'none', width: '100%', height: '100%' }}></canvas>
+                        </div>
                     </div>
                     <table style={{
                         width: '100%',
@@ -804,11 +870,11 @@ const AdminDashboard = () => {
                             </tr>
                             <tr style={{ borderBottom: '1px solid #333333' }}>
                                 <td style={{ padding: '10px' }}>Total Revenue</td>
-                                <td style={{ padding: '10px' }}>${Object.values(stats).reduce((sum, s) => sum + (s.totalRevenue || 0), 0).toFixed(2)}</td>
+                                <td style={{ padding: '10px' }}>₫{Object.values(stats).reduce((sum, s) => sum + (s.totalRevenue || 0), 0).toLocaleString()}</td>
                             </tr>
                             <tr style={{ borderBottom: '1px solid #333333' }}>
                                 <td style={{ padding: '10px' }}>Total Profit</td>
-                                <td style={{ padding: '10px' }}>${Object.values(stats).reduce((sum, s) => sum + (s.totalProfit || 0), 0).toFixed(2)}</td>
+                                <td style={{ padding: '10px' }}>₫{Object.values(stats).reduce((sum, s) => sum + (s.totalProfit || 0), 0).toLocaleString()}</td>
                             </tr>
                             <tr style={{ borderBottom: '1px solid #333333' }}>
                                 <td style={{ padding: '10px' }}>Total Products Sold</td>
@@ -834,7 +900,7 @@ const AdminDashboard = () => {
                         color: '#D4AF37',
                         marginBottom: '20px'
                     }}>
-                        Order History
+                        Order Management
                     </h2>
                     {error && (
                         <p style={{
@@ -868,7 +934,7 @@ const AdminDashboard = () => {
                                     <tr key={order.orderId} style={{ borderBottom: '1px solid #333333' }}>
                                         <td style={{ padding: '10px' }}>{order.orderId}</td>
                                         <td style={{ padding: '10px' }}>{order.userId}</td>
-                                        <td style={{ padding: '10px' }}>${order.totalPrice.toFixed(2)}</td>
+                                        <td style={{ padding: '10px' }}>₫{order.totalPrice.toLocaleString()}</td>
                                         <td style={{ padding: '10px' }}>{order.currentStatus}</td>
                                         <td style={{ padding: '10px' }}>{formatDate(order.createdAt)}</td>
                                         <td style={{ padding: '10px' }}>
@@ -1170,7 +1236,7 @@ const AdminDashboard = () => {
                         color: '#D4AF37',
                         marginBottom: '20px'
                     }}>
-                        User List
+                        User Management
                     </h2>
                     {error && (
                         <p style={{
@@ -1440,7 +1506,7 @@ const AdminDashboard = () => {
                         color: '#D4AF37',
                         marginBottom: '20px'
                     }}>
-                        Product List
+                        Product Management
                     </h2>
                     {productError && (
                         <p style={{
@@ -1464,7 +1530,7 @@ const AdminDashboard = () => {
                                     <th style={{ padding: '10px', textAlign: 'left' }}>Name</th>
                                     <th style={{ padding: '10px', textAlign: 'left' }}>Brand</th>
                                     <th style={{ padding: '10px', textAlign: 'left' }}>Category</th>
-                                    <th style={{ padding: '10px', textAlign: 'left' }}>Price Range</th>
+                                    <th style={{ padding: '10px', textAlign: 'left' }}>Price Range (₫)</th>
                                     <th style={{ padding: '10px', textAlign: 'left' }}>Actions</th>
                                 </tr>
                             </thead>
@@ -1475,8 +1541,8 @@ const AdminDashboard = () => {
                                         <td style={{ padding: '10px' }}>{product.brand}</td>
                                         <td style={{ padding: '10px' }}>{product.category || 'None'}</td>
                                         <td style={{ padding: '10px' }}>
-                                            ${Math.min(...product.variants.map(v => v.price))} - $
-                                            {Math.max(...product.variants.map(v => v.price))}
+                                            ₫{Math.min(...product.variants.map(v => v.price)).toLocaleString()} - 
+                                            ₫{Math.max(...product.variants.map(v => v.price)).toLocaleString()}
                                         </td>
                                         <td style={{ padding: '10px' }}>
                                             <button
