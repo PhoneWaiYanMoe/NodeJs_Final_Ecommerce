@@ -1,8 +1,11 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useContext } from 'react';
 import axios from 'axios';
 import { Link, useNavigate } from 'react-router-dom';
+import { AuthContext } from '../App';
 
 const LandingPage = () => {
+  const { user, logout } = useContext(AuthContext);
+  const navigate = useNavigate();
   const [categories, setCategories] = useState({
     'New Products': [],
     'Best Sellers': [],
@@ -12,7 +15,6 @@ const LandingPage = () => {
     'Hard Drives': [],
   });
   const API_URL = 'https://product-management-soyo.onrender.com/api/products';
-  const navigate = useNavigate();
 
   const fetchBestSellerProducts = async () => {
     try {
@@ -126,6 +128,15 @@ const LandingPage = () => {
     }
   };
 
+  const handleAuthAction = async () => {
+    if (user) {
+      await logout();
+      navigate('/login');
+    } else {
+      navigate('/login');
+    }
+  };
+
   return (
     <div style={{
       backgroundColor: '#000000',
@@ -166,35 +177,77 @@ const LandingPage = () => {
             </p>
           </div>
         </div>
-        <div style={{ display: "flex", alignItems: "center", gap: "20px" }}>
-          <Link to="/products" style={{ textDecoration: "none" }}>
-            <span
-              style={{
-                fontSize: "16px",
-                color: "#D4AF37",
-                cursor: "pointer",
-                transition: "color 0.3s",
-              }}
-              onMouseEnter={(e) => (e.currentTarget.style.color = "#E0E0E0")}
-              onMouseLeave={(e) => (e.currentTarget.style.color = "#D4AF37")}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
+          <Link to="/profile" style={{ textDecoration: 'none' }}>
+            <span style={{
+              fontSize: '16px',
+              color: '#D4AF37',
+              cursor: 'pointer',
+              transition: 'color 0.3s',
+            }}
+            onMouseEnter={(e) => (e.currentTarget.style.color = '#E0E0E0')}
+            onMouseLeave={(e) => (e.currentTarget.style.color = '#D4AF37')}
             >
-              Browse All Products
+              Hello, {user ? user.name : 'Guest'}
             </span>
           </Link>
-          <Link to="/login" style={{ textDecoration: "none" }}>
-            <span
-              style={{
-                fontSize: "16px",
-                color: "#D4AF37",
-                cursor: "pointer",
-                transition: "color 0.3s",
-              }}
-              onMouseEnter={(e) => (e.currentTarget.style.color = "#E0E0E0")}
-              onMouseLeave={(e) => (e.currentTarget.style.color = "#D4AF37")}
-            >
-              Login
-            </span>
-          </Link>
+          {user && (
+            <>
+              <Link to="/cart">
+                <button
+                  style={{
+                    padding: '10px 20px',
+                    backgroundColor: '#D4AF37',
+                    color: '#000000',
+                    border: 'none',
+                    borderRadius: '5px',
+                    fontFamily: "'Roboto', sans-serif",
+                    cursor: 'pointer',
+                    transition: 'background-color 0.3s',
+                  }}
+                  onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#E0E0E0')}
+                  onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = '#D4AF37')}
+                >
+                  Cart
+                </button>
+              </Link>
+              <Link to="/orders">
+                <button
+                  style={{
+                    padding: '10px 20px',
+                    backgroundColor: '#D4AF37',
+                    color: '#000000',
+                    border: 'none',
+                    borderRadius: '5px',
+                    fontFamily: "'Roboto', sans-serif",
+                    cursor: 'pointer',
+                    transition: 'background-color 0.3s',
+                  }}
+                  onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#E0E0E0')}
+                  onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = '#D4AF37')}
+                >
+                  Order History
+                </button>
+              </Link>
+            </>
+          )}
+          <button
+            onClick={handleAuthAction}
+            style={{
+              padding: '10px 20px',
+              backgroundColor: '#D4AF37',
+              color: '#000000',
+              border: 'none',
+              borderRadius: '5px',
+              fontFamily: "'Roboto', sans-serif",
+              cursor: 'pointer',
+              transition: 'background-color 0.3s',
+            }}
+            onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#E0E0E0')}
+            onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = '#D4AF37')}
+          >
+            {user ? 'Logout' : 'Login'}
+          </button>
         </div>
       </header>
 
