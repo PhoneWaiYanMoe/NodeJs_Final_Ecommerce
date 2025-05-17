@@ -255,7 +255,7 @@ const OrderHistory = () => {
                   Date: {new Date(order.createdAt).toLocaleDateString()}
                 </p>
                 <p style={{ fontSize: '16px', color: '#E0E0E0', marginBottom: '5px' }}>
-                  Total: ${order.totalPrice.toFixed(2)}
+                  Total: ₫{order.totalPrice.toFixed(2)}
                 </p>
                 <p style={{ fontSize: '16px', color: '#D4AF37', marginBottom: '5px' }}>
                   Status: {order.currentStatus.charAt(0).toUpperCase() + order.currentStatus.slice(1)}

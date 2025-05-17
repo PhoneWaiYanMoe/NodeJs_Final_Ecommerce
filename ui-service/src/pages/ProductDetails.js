@@ -429,7 +429,7 @@ const ProductDetails = () => {
                             color: '#E0E0E0',
                             marginBottom: '5px'
                         }}>
-                            {variant.name} - ${variant.price} (Stock: {variant.stock})
+                            {variant.name} - ₫{variant.price} (Stock: {variant.stock})
                         </li>
                     ))}
                 </ul>
@@ -450,7 +450,7 @@ const ProductDetails = () => {
                         <option value="" disabled>Select Variant</option>
                         {product.variants.map((variant, index) => (
                             <option key={index} value={variant.name}>
-                                {variant.name} - ${variant.price} (Stock: {variant.stock})
+                                {variant.name} - ₫{variant.price} (Stock: {variant.stock})
                             </option>
                         ))}
                     </select>

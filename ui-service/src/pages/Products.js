@@ -409,7 +409,7 @@ const Products = () => {
                   color: '#000000',
                   marginBottom: '5px',
                 }}>
-                  Price: ${Math.min(...product.variants.map(v => v.price))} - ${Math.max(...product.variants.map(v => v.price))}
+                  Price: ₫{Math.min(...product.variants.map(v => v.price))} - ₫{Math.max(...product.variants.map(v => v.price))}
                 </p>
                 <p style={{
                   fontSize: '14px',

@@ -482,10 +482,10 @@ const Cart = () => {
                       />
                     </td>
                     <td style={{ padding: "10px" }}>
-                      ${item.price.toFixed(2)}
+                      ₫{item.price.toFixed(2)}
                     </td>
                     <td style={{ padding: "10px" }}>
-                      ${(item.price * item.quantity).toFixed(2)}
+                      ₫{(item.price * item.quantity).toFixed(2)}
                     </td>
                     <td style={{ padding: "10px" }}>
                       <button

@@ -150,7 +150,7 @@ const Checkout = () => {
       }
       
       const discountValue = (response.data.pointsDiscountValue || (pointsInfo.toApply * 0.01)).toFixed(2);
-      setMessage(`Applied ${pointsInfo.toApply} points to your order (-$${discountValue})`);
+      setMessage(`Applied ${pointsInfo.toApply} points to your order (-₫${discountValue})`);
       setTimeout(() => setMessage(''), 3000);
     } catch (error) {
       console.error('Error applying points:', error);
@@ -431,7 +431,7 @@ const Checkout = () => {
               </h3>
               <p style={{ fontSize: '16px', color: '#E0E0E0', marginBottom: '20px', textAlign: 'center' }}>
                 Are you sure you want to use <span style={{ color: '#55FF55', fontWeight: 'bold' }}>{pointsInfo.toApply} points</span> to
-                reduce your order by <span style={{ color: '#D4AF37', fontWeight: 'bold' }}>${(pointsInfo.toApply * 0.01).toFixed(2)}</span>?
+                reduce your order by <span style={{ color: '#D4AF37', fontWeight: 'bold' }}>₫{(pointsInfo.toApply * 0.01).toFixed(2)}</span>?
               </p>
               <p style={{ fontSize: '14px', color: '#FF5555', marginBottom: '20px', textAlign: 'center' }}>
                 This will immediately deduct the points from your account.
@@ -523,21 +523,21 @@ const Checkout = () => {
                         {item.quantity}
                       </td>
                       <td style={{ padding: '10px' }}>
-                        ${item.price.toFixed(2)}
+                        ₫{item.price.toFixed(2)}
                       </td>
                       <td style={{ padding: '10px' }}>
-                        ${(item.price * item.quantity).toFixed(2)}
+                        ₫{(item.price * item.quantity).toFixed(2)}
                       </td>
                     </tr>
                   ))}
                 </tbody>
               </table>
               <p style={{ fontSize: '16px', color: '#E0E0E0', marginBottom: '15px' }}>
-                Subtotal: ${cartSummary.subtotal?.toFixed(2) || '0.00'}
+                Subtotal: ₫{cartSummary.subtotal?.toFixed(2) || '0.00'}
               </p>
               {cartSummary.discountApplied > 0 && (
                 <p style={{ fontSize: '16px', color: '#D4AF37', marginBottom: '15px' }}>
-                  Discount ({cartSummary.discountCode} - {cartSummary.discountPercentage}%): -$
+                  Discount ({cartSummary.discountCode} - {cartSummary.discountPercentage}%): -₫
                   {cartSummary.discountApplied?.toFixed(2) || '0.00'}
                 </p>
               )}
@@ -554,7 +554,7 @@ const Checkout = () => {
                     Loyalty Points
                   </h4>
                   <p style={{ fontSize: '14px', color: '#E0E0E0', marginBottom: '10px' }}>
-                    Available Points: {pointsInfo.available} (Value: ${pointsInfo.value.toFixed(2)})
+                    Available Points: {pointsInfo.available} (Value: ₫{pointsInfo.value.toFixed(2)})
                   </p>
                   <div style={{ display: 'flex', alignItems: 'center', marginBottom: '10px' }}>
                     <input
@@ -601,20 +601,20 @@ const Checkout = () => {
                   </div>
                   {cartSummary.pointsApplied > 0 && (
                     <p style={{ fontSize: '16px', color: '#55FF55', marginBottom: '0' }}>
-                      Points Discount: -${cartSummary.pointsDiscountValue?.toFixed(2) || '0.00'} ({cartSummary.pointsApplied} points)
+                      Points Discount: -₫{cartSummary.pointsDiscountValue?.toFixed(2) || '0.00'} ({cartSummary.pointsApplied} points)
                     </p>
                   )}
                 </div>
               )}
               
               <p style={{ fontSize: '16px', color: '#E0E0E0', marginBottom: '15px' }}>
-                Taxes: ${cartSummary.taxes?.toFixed(2) || '0.00'}
+                Taxes: ₫{cartSummary.taxes?.toFixed(2) || '0.00'}
               </p>
               <p style={{ fontSize: '16px', color: '#E0E0E0', marginBottom: '15px' }}>
-                Shipping Fee: ${cartSummary.shippingFee?.toFixed(2) || '0.00'}
+                Shipping Fee: ₫{cartSummary.shippingFee?.toFixed(2) || '0.00'}
               </p>
               <p style={{ fontSize: '18px', fontWeight: 'bold', color: '#D4AF37', marginBottom: '20px' }}>
-                Total: ${cartSummary.total?.toFixed(2) || '0.00'}
+                Total: ₫{cartSummary.total?.toFixed(2) || '0.00'}
               </p>
   
               {user && (

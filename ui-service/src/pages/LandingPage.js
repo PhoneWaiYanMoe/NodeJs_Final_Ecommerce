@@ -318,7 +318,7 @@ const LandingPage = () => {
                         color: '#D4AF37',
                         marginBottom: '5px',
                       }}>
-                        ${Math.min(...product.variants.map(v => v.price))} - ${Math.max(...product.variants.map(v => v.price))}
+                        ₫{Math.min(...product.variants.map(v => v.price))} - ₫{Math.max(...product.variants.map(v => v.price))}
                       </p>
                     </div>
                   </div>
