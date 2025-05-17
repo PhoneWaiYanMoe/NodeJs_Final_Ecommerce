@@ -932,8 +932,7 @@ router.get('/admin/discounts', [verifyToken, adminRequired], async (req, res) =>
 
 module.exports = router;
 
-// Add nodemailer to the required modules at the top
-const nodemailer = require('nodemailer');
+// Helper function to send order confirmation email
 
 // Helper function to send order confirmation email 
 const sendOrderConfirmationEmail = async (user, order) => { 
