@@ -173,10 +173,6 @@ const ProductDetails = () => {
 
     // Updated handleAddToCart function for ProductDetails.js
     const handleAddToCart = async () => {
-        if (!user) {
-            navigate('/login');
-            return;
-        }
         if (!selectedVariant) {
             setCartMessage('Please select a variant.');
             return;
@@ -206,12 +202,29 @@ const ProductDetails = () => {
                     }
                 }
             );
+            
+            console.log('Add to cart response:', response.data);
+            
+            // If this is a guest and we got a sessionId back, store it
+            if (!token && response.data.sessionId) {
+                localStorage.setItem("guestSessionId", response.data.sessionId);
+                console.log('Saved guest sessionId:', response.data.sessionId);
+            }
 
+            // Show success message
             setCartMessage('Item added to cart successfully!');
             setTimeout(() => setCartMessage(''), 3000);
         } catch (error) {
             console.error('Error adding to cart:', error);
-            setCartMessage('Failed to add item to cart.');
+            if (error.response) {
+                console.error('Error response:', error.response.data);
+                setCartMessage(`Failed to add item: ${error.response.data.error || 'Server error'}`);
+            } else if (error.request) {
+                console.error('No response received:', error.request);
+                setCartMessage('Failed to add item: No response from server');
+            } else {
+                setCartMessage(`Failed to add item: ${error.message}`);
+            }
         }
     };
     // Helper function to render ratings as stars
@@ -277,21 +290,19 @@ const ProductDetails = () => {
                     <span style={{ color: '#D4AF37' }}>
                         {user ? `Welcome, ${user.name}` : 'Guest'}
                     </span>
-                    {user && (
-                        <button 
-                            onClick={() => navigate('/cart')}
-                            style={{
-                                padding: '10px 20px',
-                                backgroundColor: '#D4AF37',
-                                color: '#000000',
-                                border: 'none',
-                                borderRadius: '5px',
-                                cursor: 'pointer'
-                            }}
-                        >
-                            Cart
-                        </button>
-                    )}
+                    <button 
+                        onClick={() => navigate('/cart')}
+                        style={{
+                            padding: '10px 20px',
+                            backgroundColor: '#D4AF37',
+                            color: '#000000',
+                            border: 'none',
+                            borderRadius: '5px',
+                            cursor: 'pointer'
+                        }}
+                    >
+                        Cart
+                    </button>
                     <button 
                         onClick={() => navigate('/products')}
                         style={{

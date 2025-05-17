@@ -47,7 +47,8 @@ const Profile = () => {
     if (name.includes('newAddress.')) {
       const field = name.split('.')[1];
       setNewAddress({ ...newAddress, [field]: value });
-    } else if (name.includes('password')) {
+    } else if (name === 'oldPassword' || name === 'newPassword' || name === 'confirmPassword') {
+      // Fix password field handling
       setPasswordData({ ...passwordData, [name]: value });
     } else {
       setFormData({ ...formData, [name]: value });
@@ -195,7 +196,25 @@ const Profile = () => {
   };
 
   const handleSavePassword = async () => {
+    // Validate password input
+    if (!passwordData.oldPassword || !passwordData.newPassword || !passwordData.confirmPassword) {
+      setError('All password fields are required.');
+      return;
+    }
+    
+    if (passwordData.newPassword !== passwordData.confirmPassword) {
+      setError('New password and confirmation do not match.');
+      return;
+    }
+    
     try {
+      // Log the data being sent for debugging
+      console.log('Sending password update request with data:', {
+        oldPassword: passwordData.oldPassword,
+        newPassword: passwordData.newPassword,
+        confirmPassword: passwordData.confirmPassword
+      });
+      
       const response = await fetch('https://nodejs-final-ecommerce.onrender.com/user/profile', {
         method: 'PUT',
         headers: {
