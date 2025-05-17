@@ -189,11 +189,14 @@ const ProductDetails = () => {
             const token = localStorage.getItem('token');
             if (!token) throw new Error('No token found');
 
+            console.log(`Adding to cart: Product ID: ${product._id}, Variant: ${selectedVariant}, Price: ${price}`);
+
+            // Make API call with explicit variantName parameter
             await axios.post(
                 `${CART_API_URL}/cart/add`,
                 {
                     product_id: product._id,
-                    variantName: selectedVariant, // Added this line to send variant name
+                    variantName: selectedVariant,  // Explicitly sending the selected variant name
                     quantity,
                     price
                 },
