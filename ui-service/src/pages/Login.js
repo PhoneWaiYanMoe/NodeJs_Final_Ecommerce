@@ -1,8 +1,8 @@
-import React, { useState, useContext } from 'react';
+import React, { useState, useContext, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { AuthContext } from '../App';
 import axios from 'axios';
-import { useLocation } from 'react-router-dom';
+import { GoogleLogin } from '@react-oauth/google';
 
 const CART_API_URL = "https://nodejs-final-ecommerce-1.onrender.com/cart";
 
@@ -75,6 +75,50 @@ const Login = () => {
     }
   };
 
+  const handleGoogleLogin = async (credentialResponse) => {
+    setIsLoading(true);
+    setError('');
+    
+    try {
+      // Make a call to the backend to verify and login with Google credentials
+      const response = await axios.post('https://nodejs-final-ecommerce.onrender.com/user/google-login', {
+        credential: credentialResponse.credential
+      });
+      
+      // Set token in local storage
+      if (response.data && response.data.token) {
+        localStorage.setItem('token', response.data.token);
+        
+        // Try to migrate guest cart
+        await migrateGuestCart(response.data.token);
+        
+        // Clear checkout redirect flag
+        localStorage.removeItem('checkoutRedirect');
+        
+        // Update context with user data
+        if (response.data.user) {
+          // Update user in context (handled by App.js useEffect for token)
+          
+          // Redirect based on user role
+          if (response.data.user.role === 'admin') {
+            navigate('/admin/dashboard');
+          } else if (checkoutRedirect) {
+            navigate('/checkout');
+          } else {
+            navigate('/products');
+          }
+        }
+      } else {
+        throw new Error('Authentication failed');
+      }
+    } catch (error) {
+      console.error('Google login error:', error);
+      setError(error.response?.data?.message || 'Social login failed. Please try again.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   const handleRecoveryEmailChange = (e) => {
     setRecoveryEmail(e.target.value);
   };
@@ -104,7 +148,7 @@ const Login = () => {
     setIsSubmitting(true);
     
     try {
-      const response = await axios.post('https://nodejs-final-ecommerce-1.onrender.com/user/forgot-password', {
+      const response = await axios.post('https://nodejs-final-ecommerce.onrender.com/user/forgot-password', {
         email: recoveryEmail
       });
       
@@ -278,12 +322,37 @@ const Login = () => {
                 fontFamily: "'Roboto', sans-serif",
                 cursor: 'pointer',
                 transition: 'background-color 0.3s',
+                marginBottom: '15px',
               }}
               onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#E0E0E0')}
               onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = '#D4AF37')}
             >
               Login
             </button>
+
+            {/* Google Login Button */}
+            <div className="social-login" style={{ marginBottom: '15px' }}>
+              <div 
+                style={{ 
+                  width: '100%', 
+                  display: 'flex',
+                  justifyContent: 'center',
+                  marginBottom: '10px'
+                }}
+              >
+                <GoogleLogin
+                  onSuccess={handleGoogleLogin}
+                  onError={() => {
+                    setError('Google login failed. Please try again.');
+                  }}
+                  theme="filled_black"
+                  text="signin_with"
+                  shape="rectangular"
+                  width="100%"
+                />
+              </div>
+            </div>
+
             <p
               style={{
                 textAlign: 'center',
