@@ -182,10 +182,45 @@ const ProductDetails = () => {
         const price = variant.price;
 
         try {
-            const token = localStorage.getItem('token');
-            if (!token) throw new Error('No token found');
-
-            await axios.post(
+            // Get token if available (for logged-in users)
+            const token = localStorage.getItem("token");
+            const sessionId = localStorage.getItem("guestSessionId");
+            
+            // For debugging
+            console.log("Adding to cart with:", {
+                hasToken: !!token,
+                sessionId,
+                product: product._id,
+                variant: selectedVariant,
+                price,
+                quantity
+            });
+            
+            // Prepare request body
+            const requestBody = {
+                product_id: product._id,
+                variantName: selectedVariant,
+                quantity,
+                price
+            };
+            
+            // If this is a guest and we have a sessionId, include it
+            if (!token && sessionId) {
+                requestBody.sessionId = sessionId;
+            }
+            
+            // Prepare headers
+            const headers = token ? { Authorization: `Bearer ${token}` } : {};
+            
+            // Log the request details for debugging
+            console.log('Add to cart request:', {
+                url: `${CART_API_URL}/cart/add`,
+                body: requestBody,
+                headers
+            });
+            
+            // Make the API call
+            const response = await axios.post(
                 `${CART_API_URL}/cart/add`,
                 {
                     product_id: product._id,
