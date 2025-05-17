@@ -96,7 +96,7 @@ const Login = () => {
       } else if (checkoutRedirect) {
         navigate('/checkout');
       } else {
-        navigate('/products');
+        navigate('/');
       }
     } catch (error) {
       console.error('Google login error:', error);
