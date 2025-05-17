@@ -5,10 +5,12 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const crypto = require('crypto');
 const nodemailer = require('nodemailer');
+const { OAuth2Client } = require('google-auth-library');
 
 const User = require('../models/User');
 
 const SECRET_KEY = process.env.JWT_SECRET || 'your-jwt-secret-key';
+const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 
 // Email setup with Nodemailer
 const transporter = nodemailer.createTransport({
@@ -319,30 +321,81 @@ router.post('/logout', (req, res) => {
   res.status(200).json({ message: 'User logged out successfully' });
 });
 
-router.post('/media-login', async (req, res) => {
-  const { email } = req.body;
+// Google OAuth Login
+router.post('/google-login', async (req, res) => {
+  const { credential } = req.body;
+  
+  if (!credential) {
+    return res.status(400).json({ message: 'Missing Google credential' });
+  }
 
   try {
+    // Verify the Google token
+    const ticket = await googleClient.verifyIdToken({
+      idToken: credential,
+      audience: process.env.GOOGLE_CLIENT_ID,
+    });
+    
+    const payload = ticket.getPayload();
+    const { email, name, sub: googleId, picture } = payload;
+    
+    // Check if user exists
     let user = await User.findOne({ email });
-    if (!user) {
-      user = new User({ email, password: null, role: 'user' });
+    
+    if (user) {
+      // If user exists but doesn't have googleId, update it
+      if (!user.googleId) {
+        user.googleId = googleId;
+        await user.save();
+      }
+    } else {
+      // Create new user with Google data
+      user = new User({
+        email,
+        name,
+        googleId,
+        password: null, // Social login users don't have passwords
+        role: 'user',
+        profilePicture: picture,
+        shippingAddress: {
+          street: '',
+          city: '',
+          state: '',
+          zip: '',
+          country: '',
+        },
+        shippingAddressCollection: [],
+      });
       await user.save();
     }
-
-    const token = jwt.sign({ id: user._id.toString(), email, role: user.role }, SECRET_KEY, { expiresIn: '24h' });
+    
+    // Generate JWT token
+    const token = jwt.sign(
+      { id: user._id.toString(), email, role: user.role },
+      SECRET_KEY,
+      { expiresIn: '24h' }
+    );
+    
+    // Return user data and token
     res.status(200).json({
-      message: 'Media login successful',
+      message: 'Google login successful',
       user: {
         id: user._id.toString(),
         email: user.email,
+        name: user.name,
         role: user.role,
         shippingAddress: user.shippingAddress,
         shippingAddressCollection: user.shippingAddressCollection,
       },
       token,
     });
+    
   } catch (err) {
-    res.status(500).json({ message: 'Server error' });
+    console.error('Google login error:', err);
+    res.status(500).json({ 
+      message: 'Failed to authenticate with Google', 
+      details: err.message 
+    });
   }
 });
 
@@ -404,8 +457,13 @@ router.put('/profile', verifyToken, userSessionRequired, async (req, res) => {
       user.shippingAddress = { ...user.shippingAddressCollection[setDefaultAddressIndex] };
     }
 
-    // Handle password change
+    // Handle password change for regular users only (not social login users)
     if (oldPassword && newPassword && confirmPassword) {
+      // For social login users who don't have a password
+      if (!user.password) {
+        return res.status(400).json({ message: 'Social login users cannot change password this way. Please use the forgot password feature instead.' });
+      }
+      
       const isMatch = await bcrypt.compare(oldPassword, user.password);
       if (!isMatch) {
         return res.status(401).json({ message: 'Old password is incorrect' });
