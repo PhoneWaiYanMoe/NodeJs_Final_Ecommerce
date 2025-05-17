@@ -98,26 +98,6 @@ const handleGuestSession = (req, res, next) => {
   next();
 };
 
-// Helper function to record points transactions
-const recordPointsTransaction = async (userId, points, reason, orderId = null) => {
-  try {
-    const transaction = new PointsTransaction({
-      userId,
-      points,
-      reason,
-      orderId: orderId || null
-    });
-    
-    await transaction.save();
-    console.log(`Recorded points transaction: ${points} points for user ${userId}`);
-    return transaction;
-  } catch (err) {
-    console.error('Error recording points transaction:', err);
-    // Don't throw error - this is a non-critical operation
-    return null;
-  }
-};
-
 // Determine if a request is from a guest
 const isGuest = (req) => {
   return !req.user;
@@ -377,102 +357,6 @@ router.post('/apply-discount', userOrGuestAllowed, async (req, res) => {
   }
 });
 
-// Apply Points - Require user login
-router.post('/apply-points', [verifyToken, userRequired], async (req, res) => {
-  const { pointsToApply } = req.body;
-  
-  // Validate input
-  if (!pointsToApply || pointsToApply <= 0 || isNaN(parseInt(pointsToApply))) {
-    return res.status(400).json({ error: 'Invalid points value' });
-  }
-
-  try {
-    console.log(`DIRECT FIX: Applying ${pointsToApply} points for user ${req.user.id}`);
-    
-    // Find the user and get their current points
-    const user = await User.findById(req.user.id);
-    if (!user) {
-      return res.status(404).json({ error: 'User not found' });
-    }
-    
-    // Check if user has enough points
-    const userPoints = user.points || 0;
-    console.log(`User current points: ${userPoints}`);
-    
-    if (pointsToApply > userPoints) {
-      return res.status(400).json({ error: `Not enough points available. You have ${userPoints} points.` });
-    }
-    
-    // Get cart items to calculate proper discount
-    const cartItems = await CartItem.find({ userId: req.user.id });
-    if (!cartItems.length) {
-      return res.status(400).json({ error: 'Cart is empty' });
-    }
-    
-    // Calculate cart subtotal
-    const subtotal = cartItems.reduce((sum, item) => sum + (item.price * item.quantity), 0);
-    
-    // Check for any already applied discount code
-    let discountAmount = 0;
-    const discountCode = req.query.discountCode;
-    if (discountCode) {
-      const discount = await DiscountCode.findOne({ code: discountCode });
-      if (discount && discount.timesUsed < discount.usageLimit) {
-        discountAmount = (discount.discountPercentage / 100) * subtotal;
-      }
-    }
-    
-    // Calculate maximum points that can be applied
-    const afterCodeDiscount = subtotal - discountAmount;
-    const maxPointsValue = afterCodeDiscount; // Can't apply more points than the remaining amount
-    const maxPointsToApply = Math.floor(maxPointsValue / POINTS_VALUE);
-    console.log(`Max points that can be applied: ${maxPointsToApply}`);
-    
-    // Limit points to what's available and what can be applied
-    const actualPointsApplied = Math.min(parseInt(pointsToApply), maxPointsToApply, userPoints);
-    console.log(`Actually applying points: ${actualPointsApplied}`);
-    
-    // Calculate points discount value
-    const pointsDiscountValue = actualPointsApplied * POINTS_VALUE;
-    
-    // Calculate new totals
-    const afterDiscounts = subtotal - discountAmount - pointsDiscountValue;
-    const taxes = afterDiscounts * TAX_RATE;
-    const total = afterDiscounts + taxes + SHIPPING_FEE;
-    
-    // ADD THIS PART - RECORD THE APPLIED POINTS TO THE CART
-    // We'll use a new collection to track applied points for carts
-    const cartPointsApplication = {
-      userId: req.user.id,
-      pointsApplied: actualPointsApplied,
-      pointsDiscountValue,
-      appliedAt: new Date()
-    };
-    
-    // Store the points application record in MongoDB
-    // First, check if there's an existing record and remove it
-    await mongoose.connection.collection('cartPointsApplications').deleteMany({ userId: req.user.id });
-    
-    // Then add the new record
-    await mongoose.connection.collection('cartPointsApplications').insertOne(cartPointsApplication);
-    console.log(`Recorded points application in database: ${actualPointsApplied} points`);
-    
-    // Return the updated cart summary with points applied
-    res.status(200).json({
-      subtotal: parseFloat(subtotal.toFixed(2)),
-      discountApplied: parseFloat(discountAmount.toFixed(2)),
-      pointsApplied: actualPointsApplied,
-      pointsDiscountValue: parseFloat(pointsDiscountValue.toFixed(2)),
-      taxes: parseFloat(taxes.toFixed(2)),
-      shippingFee: SHIPPING_FEE,
-      total: parseFloat(total.toFixed(2))
-    });
-  } catch (err) {
-    console.error('Error applying points:', err);
-    res.status(500).json({ error: 'Server error', details: err.message });
-  }
-});
-
 // Checkout Process - Require user login
 router.post('/checkout', [verifyToken, userRequired], async (req, res) => {
   const { paymentDetails, discountCode } = req.body;
@@ -482,7 +366,7 @@ router.post('/checkout', [verifyToken, userRequired], async (req, res) => {
   }
 
   try {
-    console.log(`DIRECT FIX: Checkout - User ID: ${req.user.id}, Discount Code: ${discountCode}`);
+    console.log(`Checkout - User ID: ${req.user.id}, Discount Code: ${discountCode}`);
 
     // Get user data
     const user = await User.findById(req.user.id);
@@ -493,7 +377,7 @@ router.post('/checkout', [verifyToken, userRequired], async (req, res) => {
     const originalPoints = user.points || 0;
     console.log('User found with original points:', originalPoints);
 
-    // IMPORTANT: Get applied points from the database
+    // Get applied points from the database
     let pointsUsed = 0;
     let pointsDiscountValue = 0;
     
@@ -518,7 +402,7 @@ router.post('/checkout', [verifyToken, userRequired], async (req, res) => {
       console.log(`User is redeeming ${pointsUsed} points worth $${pointsDiscountValue.toFixed(2)}`);
     }
 
-    const cartIdentifier = getCartIdentifier(req);
+    const cartIdentifier = { userId: req.user.id };
     const cartItems = await CartItem.find(cartIdentifier);
 
     if (!cartItems.length) {
@@ -564,44 +448,47 @@ router.post('/checkout', [verifyToken, userRequired], async (req, res) => {
       total
     });
 
-    // Calculate points earned from this purchase (based on amount after discounts)
-    const pointsEarned = Math.floor(afterDiscounts * POINTS_RATE);
+    // FIXED: Calculate points earned from this purchase (based on total BEFORE points discount)
+    // This ensures users earn points on their actual spending, not after their own points discount
+    const pointsEarned = Math.floor((subtotal - discountAmount) * POINTS_RATE);
     console.log('Points earned from purchase:', pointsEarned);
     
-    // CRITICAL: Update user points - SUBTRACT used points FIRST
+    // CRITICAL: Process points properly - first make a transaction to record history
     if (pointsUsed > 0) {
-      // Make a copy of current points for verification
-      const beforePoints = user.points;
-      
-      // Subtract the used points
-      user.points = Math.max(0, originalPoints - pointsUsed);
-      
-      console.log('Points deduction:', {
-        before: beforePoints,
-        deducted: pointsUsed,
-        after: user.points
-      });
-      
-      // IMPORTANT: Save immediately to update the points balance
-      await user.save();
-      console.log('User points updated after deduction:', user.points);
+      // Record the points redemption transaction
+      await recordPointsTransaction(
+        req.user.id,
+        -pointsUsed,
+        'Points redeemed for purchase discount'
+      );
     }
     
-    // Add earned points
-    const afterDeduction = user.points;
-    user.points = (user.points || 0) + pointsEarned;
+    // CRITICAL FIX: Update user points correctly
+    // First subtract used points
+    let updatedPoints = Math.max(0, originalPoints - pointsUsed);
+    
+    // Then add earned points
+    updatedPoints += pointsEarned;
+    
+    // Record the points earned transaction
+    if (pointsEarned > 0) {
+      await recordPointsTransaction(
+        req.user.id,
+        pointsEarned,
+        'Points earned from purchase'
+      );
+    }
+    
+    // Update user record with new points total
+    user.points = updatedPoints;
+    await user.save();
     
     console.log('Points update summary:', {
       originalPoints,
       pointsUsed,
-      afterDeduction,
       pointsEarned,
       finalPoints: user.points
     });
-    
-    // Save user with updated points - CRITICAL step
-    await user.save();
-    console.log('User points updated after adding earned points:', user.points);
     
     // Create and save the order with the correct pointsUsed value
     const order = new Order({
@@ -610,7 +497,7 @@ router.post('/checkout', [verifyToken, userRequired], async (req, res) => {
       totalPrice: total, // This reflects the price AFTER points discount
       taxes,
       shippingFee: SHIPPING_FEE,
-      discountApplied: discountAmount + pointsDiscountValue,
+      discountApplied: discountAmount,
       discountCode: appliedDiscountCode,
       pointsUsed, // Set the points used from our database record
       pointsEarned,
@@ -621,20 +508,6 @@ router.post('/checkout', [verifyToken, userRequired], async (req, res) => {
     
     const savedOrder = await order.save();
     console.log('Order saved with ID:', savedOrder._id.toString());
-    
-    // Get full user info to send email
-    const userDetails = await User.findById(req.user.id);
-    if (userDetails) {
-      await sendOrderConfirmationEmail(userDetails, savedOrder);
-    }
-    
-    // Double-check order was saved with correct points
-    const verifyOrder = await Order.findById(savedOrder._id);
-    console.log('Verify order details:', {
-      pointsUsed: verifyOrder.pointsUsed,
-      pointsEarned: verifyOrder.pointsEarned,
-      totalPrice: verifyOrder.totalPrice
-    });
     
     // Clean up the cart points application record
     await mongoose.connection.collection('cartPointsApplications').deleteMany({ userId: req.user.id });
@@ -659,6 +532,122 @@ router.post('/checkout', [verifyToken, userRequired], async (req, res) => {
     res.status(500).json({ error: 'Server error', details: err.message });
   }
 });
+
+// Updated apply-points endpoint
+router.post('/apply-points', [verifyToken, userRequired], async (req, res) => {
+  const { pointsToApply } = req.body;
+  
+  // Validate input
+  if (!pointsToApply || pointsToApply <= 0 || isNaN(parseInt(pointsToApply))) {
+    return res.status(400).json({ error: 'Invalid points value' });
+  }
+
+  try {
+    console.log(`Applying ${pointsToApply} points for user ${req.user.id}`);
+    
+    // Find the user and get their current points
+    const user = await User.findById(req.user.id);
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+    
+    // Check if user has enough points
+    const userPoints = user.points || 0;
+    console.log(`User current points: ${userPoints}`);
+    
+    if (pointsToApply > userPoints) {
+      return res.status(400).json({ error: `Not enough points available. You have ${userPoints} points.` });
+    }
+    
+    // Get cart items to calculate proper discount
+    const cartItems = await CartItem.find({ userId: req.user.id });
+    if (!cartItems.length) {
+      return res.status(400).json({ error: 'Cart is empty' });
+    }
+    
+    // Calculate cart subtotal
+    const subtotal = cartItems.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+    
+    // Check for any already applied discount code
+    let discountAmount = 0;
+    const discountCode = req.query.discountCode;
+    if (discountCode) {
+      const discount = await DiscountCode.findOne({ code: discountCode });
+      if (discount && discount.timesUsed < discount.usageLimit) {
+        discountAmount = (discount.discountPercentage / 100) * subtotal;
+      }
+    }
+    
+    // Calculate maximum points that can be applied
+    const afterCodeDiscount = subtotal - discountAmount;
+    const maxPointsValue = afterCodeDiscount; // Can't apply more points than the remaining amount
+    const maxPointsToApply = Math.floor(maxPointsValue / POINTS_VALUE);
+    console.log(`Max points that can be applied: ${maxPointsToApply}`);
+    
+    // Limit points to what's available and what can be applied
+    const actualPointsApplied = Math.min(parseInt(pointsToApply), maxPointsToApply, userPoints);
+    console.log(`Actually applying points: ${actualPointsApplied}`);
+    
+    // Calculate points discount value (1 point = $0.01)
+    const pointsDiscountValue = actualPointsApplied * POINTS_VALUE;
+    
+    // Calculate new totals
+    const afterDiscounts = subtotal - discountAmount - pointsDiscountValue;
+    const taxes = afterDiscounts * TAX_RATE;
+    const total = afterDiscounts + taxes + SHIPPING_FEE;
+    
+    // Record the applied points to the cart
+    const cartPointsApplication = {
+      userId: req.user.id,
+      pointsApplied: actualPointsApplied,
+      pointsDiscountValue,
+      appliedAt: new Date()
+    };
+    
+    // Store the points application record in MongoDB
+    // First, check if there's an existing record and remove it
+    await mongoose.connection.collection('cartPointsApplications').deleteMany({ userId: req.user.id });
+    
+    // Then add the new record
+    await mongoose.connection.collection('cartPointsApplications').insertOne(cartPointsApplication);
+    console.log(`Recorded points application in database: ${actualPointsApplied} points`);
+    
+    // Return the updated cart summary with points applied
+    res.status(200).json({
+      subtotal: parseFloat(subtotal.toFixed(2)),
+      discountApplied: parseFloat(discountAmount.toFixed(2)),
+      pointsApplied: actualPointsApplied,
+      pointsDiscountValue: parseFloat(pointsDiscountValue.toFixed(2)),
+      taxes: parseFloat(taxes.toFixed(2)),
+      shippingFee: SHIPPING_FEE,
+      total: parseFloat(total.toFixed(2))
+    });
+  } catch (err) {
+    console.error('Error applying points:', err);
+    res.status(500).json({ error: 'Server error', details: err.message });
+  }
+});
+
+// Helper function to record points transactions
+async function recordPointsTransaction(userId, points, reason, orderId = null) {
+  try {
+    const transaction = new PointsTransaction({
+      userId,
+      points, // Can be positive (earned) or negative (used)
+      reason,
+      orderId: orderId || null,
+      createdAt: new Date()
+    });
+    
+    await transaction.save();
+    console.log(`Recorded points transaction: ${points} points for user ${userId}`);
+    return transaction;
+  } catch (err) {
+    console.error('Error recording points transaction:', err);
+    // Don't throw error - this is a non-critical operation
+    return null;
+  }
+}
 
 // Get User Points - Require user login
 router.get('/points', [verifyToken, userRequired], async (req, res) => {
