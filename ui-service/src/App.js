@@ -32,7 +32,7 @@ function App() {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  // Login function
+  // Login function for email/password
   const login = async (email, password) => {
     try {
       const loginUrl = email === 'admin@example.com' ? '/admin/login' : '/login';
@@ -51,6 +51,38 @@ function App() {
       return response.data;
     } catch (err) {
       throw err.response?.data || { message: 'Login failed' };
+    }
+  };
+
+  // Function for social media login
+  const socialLogin = async (provider, credentialResponse) => {
+    try {
+      let endpoint = '';
+      let data = {};
+      
+      if (provider === 'google') {
+        endpoint = '/google-login';
+        data = { credential: credentialResponse.credential };
+      } else {
+        throw new Error('Unsupported social login provider');
+      }
+      
+      const response = await axios.post(endpoint, data);
+      const { user, token } = response.data;
+      
+      // Make sure points is included
+      if (user && !user.points) {
+        user.points = 0;
+      }
+      
+      if (token) {
+        localStorage.setItem('token', token);
+        setUser(user);
+      }
+      
+      return response.data;
+    } catch (err) {
+      throw err.response?.data || { message: 'Social login failed' };
     }
   };
 
@@ -131,7 +163,7 @@ function App() {
   };
 
   return (
-    <AuthContext.Provider value={{ user, setUser, login, logout, updateUserPoints }}>
+    <AuthContext.Provider value={{ user, setUser, login, socialLogin, logout, updateUserPoints }}>
       <Router>
         <Routes>
           <Route path="/" element={<LandingPage />} />
