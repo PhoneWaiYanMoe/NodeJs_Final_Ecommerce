@@ -1,8 +1,10 @@
 const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
+const session = require('express-session');
 const dotenv = require('dotenv');
-const userRoutes = require('./routes/userRoutes');
+const { v4: uuidv4 } = require('uuid');
+const cartRoutes = require('./routes/cartRoutes');
 
 dotenv.config();
 
@@ -10,6 +12,33 @@ dotenv.config();
 mongoose.set('strictQuery', false);
 
 const app = express();
+
+// Middleware
+app.use(cors({
+    origin: 'https://frontend-u30c.onrender.com',
+    credentials: true // Allow cookies/sessions
+}));
+app.use(express.json());
+
+// Update session configuration
+app.use(session({
+    secret: process.env.SESSION_SECRET || 'your-session-secret',
+    resave: false,
+    saveUninitialized: true, // Set to true to create a session for guests
+    cookie: {
+        secure: process.env.NODE_ENV === 'production',
+        maxAge: 24 * 60 * 60 * 1000 // 24 hours
+    },
+}));
+
+// Add logging middleware for debugging
+app.use((req, res, next) => {
+    console.log(`${req.method} ${req.url}`);
+    console.log('Session ID:', req.session.id);
+    console.log('User ID:', req.session.userId);
+    console.log('Session ID (guest):', req.session.sessionId);
+    next();
+});
 
 // Connect to MongoDB
 mongoose.connect(process.env.MONGO_URI, {
@@ -19,68 +48,13 @@ mongoose.connect(process.env.MONGO_URI, {
     tls: true
 })
     .then(() => console.log('Connected to MongoDB'))
-    .catch(err => {
-        console.error('MongoDB connection error:', err);
-        process.exit(1); // Exit if MongoDB fails to connect
-    });
-
-// Middleware
-const allowedOrigins = [
-    'https://a46f-2402-800-62a9-bd95-5d7f-313e-f077-afe4.ngrok-free.app',
-    'https://frontend-u30c.onrender.com',
-    'http://localhost:3000',
-    'https://product-management-soyo.onrender.com',
-    'https://nodejs-final-ecommerce-1.onrender.com'
-];
-
-// Explicitly handle OPTIONS requests for CORS preflight
-app.use((req, res, next) => {
-    if (req.method === 'OPTIONS') {
-        console.log('Handling OPTIONS request for:', req.url);
-        const origin = req.headers.origin;
-        if (allowedOrigins.includes(origin)) {
-            res.header('Access-Control-Allow-Origin', origin);
-            res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-            res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization');
-            res.header('Access-Control-Allow-Credentials', 'true');
-            return res.status(200).json({});
-        }
-    }
-    next();
-});
-
-app.use(cors({
-    origin: (origin, callback) => {
-        if (!origin || allowedOrigins.includes(origin)) {
-            callback(null, origin);
-        } else {
-            callback(new Error('Not allowed by CORS'));
-        }
-    },
-    credentials: true,
-    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization']
-}));
-app.use(express.json());
-
-// Log requests and Authorization header for debugging
-app.use((req, res, next) => {
-    console.log(`Request: ${req.method} ${req.url}`);
-    console.log('Authorization header:', req.headers.authorization);
-    next();
-});
+    .catch(err => console.error('MongoDB connection error:', err));
 
 // Routes
-app.use('/user', userRoutes);
-
-// Error handling middleware
-app.use((err, req, res, next) => {
-    console.error('Server error:', err.stack);
-    res.status(500).json({ message: 'Internal server error' });
-});
+app.use('/cart', cartRoutes);
 
 // Start server
-const PORT = process.env.PORT || 5002;
+const PORT = process.env.PORT || 5001;
 app.listen(PORT, () => {
-    console.log(`AccountManagerService running on port ${PORT}`);
+    console.log(`CartAndCheckout service running on port ${PORT}`);
 });

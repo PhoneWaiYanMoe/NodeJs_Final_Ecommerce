@@ -1,25 +1,21 @@
 {
-  "name": "account-manager-service",
-  "version": "1.0.0",
-  "main": "app.js",
-  "scripts": {
-    "start": "node app.js"
-  },
-  "dependencies": {
-    "account-manager-service": "file:",
-    "axios": "^1.9.0",
-    "bcryptjs": "^2.4.3",
-    "connect-mongo": "^5.1.0",
-    "cors": "^2.8.5",
-    "crypto": "^1.0.1",
-    "dotenv": "^10.0.0",
-    "express": "^4.17.1",
-    "express-session": "^1.17.2",
-    "jsonwebtoken": "^9.0.2",
-    "google-auth-library": "^9.15.1",
-    "mongodb": "^6.16.0",
-    "mongoose": "^6.13.8",
-    "nodemailer": "^7.0.2",
-    "punycode": "^2.3.1"
-  }
+    "name": "cart-and-checkout",
+    "version": "1.0.0",
+    "main": "app.js",
+    "scripts": {
+        "start": "node app.js"
+    },
+    "dependencies": {
+        "axios": "^1.9.0",
+        "cart-and-checkout": "file:",
+        "cors": "^2.8.5",
+        "dotenv": "^10.0.0",
+        "express": "^4.17.1",
+        "express-session": "^1.17.2",
+        "jsonwebtoken": "^9.0.2",
+        "mongoose": "^6.0.0",
+        "nodemailer": "^7.0.2",
+        "punycode": "^2.3.1",
+        "uuid": "^8.3.2"
+    }
 }
