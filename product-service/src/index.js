@@ -6,6 +6,7 @@ import { createServer } from "http";
 import { Server } from "socket.io";
 import productRoutes from "./routes/productRoutes.js";
 import categoryRoutes from "./routes/categoryRoutes.js";
+import chatbotRoutes from './routes/chatbotRoutes.js';
 
 dotenv.config();
 
@@ -52,6 +53,7 @@ app.use(express.json());
 // Routes
 app.use("/api/products", productRoutes);
 app.use("/api/categories", categoryRoutes);
+app.use('/api/chatbot', chatbotRoutes);
 
 // Connect to database and start server
 connectDB()

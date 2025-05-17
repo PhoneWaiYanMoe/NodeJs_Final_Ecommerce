@@ -2,6 +2,7 @@ import React, { useState, useEffect, useContext } from 'react';
 import axios from 'axios';
 import { Link, useNavigate } from 'react-router-dom';
 import { AuthContext } from '../App';
+import Chatbot from '../components/Chatbot'; // Import the Chatbot component
 
 const LandingPage = () => {
   const { user, logout } = useContext(AuthContext);
@@ -330,6 +331,9 @@ const LandingPage = () => {
           </section>
         ))}
       </main>
+      
+      {/* Add the Chatbot component */}
+      <Chatbot />
     </div>
   );
 };
