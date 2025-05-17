@@ -124,13 +124,15 @@ const Checkout = () => {
       const token = localStorage.getItem('token');
       if (!token) throw new Error('No token found');
       
+      console.log(`Applying ${pointsInfo.toApply} points`);
+      
       const response = await axios.post(
         `${CART_API_URL}/apply-points`,
         { pointsToApply: pointsInfo.toApply },
         { headers: { Authorization: `Bearer ${token}` } }
       );
       
-      console.log("Points application response:", response.data);
+      console.log("Apply points response:", response.data);
       
       setPointsInfo(prev => ({
         ...prev,
@@ -147,7 +149,7 @@ const Checkout = () => {
         }));
       }
       
-      const discountValue = (pointsInfo.toApply * 0.01).toFixed(2);
+      const discountValue = (response.data.pointsDiscountValue || (pointsInfo.toApply * 0.01)).toFixed(2);
       setMessage(`Applied ${pointsInfo.toApply} points to your order (-$${discountValue})`);
       setTimeout(() => setMessage(''), 3000);
     } catch (error) {
@@ -186,10 +188,6 @@ const Checkout = () => {
         paymentDetails, 
         discountCode
       };
-      
-      if (pointsInfo.isApplied && pointsInfo.toApply > 0) {
-        checkoutData.pointsToApply = pointsInfo.toApply;
-      }
       
       console.log("Sending checkout data:", checkoutData);
 
