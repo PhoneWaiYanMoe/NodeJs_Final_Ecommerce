@@ -14,6 +14,31 @@ const LandingPage = () => {
   const API_URL = 'https://product-management-soyo.onrender.com/api/products';
   const navigate = useNavigate();
 
+  const fetchBestSellerProducts = async () => {
+    try {
+      // Use the existing best-sellers endpoint
+      const response = await axios.get(`${API_URL}/best-sellers`, { params: { limit: 4 } });
+      
+      // Check if the response contains products directly or in a nested object
+      const products = response.data.products || response.data || [];
+      
+      // Update the categories state with the best sellers
+      setCategories(prevCategories => ({
+        ...prevCategories,
+        'Best Sellers': products
+      }));
+      
+      console.log('Best seller products fetched:', products);
+    } catch (error) {
+      console.error('Error fetching best seller products:', error);
+      // If the API call fails, set an empty array for best sellers
+      setCategories(prevCategories => ({
+        ...prevCategories,
+        'Best Sellers': []
+      }));
+    }
+  };
+
   useEffect(() => {
     const fetchCategoryProducts = async (category) => {
       try {
@@ -40,13 +65,30 @@ const LandingPage = () => {
     };
 
     const loadCategories = async () => {
+      // Create a map of category name to fetch function
       const categoryPromises = Object.keys(categories).map(async (category) => {
-        const products = await fetchCategoryProducts(category);
-        return { [category]: products };
+        let products = [];
+        
+        if (category === 'Best Sellers') {
+          // Use the specific function for best sellers
+          await fetchBestSellerProducts();
+          // Return empty object as the state is already updated in fetchBestSellerProducts
+          return {};
+        } else {
+          // Use the existing function for other categories
+          products = await fetchCategoryProducts(category);
+          return { [category]: products };
+        }
       });
+      
       const results = await Promise.all(categoryPromises);
       const updatedCategories = results.reduce((acc, curr) => ({ ...acc, ...curr }), {});
-      setCategories(updatedCategories);
+      
+      // Only update categories that weren't handled specifically
+      setCategories(prevCategories => ({
+        ...prevCategories,
+        ...updatedCategories
+      }));
     };
 
     loadCategories();
