@@ -357,6 +357,9 @@ router.post('/apply-discount', userOrGuestAllowed, async (req, res) => {
   }
 });
 
+// Updated checkout route handler with fixed loyalty points logic
+// This should be added to routes/cartRoutes.js, replacing the existing checkout route
+
 // Checkout Process - Require user login
 router.post('/checkout', [verifyToken, userRequired], async (req, res) => {
   const { paymentDetails, discountCode } = req.body;
@@ -448,10 +451,10 @@ router.post('/checkout', [verifyToken, userRequired], async (req, res) => {
       total
     });
 
-    // FIXED: Calculate points earned from this purchase (based on total BEFORE points discount)
-    // This ensures users earn points on their actual spending, not after their own points discount
-    const pointsEarned = Math.floor((subtotal - discountAmount) * POINTS_RATE);
-    console.log('Points earned from purchase:', pointsEarned);
+    // UPDATED FIX: Calculate points earned from this purchase based on FINAL total amount
+    // This gives customers points on their full purchase INCLUDING taxes and shipping
+    const pointsEarned = Math.floor(total * POINTS_RATE);
+    console.log('Points earned from purchase (10% of final total):', pointsEarned);
     
     // CRITICAL: Process points properly - first make a transaction to record history
     if (pointsUsed > 0) {
