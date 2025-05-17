@@ -1,4 +1,4 @@
-import React, { useState, useContext, useEffect } from 'react';
+import React, { useState, useContext } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { AuthContext } from '../App';
 import axios from 'axios';
@@ -15,7 +15,7 @@ const Login = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [success, setSuccess] = useState('');
   const navigate = useNavigate();
-  const { login } = useContext(AuthContext);
+  const { login, socialLogin } = useContext(AuthContext);
 
   // Check if we came from checkout
   const checkoutRedirect = localStorage.getItem('checkoutRedirect') === 'true';
@@ -80,40 +80,27 @@ const Login = () => {
     setError('');
     
     try {
-      // Make a call to the backend to verify and login with Google credentials
-      const response = await axios.post('https://nodejs-final-ecommerce.onrender.com/user/google-login', {
-        credential: credentialResponse.credential
-      });
+      const response = await socialLogin('google', credentialResponse);
+      const user = response.user;
+      const token = response.token;
       
-      // Set token in local storage
-      if (response.data && response.data.token) {
-        localStorage.setItem('token', response.data.token);
-        
-        // Try to migrate guest cart
-        await migrateGuestCart(response.data.token);
-        
-        // Clear checkout redirect flag
-        localStorage.removeItem('checkoutRedirect');
-        
-        // Update context with user data
-        if (response.data.user) {
-          // Update user in context (handled by App.js useEffect for token)
-          
-          // Redirect based on user role
-          if (response.data.user.role === 'admin') {
-            navigate('/admin/dashboard');
-          } else if (checkoutRedirect) {
-            navigate('/checkout');
-          } else {
-            navigate('/products');
-          }
-        }
+      // Try to migrate guest cart
+      await migrateGuestCart(token);
+      
+      // Clear checkout redirect flag
+      localStorage.removeItem('checkoutRedirect');
+      
+      // Redirect based on user role
+      if (user.role === 'admin') {
+        navigate('/admin/dashboard');
+      } else if (checkoutRedirect) {
+        navigate('/checkout');
       } else {
-        throw new Error('Authentication failed');
+        navigate('/products');
       }
     } catch (error) {
       console.error('Google login error:', error);
-      setError(error.response?.data?.message || 'Social login failed. Please try again.');
+      setError(error.message || 'Social login failed. Please try again.');
     } finally {
       setIsLoading(false);
     }
@@ -331,7 +318,8 @@ const Login = () => {
             </button>
 
             {/* Google Login Button */}
-            <div className="social-login" style={{ marginBottom: '15px' }}>
+            <div className="social-login" style={{ marginBottom: '15px', textAlign: 'center' }}>
+              <p style={{ color: '#E0E0E0', marginBottom: '10px', fontSize: '14px' }}>Or sign in with:</p>
               <div 
                 style={{ 
                   width: '100%', 
