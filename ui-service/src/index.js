@@ -5,9 +5,11 @@ import './index.css';
 import App from './App';
 import reportWebVitals from './reportWebVitals';
 
+const GOOGLE_CLIENT_ID = process.env.REACT_APP_GOOGLE_CLIENT_ID || '188366969962-458iqp9kpi6fgjqsq2ev3seve74q5u7d.apps.googleusercontent.com';
+
 const root = ReactDOM.createRoot(document.getElementById('root'));
 root.render(
-  <GoogleOAuthProvider clientId={process.env.REACT_APP_GOOGLE_CLIENT_ID}>
+  <GoogleOAuthProvider clientId={GOOGLE_CLIENT_ID}>
     <React.StrictMode>
       <App />
     </React.StrictMode>
