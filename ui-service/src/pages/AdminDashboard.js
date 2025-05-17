@@ -24,6 +24,12 @@ const AdminDashboard = () => {
         category: '',
         tags: ''
     });
+    const [categoryForm, setCategoryForm] = useState({
+        _id: null,
+        name: '',
+        description: '',
+        image: ''
+    });
     const [discountForm, setDiscountForm] = useState({
         code: '',
         discount_percentage: '',
@@ -47,6 +53,7 @@ const AdminDashboard = () => {
     const [newStatus, setNewStatus] = useState('');
     const [modalOpen, setModalOpen] = useState(false);
     const [chartType, setChartType] = useState('bar');
+    const [reassignCategoryId, setReassignCategoryId] = useState('');
     const barChartRef = useRef(null);
     const lineChartRef = useRef(null);
     const pieChartRef = useRef(null);
@@ -110,8 +117,7 @@ const AdminDashboard = () => {
             }
             const mappedUsers = response.data.map(user => ({
                 ...user,
-                id: user._id,
-                createdAt: user.created_at || user.createdAt
+                id: user._id
             }));
             setUsers(mappedUsers);
             setError('');
@@ -426,6 +432,11 @@ const AdminDashboard = () => {
         setFormData({ ...formData, [name]: value });
     };
 
+    const handleCategoryInputChange = (e) => {
+        const { name, value } = e.target;
+        setCategoryForm({ ...categoryForm, [name]: value });
+    };
+
     const handleDiscountInputChange = (e) => {
         const { name, value } = e.target;
         setDiscountForm({ ...discountForm, [name]: value });
@@ -450,6 +461,90 @@ const AdminDashboard = () => {
             return false;
         }
         return true;
+    };
+
+    const validateCategoryForm = () => {
+        if (!categoryForm.name || categoryForm.name.trim() === '') {
+            setCategoryError('Category name is required.');
+            return false;
+        }
+        return true;
+    };
+
+    const handleCreateOrUpdateCategory = async (e) => {
+        e.preventDefault();
+        if (!validateCategoryForm()) return;
+
+        try {
+            const token = localStorage.getItem('token');
+            if (!token) throw new Error('No JWT token found in localStorage');
+            axios.defaults.headers.Authorization = `Bearer ${token}`;
+
+            const categoryData = {
+                name: categoryForm.name,
+                description: categoryForm.description,
+                image: categoryForm.image
+            };
+
+            if (categoryForm._id) {
+                await axios.put(`${PRODUCT_API_URL}/api/categories/${categoryForm._id}`, categoryData);
+            } else {
+                await axios.post(`${PRODUCT_API_URL}/api/categories`, categoryData);
+            }
+
+            fetchCategories();
+            
+            setCategoryForm({
+                _id: null,
+                name: '',
+                description: '',
+                image: ''
+            });
+            setCategoryError('');
+            alert(categoryForm._id ? 'Category updated successfully!' : 'Category created successfully!');
+        } catch (err) {
+            setCategoryError(`Failed to ${categoryForm._id ? 'update' : 'create'} category: ${err.message}${err.response?.data?.message ? ` - ${err.response.data.message}` : ''}`);
+            if (err.response?.status === 401) {
+                await logout();
+                navigate('/login');
+            }
+        }
+    };
+
+    const handleEditCategory = (category) => {
+        setCategoryForm({
+            _id: category._id,
+            name: category.name,
+            description: category.description || '',
+            image: category.image || ''
+        });
+    };
+
+    const handleDeleteCategory = async (id) => {
+        try {
+            const token = localStorage.getItem('token');
+            if (!token) throw new Error('No JWT token found in localStorage');
+            axios.defaults.headers.Authorization = `Bearer ${token}`;
+
+            const requestBody = reassignCategoryId ? { reassignCategoryId } : {};
+            
+            await axios.delete(`${PRODUCT_API_URL}/api/categories/${id}`, { 
+                data: requestBody
+            });
+            
+            setCategories(categories.filter(category => category._id !== id));
+            setReassignCategoryId('');
+            alert('Category deleted successfully!');
+            
+            // Refresh products to update any changes in category assignments
+            fetchProducts();
+        } catch (err) {
+            setCategoryError(`Failed to delete category: ${err.message}${err.response?.data?.message ? ` - ${err.response.data.message}` : ''}`);
+            if (err.response?.status === 401) {
+                await logout();
+                navigate('/login');
+            }
+        }
     };
 
     const handleCreateDiscount = async (e) => {
@@ -593,8 +688,7 @@ const AdminDashboard = () => {
 
             const mappedUsers = response.data.map(user => ({
                 ...user,
-                id: user._id,
-                createdAt: user.created_at || user.createdAt
+                id: user._id
             }));
             setUsers(mappedUsers);
             setUserForm({
@@ -756,486 +850,6 @@ const AdminDashboard = () => {
                         color: '#D4AF37',
                         marginBottom: '20px'
                     }}>
-                        Advanced Dashboard
-                    </h2>
-                    <div style={{ marginBottom: '20px', display: 'flex', alignItems: 'center', flexWrap: 'wrap' }}>
-                        <select
-                            value={timeInterval}
-                            onChange={(e) => setTimeInterval(e.target.value)}
-                            style={{
-                                padding: '10px',
-                                marginRight: '10px',
-                                marginBottom: '10px',
-                                backgroundColor: '#E0E0E0',
-                                border: 'none',
-                                borderRadius: '5px',
-                                color: '#000000'
-                            }}
-                        >
-                            <option value="year">Yearly</option>
-                            <option value="quarter">Quarterly</option>
-                            <option value="month">Monthly</option>
-                            <option value="week">Weekly</option>
-                        </select>
-                        <input
-                            type="date"
-                            value={startDate}
-                            onChange={(e) => setStartDate(e.target.value)}
-                            style={{
-                                padding: '10px',
-                                marginRight: '10px',
-                                marginBottom: '10px',
-                                backgroundColor: '#E0E0E0',
-                                border: 'none',
-                                borderRadius: '5px',
-                                color: '#000000'
-                            }}
-                        />
-                        <input
-                            type="date"
-                            value={endDate}
-                            onChange={(e) => setEndDate(e.target.value)}
-                            style={{
-                                padding: '10px',
-                                marginRight: '10px',
-                                marginBottom: '10px',
-                                backgroundColor: '#E0E0E0',
-                                border: 'none',
-                                borderRadius: '5px',
-                                color: '#000000'
-                            }}
-                        />
-                        <select
-                            value={chartType}
-                            onChange={(e) => setChartType(e.target.value)}
-                            style={{
-                                padding: '10px',
-                                marginRight: '10px',
-                                marginBottom: '10px',
-                                backgroundColor: '#E0E0E0',
-                                border: 'none',
-                                borderRadius: '5px',
-                                color: '#000000'
-                            }}
-                        >
-                            <option value="bar">Bar Chart (Key Metrics)</option>
-                            <option value="line">Line Chart (Revenue & Profit Trend)</option>
-                            <option value="pie">Pie Chart (Order Distribution)</option>
-                        </select>
-                        <button
-                            onClick={handleGetData}
-                            style={{
-                                padding: '10px 20px',
-                                backgroundColor: '#D4AF37',
-                                color: '#000000',
-                                border: 'none',
-                                borderRadius: '5px',
-                                fontFamily: "'Roboto', sans-serif",
-                                cursor: 'pointer',
-                                transition: 'background-color 0.3s'
-                            }}
-                            onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#E0E0E0'}
-                            onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#D4AF37'}
-                        >
-                            Generate Report
-                        </button>
-                    </div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '20px' }}>
-                        <div style={{ width: '48%', height: '400px', backgroundColor: '#222', borderRadius: '10px', padding: '10px' }}>
-                            <canvas ref={barChartRef} style={{ display: chartType === 'bar' ? 'block' : 'none', width: '100%', height: '100%' }}></canvas>
-                            <canvas ref={lineChartRef} style={{ display: chartType === 'line' ? 'block' : 'none', width: '100%', height: '100%' }}></canvas>
-                        </div>
-                        <div style={{ width: '48%', height: '400px', backgroundColor: '#222', borderRadius: '10px', padding: '10px' }}>
-                            <canvas ref={pieChartRef} style={{ display: chartType === 'pie' ? 'block' : 'none', width: '100%', height: '100%' }}></canvas>
-                        </div>
-                    </div>
-                    <table style={{
-                        width: '100%',
-                        borderCollapse: 'collapse',
-                        color: '#FFFFFF',
-                        fontFamily: "'Roboto', sans-serif",
-                        backgroundColor: '#2A2A2A',
-                        border: '1px solid #D4AF37'
-                    }}>
-                        <thead>
-                            <tr style={{ borderBottom: '1px solid #D4AF37' }}>
-                                <th style={{ padding: '10px', textAlign: 'left' }}>Metric</th>
-                                <th style={{ padding: '10px', textAlign: 'left' }}>Value</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <tr style={{ borderBottom: '1px solid #333333' }}>
-                                <td style={{ padding: '10px' }}>Orders Count</td>
-                                <td style={{ padding: '10px' }}>{Object.values(stats).reduce((sum, s) => sum + (s.ordersCount || 0), 0)}</td>
-                            </tr>
-                            <tr style={{ borderBottom: '1px solid #333333' }}>
-                                <td style={{ padding: '10px' }}>Total Revenue</td>
-                                <td style={{ padding: '10px' }}>₫{Object.values(stats).reduce((sum, s) => sum + (s.totalRevenue || 0), 0).toLocaleString()}</td>
-                            </tr>
-                            <tr style={{ borderBottom: '1px solid #333333' }}>
-                                <td style={{ padding: '10px' }}>Total Profit</td>
-                                <td style={{ padding: '10px' }}>₫{Object.values(stats).reduce((sum, s) => sum + (s.totalProfit || 0), 0).toLocaleString()}</td>
-                            </tr>
-                            <tr style={{ borderBottom: '1px solid #333333' }}>
-                                <td style={{ padding: '10px' }}>Total Products Sold</td>
-                                <td style={{ padding: '10px' }}>{productStats.totalProducts || 0}</td>
-                            </tr>
-                            <tr style={{ borderBottom: '1px solid #333333' }}>
-                                <td style={{ padding: '10px' }}>Unique Product Types</td>
-                                <td style={{ padding: '10px' }}>{productStats.uniqueProductTypes || 0}</td>
-                            </tr>
-                        </tbody>
-                    </table>
-                </div>
-
-                <div style={{
-                    backgroundColor: '#1A1A1A',
-                    padding: '30px',
-                    borderRadius: '10px',
-                    boxShadow: '0 4px 10px rgba(0, 0, 0, 0.5)',
-                    marginBottom: '40px'
-                }}>
-                    <h2 style={{
-                        fontSize: '24px',
-                        color: '#D4AF37',
-                        marginBottom: '20px'
-                    }}>
-                        Order Management
-                    </h2>
-                    {error && (
-                        <p style={{
-                            color: '#FF5555',
-                            marginBottom: '15px'
-                        }}>
-                            {error}
-                        </p>
-                    )}
-                    {orders.length === 0 && !error ? (
-                        <p style={{ color: '#E0E0E0' }}>No orders available.</p>
-                    ) : (
-                        <table style={{
-                            width: '100%',
-                            borderCollapse: 'collapse',
-                            color: '#FFFFFF',
-                            fontFamily: "'Roboto', sans-serif"
-                        }}>
-                            <thead>
-                                <tr style={{ borderBottom: '1px solid #D4AF37' }}>
-                                    <th style={{ padding: '10px', textAlign: 'left' }}>Order ID</th>
-                                    <th style={{ padding: '10px', textAlign: 'left' }}>User ID</th>
-                                    <th style={{ padding: '10px', textAlign: 'left' }}>Total Price</th>
-                                    <th style={{ padding: '10px', textAlign: 'left' }}>Status</th>
-                                    <th style={{ padding: '10px', textAlign: 'left' }}>Created At</th>
-                                    <th style={{ padding: '10px', textAlign: 'left' }}>Actions</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {orders.map(order => (
-                                    <tr key={order.orderId} style={{ borderBottom: '1px solid #333333' }}>
-                                        <td style={{ padding: '10px' }}>{order.orderId}</td>
-                                        <td style={{ padding: '10px' }}>{order.userId}</td>
-                                        <td style={{ padding: '10px' }}>₫{order.totalPrice.toLocaleString()}</td>
-                                        <td style={{ padding: '10px' }}>{order.currentStatus}</td>
-                                        <td style={{ padding: '10px' }}>{formatDate(order.createdAt)}</td>
-                                        <td style={{ padding: '10px' }}>
-                                            <button
-                                                onClick={() => handleOrderClick(order)}
-                                                style={{
-                                                    padding: '5px 10px',
-                                                    backgroundColor: '#D4AF37',
-                                                    color: '#000000',
-                                                    border: 'none',
-                                                    borderRadius: '5px',
-                                                    marginRight: '10px',
-                                                    cursor: 'pointer',
-                                                    transition: 'background-color 0.3s'
-                                                }}
-                                                onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#E0E0E0'}
-                                                onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#D4AF37'}
-                                            >
-                                                Edit Status
-                                            </button>
-                                        </td>
-                                    </tr>
-                                ))}
-                            </tbody>
-                        </table>
-                    )}
-                </div>
-
-                <div style={{
-                    backgroundColor: '#1A1A1A',
-                    padding: '30px',
-                    borderRadius: '10px',
-                    maxWidth: '600px',
-                    margin: '0 auto 40px',
-                    boxShadow: '0 4px 10px rgba(0, 0, 0, 0.5)'
-                }}>
-                    <h2 style={{
-                        fontSize: '24px',
-                        color: '#D4AF37',
-                        marginBottom: '20px'
-                    }}>
-                        Create Discount Code
-                    </h2>
-                    {error && (
-                        <p style={{
-                            color: '#FF5555',
-                            marginBottom: '15px'
-                        }}>
-                            {error}
-                        </p>
-                    )}
-                    <div>
-                        <input
-                            type="text"
-                            name="code"
-                            placeholder="Discount Code (5-character alphanumeric)"
-                            value={discountForm.code}
-                            onChange={handleDiscountInputChange}
-                            style={{
-                                width: '100%',
-                                padding: '10px',
-                                marginBottom: '15px',
-                                backgroundColor: '#E0E0E0',
-                                border: 'none',
-                                borderRadius: '5px',
-                                color: '#000000',
-                                fontFamily: "'Roboto', sans-serif"
-                            }}
-                        />
-                        <input
-                            type="number"
-                            name="discount_percentage"
-                            placeholder="Discount Percentage (e.g., 10)"
-                            value={discountForm.discount_percentage}
-                            onChange={handleDiscountInputChange}
-                            style={{
-                                width: '100%',
-                                padding: '10px',
-                                marginBottom: '15px',
-                                backgroundColor: '#E0E0E0',
-                                border: 'none',
-                                borderRadius: '5px',
-                                color: '#000000',
-                                fontFamily: "'Roboto', sans-serif"
-                            }}
-                        />
-                        <input
-                            type="number"
-                            name="usageLimit"
-                            placeholder="Usage Limit (1-10)"
-                            value={discountForm.usageLimit}
-                            onChange={handleDiscountInputChange}
-                            style={{
-                                width: '100%',
-                                padding: '10px',
-                                marginBottom: '20px',
-                                backgroundColor: '#E0E0E0',
-                                border: 'none',
-                                borderRadius: '5px',
-                                color: '#000000',
-                                fontFamily: "'Roboto', sans-serif"
-                            }}
-                        />
-                        <button
-                            onClick={handleCreateDiscount}
-                            style={{
-                                width: '100%',
-                                padding: '10px',
-                                backgroundColor: '#D4AF37',
-                                color: '#000000',
-                                border: 'none',
-                                borderRadius: '5px',
-                                fontFamily: "'Roboto', sans-serif",
-                                cursor: 'pointer',
-                                transition: 'background-color 0.3s'
-                            }}
-                            onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#E0E0E0'}
-                            onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#D4AF37'}
-                        >
-                            Create Discount Code
-                        </button>
-                    </div>
-                </div>
-
-                <div style={{
-                    backgroundColor: '#1A1A1A',
-                    padding: '30px',
-                    borderRadius: '10px',
-                    boxShadow: '0 4px 10px rgba(0, 0, 0, 0.5)',
-                    marginBottom: '40px'
-                }}>
-                    <h2 style={{
-                        fontSize: '24px',
-                        color: '#D4AF37',
-                        marginBottom: '20px'
-                    }}>
-                        Discount Code List
-                    </h2>
-                    {discountError && (
-                        <p style={{
-                            color: '#FF5555',
-                            marginBottom: '15px'
-                        }}>
-                            {discountError}
-                        </p>
-                    )}
-                    {discounts.length === 0 && !discountError ? (
-                        <p style={{ color: '#E0E0E0' }}>No discount codes available.</p>
-                    ) : (
-                        <table style={{
-                            width: '100%',
-                            borderCollapse: 'collapse',
-                            color: '#FFFFFF',
-                            fontFamily: "'Roboto', sans-serif"
-                        }}>
-                            <thead>
-                                <tr style={{ borderBottom: '1px solid #D4AF37' }}>
-                                    <th style={{ padding: '10px', textAlign: 'left' }}>Code</th>
-                                    <th style={{ padding: '10px', textAlign: 'left' }}>Discount %</th>
-                                    <th style={{ padding: '10px', textAlign: 'left' }}>Usage</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {discounts.map(discount => (
-                                    <tr key={discount.code} style={{ borderBottom: '1px solid #333333' }}>
-                                        <td style={{ padding: '10px' }}>{discount.code}</td>
-                                        <td style={{ padding: '10px' }}>{discount.discountPercentage}%</td>
-                                        <td style={{ padding: '10px' }}>{discount.timesUsed}/{discount.usageLimit}</td>
-                                    </tr>
-                                ))}
-                            </tbody>
-                        </table>
-                    )}
-                </div>
-
-                <div style={{
-                    backgroundColor: '#1A1A1A',
-                    padding: '30px',
-                    borderRadius: '10px',
-                    maxWidth: '600px',
-                    margin: '0 auto 40px',
-                    boxShadow: '0 4px 10px rgba(0, 0, 0, 0.5)'
-                }}>
-                    <h2 style={{
-                        fontSize: '24px',
-                        color: '#D4AF37',
-                        marginBottom: '20px'
-                    }}>
-                        {userForm._id ? 'Update User' : 'Create User'}
-                    </h2>
-                    {error && (
-                        <p style={{
-                            color: '#FF5555',
-                            marginBottom: '15px'
-                        }}>
-                            {error}
-                        </p>
-                    )}
-                    <div>
-                        <input
-                            type="email"
-                            name="email"
-                            placeholder="Email"
-                            value={userForm.email}
-                            onChange={handleUserInputChange}
-                            style={{
-                                width: '100%',
-                                padding: '10px',
-                                marginBottom: '15px',
-                                backgroundColor: '#E0E0E0',
-                                border: 'none',
-                                borderRadius: '5px',
-                                color: '#000000',
-                                fontFamily: "'Roboto', sans-serif"
-                            }}
-                        />
-                        <input
-                            type="password"
-                            name="password"
-                            placeholder="Password (leave blank to keep unchanged)"
-                            value={userForm.password}
-                            onChange={handleUserInputChange}
-                            style={{
-                                width: '100%',
-                                padding: '10px',
-                                marginBottom: '15px',
-                                backgroundColor: '#E0E0E0',
-                                border: 'none',
-                                borderRadius: '5px',
-                                color: '#000000',
-                                fontFamily: "'Roboto', sans-serif"
-                            }}
-                        />
-                        <input
-                            type="text"
-                            name="name"
-                            placeholder="Name"
-                            value={userForm.name}
-                            onChange={handleUserInputChange}
-                            style={{
-                                width: '100%',
-                                padding: '10px',
-                                marginBottom: '15px',
-                                backgroundColor: '#E0E0E0',
-                                border: 'none',
-                                borderRadius: '5px',
-                                color: '#000000',
-                                fontFamily: "'Roboto', sans-serif"
-                            }}
-                        />
-                        <select
-                            name="role"
-                            value={userForm.role}
-                            onChange={handleUserInputChange}
-                            style={{
-                                width: '100%',
-                                padding: '10px',
-                                marginBottom: '20px',
-                                backgroundColor: '#E0E0E0',
-                                border: 'none',
-                                borderRadius: '5px',
-                                color: '#000000',
-                                fontFamily: "'Roboto', sans-serif"
-                            }}
-                        >
-                            <option value="user">User</option>
-                            <option value="admin">Admin</option>
-                        </select>
-                        <button
-                            onClick={handleCreateOrUpdateUser}
-                            style={{
-                                width: '100%',
-                                padding: '10px',
-                                backgroundColor: '#D4AF37',
-                                color: '#000000',
-                                border: 'none',
-                                borderRadius: '5px',
-                                fontFamily: "'Roboto', sans-serif",
-                                cursor: 'pointer',
-                                transition: 'background-color 0.3s'
-                            }}
-                            onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#E0E0E0'}
-                            onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#D4AF37'}
-                        >
-                            {userForm._id ? 'Update User' : 'Create User'}
-                        </button>
-                    </div>
-                </div>
-
-                <div style={{
-                    backgroundColor: '#1A1A1A',
-                    padding: '30px',
-                    borderRadius: '10px',
-                    boxShadow: '0 4px 10px rgba(0, 0, 0, 0.5)',
-                    marginBottom: '40px'
-                }}>
-                    <h2 style={{
-                        fontSize: '24px',
-                        color: '#D4AF37',
-                        marginBottom: '20px'
-                    }}>
                         User Management
                     </h2>
                     {error && (
@@ -1260,7 +874,6 @@ const AdminDashboard = () => {
                                     <th style={{ padding: '10px', textAlign: 'left' }}>Email</th>
                                     <th style={{ padding: '10px', textAlign: 'left' }}>Name</th>
                                     <th style={{ padding: '10px', textAlign: 'left' }}>Role</th>
-                                    <th style={{ padding: '10px', textAlign: 'left' }}>Created At</th>
                                     <th style={{ padding: '10px', textAlign: 'left' }}>Actions</th>
                                 </tr>
                             </thead>
@@ -1270,7 +883,6 @@ const AdminDashboard = () => {
                                         <td style={{ padding: '10px' }}>{user.email}</td>
                                         <td style={{ padding: '10px' }}>{user.name}</td>
                                         <td style={{ padding: '10px' }}>{user.role}</td>
-                                        <td style={{ padding: '10px' }}>{formatDate(user.createdAt)}</td>
                                         <td style={{ padding: '10px' }}>
                                             <button
                                                 onClick={() => handleEditUser(user)}
