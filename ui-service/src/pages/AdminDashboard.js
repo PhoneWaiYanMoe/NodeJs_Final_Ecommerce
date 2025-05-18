@@ -611,7 +611,7 @@ const AdminDashboard = () => {
     };
 
     const validateDiscountForm = () => {
-        if (!discount  discountForm.code || discountForm.code.length !== 5 || !/^[a-zA-Z0-9]+$/.test(discountForm.code)) {
+        if (!discountForm.code || discountForm.code.length !== 5 || !/^[a-zA-Z0-9]+$/.test(discountForm.code)) {
             setError('Discount code must be a 5-character alphanumeric string.');
             return false;
         }
