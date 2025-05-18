@@ -58,19 +58,18 @@ const AdminDashboard = () => {
     const ACCOUNT_API_URL = 'https://nodejs-final-ecommerce.onrender.com';
     const CART_API_URL = 'https://nodejs-final-ecommerce-1.onrender.com';
 
-    // Helper function to create Basic Auth headers for product API
-    const getProductApiHeaders = () => {
-        // Create proper Basic Auth header for product API
-        // Using the hardcoded admin credentials: admin@example.com:admin123
-        const basicAuthCredentials = 'admin@example.com:admin123';
-        const encodedCredentials = btoa(basicAuthCredentials);
-        
-        return {
-            'Authorization': `Basic ${encodedCredentials}`,
-            'Content-Type': 'application/json'
-        };
-    };
+ // In AdminDashboard.js, fix the getProductApiHeaders function
 
+const getProductApiHeaders = () => {
+    // Create proper Basic Auth header for product API
+    const basicAuthCredentials = 'admin@example.com:admin123';
+    const encodedCredentials = btoa(basicAuthCredentials);
+    
+    return {
+        'Authorization': `Basic ${encodedCredentials}`,
+        'Content-Type': 'application/json'
+    };
+};
     // Helper function to create JWT Auth headers for user and cart APIs
     const getJwtApiHeaders = () => {
         const token = localStorage.getItem('token');
