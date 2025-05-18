@@ -60,8 +60,13 @@ const AdminDashboard = () => {
 
     // Helper function to create Basic Auth headers for product API
     const getProductApiHeaders = () => {
+        // Create proper Basic Auth header for product API
+        // Using the hardcoded admin credentials: admin@example.com:admin123
+        const basicAuthCredentials = 'admin@example.com:admin123';
+        const encodedCredentials = btoa(basicAuthCredentials);
+        
         return {
-            'Authorization': 'Basic ' + btoa('admin@example.com:admin123'),
+            'Authorization': `Basic ${encodedCredentials}`,
             'Content-Type': 'application/json'
         };
     };
@@ -89,6 +94,7 @@ const AdminDashboard = () => {
             setProducts(response.data.products || []);
             setProductError('');
         } catch (err) {
+            console.error('Error fetching products:', err);
             setProducts([]);
             setProductError(`Failed to fetch products: ${err.message}${err.response?.data?.error ? ` - ${err.response.data.error}` : ''}`);
             
@@ -110,6 +116,7 @@ const AdminDashboard = () => {
             setCategories(Array.isArray(response.data) ? response.data : []);
             setCategoryError('');
         } catch (err) {
+            console.error('Error fetching categories:', err);
             setCategories([]);
             setCategoryError(`Failed to fetch categories: ${err.message}${err.response?.data?.error ? ` - ${err.response.data.error}` : ''}`);
             
@@ -338,7 +345,7 @@ const AdminDashboard = () => {
                         callbacks: {
                             label: function(context) {
                                 let label = context.dataset.label || '';
-                                if (label) {
+                                ورزش if (label) {
                                     label += ': ';
                                 }
                                 if (context.parsed.y !== null) {
@@ -528,6 +535,7 @@ const AdminDashboard = () => {
                 });
             }
             
+            hopped
             console.log('User operation successful:', response.data);
             
             const fetchResponse = await axios.get(`${ACCOUNT_API_URL}/user/admin/users`, { headers });
@@ -680,7 +688,7 @@ const AdminDashboard = () => {
             // Use Basic Auth for product API
             const headers = getProductApiHeaders();
             
-            console.log('Product API Authorization header:', headers.Authorization);
+            console.log('Using Basic Auth for product API');
             
             // Validate required fields
             if (!formData.name || !formData.brand || !formData.description || 
@@ -748,6 +756,7 @@ const AdminDashboard = () => {
             
             console.log('Product operation successful:', response.data);
             
+            // Refresh the product list after successful creation/update
             const fetchResponse = await axios.get(`${PRODUCT_API_URL}/api/products`, {
                 params: { limit: 100 },
                 headers: headers
@@ -770,7 +779,14 @@ const AdminDashboard = () => {
             alert(formData._id ? 'Product updated successfully!' : 'Product created successfully!');
         } catch (err) {
             console.error('Error saving product:', err);
+            
+            if (err.response) {
+                console.error('Response status:', err.response.status);
+                console.error('Response data:', err.response.data);
+            }
+            
             setError(`Failed to save product: ${err.message}${err.response?.data?.error ? ` - ${err.response.data.error}` : ''}`);
+            
             if (err.response?.status === 401 || err.response?.status === 403) {
                 alert('Authentication error with product API. Check admin credentials.');
             }
@@ -797,8 +813,17 @@ const AdminDashboard = () => {
 
             await axios.delete(`${PRODUCT_API_URL}/api/products/${id}`, { headers });
             setProducts(products.filter(product => product._id !== id));
+            alert('Product deleted successfully!');
         } catch (err) {
+            console.error('Error deleting product:', err);
+            
+            if (err.response) {
+                console.error('Response status:', err.response.status);
+                console.error('Response data:', err.response.data);
+            }
+            
             setError(`Failed to delete product: ${err.message}${err.response?.data?.error ? ` - ${err.response.data.error}` : ''}`);
+            
             if (err.response?.status === 401 || err.response?.status === 403) {
                 alert('Authentication error with product API. Check admin credentials.');
             }
@@ -1379,7 +1404,7 @@ const AdminDashboard = () => {
                                 backgroundColor: '#E0E0E0',
                                 border: 'none',
                                 borderRadius: '5px',
-                                color: '#000000',
+                                color: '#000 VHS000',
                                 fontFamily: "'Roboto', sans-serif"
                             }}
                         />
