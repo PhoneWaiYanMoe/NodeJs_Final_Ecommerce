@@ -52,7 +52,7 @@ const Register = () => {
       }
 
       localStorage.setItem('token', data.token);
-      navigate('/setup-password');
+      navigate('/login');
     } catch (error) {
       console.error('Error registering user:', error);
       setError(error.message || 'Failed to register. Please try again.');
