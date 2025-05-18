@@ -60,13 +60,20 @@ const AdminDashboard = () => {
 
  // In AdminDashboard.js, fix the getProductApiHeaders function
 
+// Replace your current getProductApiHeaders function with this in AdminDashboard.js
+
 const getProductApiHeaders = () => {
-    // Create proper Basic Auth header for product API
-    const basicAuthCredentials = 'admin@example.com:admin123';
-    const encodedCredentials = btoa(basicAuthCredentials);
+    // Ensure proper encoding for Basic Auth
+    // The credentials must be "admin@example.com:admin123" exactly as in your middleware
+    const username = 'admin@example.com';
+    const password = 'admin123';
+    
+    // Create the Authorization header properly
+    // Make sure to encode it correctly - some browsers need this specific format
+    const basicAuth = 'Basic ' + btoa(username + ':' + password);
     
     return {
-        'Authorization': `Basic ${encodedCredentials}`,
+        'Authorization': basicAuth,
         'Content-Type': 'application/json'
     };
 };
@@ -805,30 +812,42 @@ const getProductApiHeaders = () => {
         });
     };
 
-    const handleDeleteProduct = async (id) => {
-        try {
-            // Use Basic Auth for product API
-            const headers = getProductApiHeaders();
+    // Modify your handleDeleteProduct function to ensure proper headers are sent
 
-            await axios.delete(`${PRODUCT_API_URL}/api/products/${id}`, { headers });
-            setProducts(products.filter(product => product._id !== id));
-            alert('Product deleted successfully!');
-        } catch (err) {
-            console.error('Error deleting product:', err);
-            
-            if (err.response) {
-                console.error('Response status:', err.response.status);
-                console.error('Response data:', err.response.data);
-            }
-            
-            setError(`Failed to delete product: ${err.message}${err.response?.data?.error ? ` - ${err.response.data.error}` : ''}`);
-            
-            if (err.response?.status === 401 || err.response?.status === 403) {
-                alert('Authentication error with product API. Check admin credentials.');
-            }
+const handleDeleteProduct = async (id) => {
+    try {
+        // Get the headers
+        const headers = getProductApiHeaders();
+        
+        console.log('Deleting product with ID:', id);
+        console.log('Using Authorization header:', headers.Authorization);
+        
+        const response = await axios.delete(
+            `${PRODUCT_API_URL}/api/products/${id}`, 
+            { headers }
+        );
+        
+        console.log('Delete response:', response);
+        
+        setProducts(products.filter(product => product._id !== id));
+        alert('Product deleted successfully!');
+    } catch (err) {
+        console.error('Error deleting product:', err);
+        
+        // Log more details about the error for debugging
+        if (err.response) {
+            console.error('Response status:', err.response.status);
+            console.error('Response data:', err.response.data);
+            console.error('Response headers:', err.response.headers);
         }
-    };
-
+        
+        setError(`Failed to delete product: ${err.message}${err.response?.data?.error ? ` - ${err.response.data.error}` : ''}`);
+        
+        if (err.response?.status === 401 || err.response?.status === 403) {
+            alert('Authentication error with product API. Check admin credentials.');
+        }
+    }
+};
     const handleOrderClick = (order) => {
         setSelectedOrder(order);
         setNewStatus(order.currentStatus);
