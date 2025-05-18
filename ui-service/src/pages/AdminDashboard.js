@@ -54,23 +54,53 @@ const AdminDashboard = () => {
     const lineChartInstance = useRef(null);
     const pieChartInstance = useRef(null);
 
-    const PRODUCT_API_URL = 'https://product-management-soyo.onrender.com';
-    const ACCOUNT_API_URL = 'https://nodejs-final-ecommerce.onrender.com';
-    const CART_API_URL = 'https://nodejs-final-ecommerce-1.onrender.com';
+    // API URLs - no trailing slashes to ensure proper URL construction
+    const PRODUCT_API_URL = 'https://product-management-soyo.onrender.com/api';
+    const ACCOUNT_API_URL = 'https://nodejs-final-ecommerce.onrender.com/user';
+    const CART_API_URL = 'https://nodejs-final-ecommerce-1.onrender.com/cart';
+
+    // Helper to ensure authentication headers are properly set before each request
+    const setAuthHeader = () => {
+        const token = localStorage.getItem('token');
+        if (!token) {
+            throw new Error('No JWT token found in localStorage');
+        }
+        
+        // Set the Authorization header correctly
+        axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
+        return token;
+    };
+
+    // Clear any error messages after 5 seconds
+    useEffect(() => {
+        if (error || productError || categoryError || discountError) {
+            const timer = setTimeout(() => {
+                setError('');
+                setProductError('');
+                setCategoryError('');
+                setDiscountError('');
+            }, 5000);
+            return () => clearTimeout(timer);
+        }
+    }, [error, productError, categoryError, discountError]);
 
     const fetchCategories = useCallback(async () => {
         try {
-            const token = localStorage.getItem('token');
-            if (!token) throw new Error('No JWT token found in localStorage');
-            axios.defaults.headers.Authorization = `Bearer ${token}`;
-
-            const response = await axios.get(`${PRODUCT_API_URL}/api/categories`);
+            setAuthHeader();
+            const response = await axios.get(`${PRODUCT_API_URL}/categories`);
+            
+            // Log the response for debugging
+            console.log('Categories response:', response.data);
+            
             setCategories(Array.isArray(response.data) ? response.data : []);
             setCategoryError('');
         } catch (err) {
+            console.error('Categories fetch error:', err);
             setCategories([]);
-            setCategoryError(`Failed to fetch categories: ${err.message}${err.response?.data?.error ? ` - ${err.response.data.error}` : ''}`);
+            setCategoryError(`Failed to fetch categories: ${err.message || 'Unknown error'}`);
+            
             if (err.response?.status === 401) {
+                console.log('Authentication failed, redirecting to login');
                 await logout();
                 navigate('/login');
             }
@@ -79,19 +109,23 @@ const AdminDashboard = () => {
 
     const fetchProducts = useCallback(async () => {
         try {
-            const token = localStorage.getItem('token');
-            if (!token) throw new Error('No JWT token found in localStorage');
-            axios.defaults.headers.Authorization = `Bearer ${token}`;
-
-            const response = await axios.get(`${PRODUCT_API_URL}/api/products`, {
+            setAuthHeader();
+            const response = await axios.get(`${PRODUCT_API_URL}/products`, {
                 params: { limit: 100 }
             });
+            
+            // Log the response for debugging
+            console.log('Products response:', response.data);
+            
             setProducts(response.data.products || []);
             setProductError('');
         } catch (err) {
+            console.error('Products fetch error:', err);
             setProducts([]);
-            setProductError(`Failed to fetch products: ${err.message}${err.response?.data?.error ? ` - ${err.response.data.error}` : ''}`);
+            setProductError(`Failed to fetch products: ${err.message || 'Unknown error'}`);
+            
             if (err.response?.status === 401) {
+                console.log('Authentication failed, redirecting to login');
                 await logout();
                 navigate('/login');
             }
@@ -100,24 +134,30 @@ const AdminDashboard = () => {
 
     const fetchUsers = useCallback(async () => {
         try {
-            const token = localStorage.getItem('token');
-            if (!token) throw new Error('No JWT token found in localStorage');
-            axios.defaults.headers.Authorization = `Bearer ${token}`;
-
-            const response = await axios.get(`${ACCOUNT_API_URL}/user/admin/users`);
+            setAuthHeader();
+            const response = await axios.get(`${ACCOUNT_API_URL}/admin/users`);
+            
+            // Log the response for debugging
+            console.log('Users response:', response.data);
+            
             if (!Array.isArray(response.data)) {
                 throw new Error('Unexpected response format: response.data is not an array');
             }
+            
             const mappedUsers = response.data.map(user => ({
                 ...user,
-                id: user._id,
+                id: user._id || user.id,
                 createdAt: user.created_at || user.createdAt
             }));
+            
             setUsers(mappedUsers);
             setError('');
         } catch (err) {
-            setError(`Failed to fetch users: ${err.message}${err.response?.data?.message ? ` - ${err.response.data.message}` : ''}`);
+            console.error('Users fetch error:', err);
+            setError(`Failed to fetch users: ${err.message || 'Unknown error'}`);
+            
             if (err.response?.status === 401) {
+                console.log('Authentication failed, redirecting to login');
                 await logout();
                 navigate('/login');
             }
@@ -126,20 +166,25 @@ const AdminDashboard = () => {
 
     const fetchDiscounts = useCallback(async () => {
         try {
-            const token = localStorage.getItem('token');
-            if (!token) throw new Error('No JWT token found in localStorage');
-            axios.defaults.headers.Authorization = `Bearer ${token}`;
-
-            const response = await axios.get(`${CART_API_URL}/cart/admin/discounts`);
+            setAuthHeader();
+            const response = await axios.get(`${CART_API_URL}/admin/discounts`);
+            
+            // Log the response for debugging
+            console.log('Discounts response:', response.data);
+            
             setDiscounts(Array.isArray(response.data) ? response.data.map(discount => ({
                 ...discount,
                 discountPercentage: discount.discount_percentage || discount.discountPercentage
             })) : []);
+            
             setDiscountError('');
         } catch (err) {
+            console.error('Discounts fetch error:', err);
             setDiscounts([]);
-            setDiscountError(`Failed to fetch discount codes: ${err.message}${err.response?.data?.error ? ` - ${err.response.data.error}` : ''}`);
+            setDiscountError(`Failed to fetch discount codes: ${err.message || 'Unknown error'}`);
+            
             if (err.response?.status === 401) {
+                console.log('Authentication failed, redirecting to login');
                 await logout();
                 navigate('/login');
             }
@@ -148,31 +193,61 @@ const AdminDashboard = () => {
 
     const fetchOrders = useCallback(async () => {
         try {
-            const token = localStorage.getItem('token');
-            if (!token) throw new Error('No JWT token found in localStorage');
-            axios.defaults.headers.Authorization = `Bearer ${token}`;
-
+            setAuthHeader();
+            
             const params = { interval: timeInterval };
             if (startDate && endDate) {
                 params.startDate = startDate;
                 params.endDate = endDate;
             }
-            const response = await axios.get(`${CART_API_URL}/cart/admin/orders`, { params });
+            
+            const response = await axios.get(`${CART_API_URL}/admin/orders`, { 
+                params,
+                headers: { 
+                    'Authorization': `Bearer ${localStorage.getItem('token')}` 
+                }
+            });
+            
+            // Log the response for debugging
+            console.log('Orders response:', response.data);
+            
             setOrders(response.data.orders || []);
             setStats(response.data.stats || {});
-            // Calculate product stats (e.g., number of products sold and types)
-            const productCount = response.data.orders.reduce((acc, order) => acc + order.items.length, 0);
-            const productTypes = [...new Set(response.data.orders.flatMap(order => order.items.map(item => item.category)))];
-            setProductStats({
-                totalProducts: productCount,
-                uniqueProductTypes: productTypes.length
-            });
+            
+            // Calculate product stats
+            if (response.data.orders && response.data.orders.length > 0) {
+                const productCount = response.data.orders.reduce((acc, order) => {
+                    return acc + (Array.isArray(order.items) ? order.items.length : 0);
+                }, 0);
+                
+                // Extract unique product types
+                const productTypes = [...new Set(
+                    response.data.orders
+                        .filter(order => Array.isArray(order.items))
+                        .flatMap(order => order.items.map(item => item.category || 'unknown'))
+                )];
+                
+                setProductStats({
+                    totalProducts: productCount,
+                    uniqueProductTypes: productTypes.length
+                });
+            } else {
+                setProductStats({
+                    totalProducts: 0,
+                    uniqueProductTypes: 0
+                });
+            }
+            
+            setError('');
         } catch (err) {
+            console.error('Orders fetch error:', err);
             setOrders([]);
             setStats({});
             setProductStats({});
-            setError(`Failed to fetch orders: ${err.message}${err.response?.data?.error ? ` - ${err.response.data.error}` : ''}`);
+            setError(`Failed to fetch orders: ${err.message || 'Unknown error'}`);
+            
             if (err.response?.status === 401) {
+                console.log('Authentication failed, redirecting to login');
                 await logout();
                 navigate('/login');
             }
@@ -181,10 +256,17 @@ const AdminDashboard = () => {
 
     const renderBarChart = useCallback(() => {
         if (!barChartRef.current) return;
+        
+        // Destroy previous chart instance if it exists
         if (barChartInstance.current) {
             barChartInstance.current.destroy();
         }
+        
         const ctx = barChartRef.current.getContext('2d');
+        
+        // Calculate total orders count from stats
+        const totalOrders = Object.values(stats).reduce((sum, s) => sum + (s.ordersCount || 0), 0);
+        
         barChartInstance.current = new Chart(ctx, {
             type: 'bar',
             data: {
@@ -192,7 +274,7 @@ const AdminDashboard = () => {
                 datasets: [{
                     label: 'Count',
                     data: [
-                        Object.values(stats).reduce((sum, s) => sum + (s.ordersCount || 0), 0),
+                        totalOrders,
                         productStats.totalProducts || 0,
                         productStats.uniqueProductTypes || 0
                     ],
@@ -227,14 +309,16 @@ const AdminDashboard = () => {
 
     const renderLineChart = useCallback(() => {
         if (!lineChartRef.current) return;
+        
+        // Destroy previous chart instance if it exists
         if (lineChartInstance.current) {
             lineChartInstance.current.destroy();
         }
         
         // Get time period labels based on interval
         const periodLabels = Object.keys(stats).sort();
-        const revenueData = periodLabels.map(period => stats[period].totalRevenue || 0);
-        const profitData = periodLabels.map(period => stats[period].totalProfit || 0);
+        const revenueData = periodLabels.map(period => stats[period]?.totalRevenue || 0);
+        const profitData = periodLabels.map(period => stats[period]?.totalProfit || 0);
         
         const ctx = lineChartRef.current.getContext('2d');
         lineChartInstance.current = new Chart(ctx, {
@@ -315,13 +399,20 @@ const AdminDashboard = () => {
 
     const renderOrderCountChart = useCallback(() => {
         if (!pieChartRef.current) return;
+        
+        // Destroy previous chart instance if it exists
         if (pieChartInstance.current) {
             pieChartInstance.current.destroy();
         }
         
         // Get time period labels based on interval
         const periodLabels = Object.keys(stats).sort();
-        const ordersData = periodLabels.map(period => stats[period].ordersCount || 0);
+        const ordersData = periodLabels.map(period => stats[period]?.ordersCount || 0);
+        
+        // Only render if we have data
+        if (periodLabels.length === 0 || ordersData.every(value => value === 0)) {
+            return;
+        }
         
         const ctx = pieChartRef.current.getContext('2d');
         pieChartInstance.current = new Chart(ctx, {
@@ -383,12 +474,19 @@ const AdminDashboard = () => {
     }, [stats, timeInterval]);
 
     const fetchData = useCallback(async () => {
-        await Promise.all([
-            fetchCategories(),
-            fetchProducts(),
-            fetchUsers(),
-            fetchDiscounts(),
-        ]);
+        try {
+            // Fetch data in parallel to improve performance
+            await Promise.all([
+                fetchCategories(),
+                fetchProducts(),
+                fetchUsers(),
+                fetchDiscounts(),
+            ]);
+            console.log('All initial data fetched successfully');
+        } catch (err) {
+            console.error('Error fetching data:', err);
+            setError('Failed to fetch initial data. Please try again.');
+        }
     }, [fetchCategories, fetchProducts, fetchUsers, fetchDiscounts]);
 
     const handleGetData = () => {
@@ -410,14 +508,26 @@ const AdminDashboard = () => {
 
     // Verify admin role and initialize token on mount
     useEffect(() => {
+        console.log('AdminDashboard - Current user:', user);
+        
+        // Check if user exists and has admin role
         if (!user || (user.email !== 'admin@example.com' && user.role !== 'admin')) {
+            console.log('User is not admin, redirecting to login');
             navigate('/login');
             return;
         }
+        
         const token = localStorage.getItem('token');
-        if (token && !axios.defaults.headers.Authorization) {
-            axios.defaults.headers.Authorization = `Bearer ${token}`;
+        if (!token) {
+            console.log('No token found, redirecting to login');
+            navigate('/login');
+            return;
         }
+        
+        // Set default authorization header
+        axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
+        
+        // Fetch initial data
         fetchData();
     }, [user, navigate, fetchData]);
 
@@ -457,31 +567,37 @@ const AdminDashboard = () => {
         if (!validateDiscountForm()) return;
 
         try {
-            const token = localStorage.getItem('token');
-            if (!token) throw new Error('No JWT token found in localStorage');
-            axios.defaults.headers.Authorization = `Bearer ${token}`;
+            const token = setAuthHeader();
 
-            await axios.post(`${CART_API_URL}/cart/admin/discount`, {
+            const response = await axios.post(`${CART_API_URL}/admin/discount`, {
                 code: discountForm.code,
                 discount_percentage: Number(discountForm.discount_percentage),
                 usageLimit: Number(discountForm.usageLimit)
+            }, {
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json'
+                }
             });
+            
+            console.log('Discount code created:', response.data);
 
-            const response = await axios.get(`${CART_API_URL}/cart/admin/discounts`);
-            setDiscounts(Array.isArray(response.data) ? response.data.map(discount => ({
-                ...discount,
-                discountPercentage: discount.discount_percentage || discount.discountPercentage
-            })) : []);
+            // Refresh discount codes list
+            await fetchDiscounts();
 
+            // Reset form
             setDiscountForm({
                 code: '',
                 discount_percentage: '',
                 usageLimit: ''
             });
+            
             setError('');
             alert('Discount code created successfully!');
         } catch (err) {
-            setError(`Failed to create discount code: ${err.message}${err.response?.data?.error ? ` - ${err.response.data.error}` : ''}`);
+            console.error('Create discount error:', err);
+            setError(`Failed to create discount code: ${err.message || 'Unknown error'}`);
+            
             if (err.response?.status === 401) {
                 await logout();
                 navigate('/login');
@@ -491,35 +607,83 @@ const AdminDashboard = () => {
 
     const handleCreateOrUpdateProduct = async (e) => {
         e.preventDefault();
+        
         try {
-            const token = localStorage.getItem('token');
-            if (!token) throw new Error('No JWT token found in localStorage');
-            axios.defaults.headers.Authorization = `Bearer ${token}`;
-
+            const token = setAuthHeader();
+            
+            // Validate required fields
+            if (!formData.name || !formData.brand || !formData.description || !formData.images || !formData.variants) {
+                setError('Please fill in all required fields for the product.');
+                return;
+            }
+            
+            // Parse variants to ensure valid format
+            let parsedVariants;
+            try {
+                parsedVariants = formData.variants.split(';').map(variant => {
+                    const [name, stock, price] = variant.split(',').map(item => item.trim());
+                    if (!name || isNaN(Number(stock)) || isNaN(Number(price))) {
+                        throw new Error(`Invalid variant format: ${variant}`);
+                    }
+                    return { name, stock: Number(stock), price: Number(price) };
+                });
+                
+                // Ensure at least 2 variants
+                if (parsedVariants.length < 2) {
+                    setError('Product must have at least 2 variants.');
+                    return;
+                }
+            } catch (variantError) {
+                setError(`Variant format error: ${variantError.message}`);
+                return;
+            }
+            
             const productData = {
                 name: formData.name,
                 brand: formData.brand,
                 description: formData.description,
                 images: formData.images.split(',').map(img => img.trim()),
-                variants: formData.variants.split(';').map(variant => {
-                    const [name, stock, price] = variant.split(',').map(item => item.trim());
-                    return { name, stock: Number(stock), price: Number(price) };
-                }),
+                variants: parsedVariants,
                 category: formData.category,
                 tags: formData.tags.split(',').map(tag => tag.trim())
             };
+            
+            console.log('Sending product data:', productData);
 
             if (formData._id) {
-                await axios.put(`${PRODUCT_API_URL}/api/products/${formData._id}`, productData);
+                // Update existing product
+                const response = await axios.put(
+                    `${PRODUCT_API_URL}/products/${formData._id}`, 
+                    productData,
+                    { 
+                        headers: { 
+                            'Authorization': `Bearer ${token}`,
+                            'Content-Type': 'application/json' 
+                        } 
+                    }
+                );
+                
+                console.log('Product updated:', response.data);
             } else {
-                await axios.post(`${PRODUCT_API_URL}/api/products`, productData);
+                // Create new product
+                const response = await axios.post(
+                    `${PRODUCT_API_URL}/products`, 
+                    productData,
+                    { 
+                        headers: { 
+                            'Authorization': `Bearer ${token}`,
+                            'Content-Type': 'application/json' 
+                        } 
+                    }
+                );
+                
+                console.log('Product created:', response.data);
             }
 
-            const response = await axios.get(`${PRODUCT_API_URL}/api/products`, {
-                params: { limit: 100 }
-            });
+            // Refresh products list
+            await fetchProducts();
 
-            setProducts(response.data.products || []);
+            // Reset form
             setFormData({
                 _id: null,
                 name: '',
@@ -530,10 +694,17 @@ const AdminDashboard = () => {
                 category: '',
                 tags: ''
             });
+            
             setError('');
             setProductError('');
+            alert(formData._id ? 'Product updated successfully!' : 'Product created successfully!');
         } catch (err) {
-            setError(`Failed to save product: ${err.message}${err.response?.data?.error ? ` - ${err.response.data.error}` : ''}`);
+            console.error('Product save error:', err);
+            
+            // Extract detailed error message if available
+            const errorMessage = err.response?.data?.message || err.response?.data?.error || err.message || 'Unknown error';
+            setError(`Failed to save product: ${errorMessage}`);
+            
             if (err.response?.status === 401) {
                 await logout();
                 navigate('/login');
@@ -550,20 +721,38 @@ const AdminDashboard = () => {
             images: product.images.join(', '),
             variants: product.variants.map(v => `${v.name},${v.stock},${v.price}`).join('; '),
             category: product.category,
-            tags: product.tags.join(', ')
+            tags: Array.isArray(product.tags) ? product.tags.join(', ') : ''
+        });
+        
+        // Scroll to product form
+        window.scrollTo({
+            top: document.getElementById('productForm').offsetTop - 100,
+            behavior: 'smooth'
         });
     };
 
     const handleDeleteProduct = async (id) => {
+        if (!window.confirm('Are you sure you want to delete this product?')) {
+            return;
+        }
+        
         try {
-            const token = localStorage.getItem('token');
-            if (!token) throw new Error('No JWT token found in localStorage');
-            axios.defaults.headers.Authorization = `Bearer ${token}`;
+            const token = setAuthHeader();
 
-            await axios.delete(`${PRODUCT_API_URL}/api/products/${id}`);
+            const response = await axios.delete(`${PRODUCT_API_URL}/products/${id}`, {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            
+            console.log('Product deleted:', response.data);
+            
+            // Update products state by filtering out the deleted product
             setProducts(products.filter(product => product._id !== id));
+            
+            alert('Product deleted successfully!');
         } catch (err) {
-            setError(`Failed to delete product: ${err.message}${err.response?.data?.error ? ` - ${err.response.data.error}` : ''}`);
+            console.error('Product delete error:', err);
+            setError(`Failed to delete product: ${err.message || 'Unknown error'}`);
+            
             if (err.response?.status === 401) {
                 await logout();
                 navigate('/login');
@@ -573,30 +762,74 @@ const AdminDashboard = () => {
 
     const handleCreateOrUpdateUser = async (e) => {
         e.preventDefault();
+        
         try {
-            const token = localStorage.getItem('token');
-            if (!token) throw new Error('No JWT token found in localStorage');
-            axios.defaults.headers.Authorization = `Bearer ${token}`;
-
+            const token = setAuthHeader();
+            
+            // Validate required fields
+            if (!userForm.email || (!userForm._id && !userForm.password) || !userForm.name) {
+                setError('Please fill in all required fields for the user.');
+                return;
+            }
+            
             const userData = {
                 email: userForm.email,
-                password: userForm.password,
                 name: userForm.name,
                 role: userForm.role
             };
+            
+            // Only include password if it's provided (for updates) or required (for new users)
+            if (userForm.password) {
+                userData.password = userForm.password;
+            }
+            
+            // For new users, ensure they have valid shipping address
+            if (!userForm._id) {
+                userData.shippingAddress = {
+                    street: '123 Default St.',
+                    city: 'Default City',
+                    state: 'Default State',
+                    zip: '12345',
+                    country: 'Default Country'
+                };
+            }
+            
+            console.log('Sending user data:', userData);
 
-            const url = userForm._id ? `${ACCOUNT_API_URL}/user/admin/users/${userForm._id}` : `${ACCOUNT_API_URL}/user/admin/users`;
-            const method = userForm._id ? 'put' : 'post';
+            if (userForm._id) {
+                // Update existing user
+                const response = await axios.put(
+                    `${ACCOUNT_API_URL}/admin/users/${userForm._id}`, 
+                    userData,
+                    { 
+                        headers: { 
+                            'Authorization': `Bearer ${token}`,
+                            'Content-Type': 'application/json' 
+                        } 
+                    }
+                );
+                
+                console.log('User updated:', response.data);
+            } else {
+                // Create new user
+                const response = await axios.post(
+                    `${ACCOUNT_API_URL}/admin/users`, 
+                    userData,
+                    { 
+                        headers: { 
+                            'Authorization': `Bearer ${token}`,
+                            'Content-Type': 'application/json' 
+                        } 
+                    }
+                );
+                
+                console.log('User created:', response.data);
+            }
 
-            await axios[method](url, userData);
-            const response = await axios.get(`${ACCOUNT_API_URL}/user/admin/users`);
+            // Refresh users list
+            await fetchUsers();
 
-            const mappedUsers = response.data.map(user => ({
-                ...user,
-                id: user._id,
-                createdAt: user.created_at || user.createdAt
-            }));
-            setUsers(mappedUsers);
+            // Reset form
             setUserForm({
                 _id: null,
                 email: '',
@@ -604,9 +837,16 @@ const AdminDashboard = () => {
                 name: '',
                 role: 'user'
             });
+            
             setError('');
+            alert(userForm._id ? 'User updated successfully!' : 'User created successfully!');
         } catch (err) {
-            setError(`Failed to save user: ${err.message}${err.response?.data?.message ? ` - ${err.response.data.message}` : ''}`);
+            console.error('User save error:', err);
+            
+            // Extract detailed error message if available
+            const errorMessage = err.response?.data?.message || err.response?.data?.error || err.message || 'Unknown error';
+            setError(`Failed to save user: ${errorMessage}`);
+            
             if (err.response?.status === 401) {
                 await logout();
                 navigate('/login');
@@ -622,18 +862,36 @@ const AdminDashboard = () => {
             name: user.name,
             role: user.role
         });
+        
+        // Scroll to user form
+        window.scrollTo({
+            top: document.getElementById('userForm').offsetTop - 100,
+            behavior: 'smooth'
+        });
     };
 
     const handleDeleteUser = async (id) => {
+        if (!window.confirm('Are you sure you want to delete this user?')) {
+            return;
+        }
+        
         try {
-            const token = localStorage.getItem('token');
-            if (!token) throw new Error('No JWT token found in localStorage');
-            axios.defaults.headers.Authorization = `Bearer ${token}`;
+            const token = setAuthHeader();
 
-            await axios.delete(`${ACCOUNT_API_URL}/user/admin/users/${id}`);
+            const response = await axios.delete(`${ACCOUNT_API_URL}/admin/users/${id}`, {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            
+            console.log('User deleted:', response.data);
+            
+            // Update users state by filtering out the deleted user
             setUsers(users.filter(user => user.id !== id));
+            
+            alert('User deleted successfully!');
         } catch (err) {
-            setError(`Failed to delete user: ${err.message}${err.response?.data?.message ? ` - ${err.response.data.message}` : ''}`);
+            console.error('User delete error:', err);
+            setError(`Failed to delete user: ${err.message || 'Unknown error'}`);
+            
             if (err.response?.status === 401) {
                 await logout();
                 navigate('/login');
@@ -649,17 +907,47 @@ const AdminDashboard = () => {
 
     const handleUpdateStatus = async (e) => {
         e.preventDefault();
+        
         try {
-            const token = localStorage.getItem('token');
-            if (!token) throw new Error('No JWT token found in localStorage');
-            axios.defaults.headers.Authorization = `Bearer ${token}`;
+            const token = setAuthHeader();
 
-            await axios.put(`${CART_API_URL}/cart/admin/orders/${selectedOrder.orderId}/status`, { status: newStatus });
-            setOrders(orders.map(order => order.orderId === selectedOrder.orderId ? { ...order, currentStatus: newStatus, statusHistory: [...order.statusHistory, { status: newStatus, updatedAt: new Date() }] } : order));
+            const response = await axios.put(
+                `${CART_API_URL}/admin/orders/${selectedOrder.orderId}/status`, 
+                { status: newStatus },
+                {
+                    headers: { 
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json'
+                    }
+                }
+            );
+            
+            console.log('Order status updated:', response.data);
+            
+            // Update the order in the orders list
+            setOrders(orders.map(order => 
+                order.orderId === selectedOrder.orderId 
+                    ? { 
+                        ...order, 
+                        currentStatus: newStatus, 
+                        statusHistory: [
+                            ...(order.statusHistory || []), 
+                            { status: newStatus, updatedAt: new Date() }
+                        ] 
+                    } 
+                    : order
+            ));
+            
             setModalOpen(false);
             alert('Order status updated successfully!');
         } catch (err) {
-            setError(`Failed to update order status: ${err.message}${err.response?.data?.error ? ` - ${err.response.data.error}` : ''}`);
+            console.error('Order status update error:', err);
+            setError(`Failed to update order status: ${err.message || 'Unknown error'}`);
+            
+            if (err.response?.status === 401) {
+                await logout();
+                navigate('/login');
+            }
         }
     };
 
@@ -669,7 +957,10 @@ const AdminDashboard = () => {
         return isNaN(date.getTime()) ? 'N/A' : date.toLocaleString();
     };
 
-    if (!user) return null;
+    // Redirect if no user or not admin
+    if (!user || (user.email !== 'admin@example.com' && user.role !== 'admin')) {
+        return null;
+    }
 
     return (
         <div style={{
@@ -911,7 +1202,7 @@ const AdminDashboard = () => {
                         </p>
                     )}
                     {orders.length === 0 && !error ? (
-                        <p style={{ color: '#E0E0E0' }}>No orders available.</p>
+                        <p style={{ color: '#E0E0E0' }}>No orders available. Click "Generate Report" to fetch orders.</p>
                     ) : (
                         <table style={{
                             width: '100%',
@@ -934,7 +1225,7 @@ const AdminDashboard = () => {
                                     <tr key={order.orderId} style={{ borderBottom: '1px solid #333333' }}>
                                         <td style={{ padding: '10px' }}>{order.orderId}</td>
                                         <td style={{ padding: '10px' }}>{order.userId}</td>
-                                        <td style={{ padding: '10px' }}>₫{order.totalPrice.toLocaleString()}</td>
+                                        <td style={{ padding: '10px' }}>₫{order.totalPrice?.toLocaleString() || '0'}</td>
                                         <td style={{ padding: '10px' }}>{order.currentStatus}</td>
                                         <td style={{ padding: '10px' }}>{formatDate(order.createdAt)}</td>
                                         <td style={{ padding: '10px' }}>
@@ -1110,7 +1401,7 @@ const AdminDashboard = () => {
                     )}
                 </div>
 
-                <div style={{
+                <div id="userForm" style={{
                     backgroundColor: '#1A1A1A',
                     padding: '30px',
                     borderRadius: '10px',
@@ -1313,7 +1604,7 @@ const AdminDashboard = () => {
                     )}
                 </div>
 
-                <div style={{
+                <div id="productForm" style={{
                     backgroundColor: '#1A1A1A',
                     padding: '30px',
                     borderRadius: '10px',
@@ -1356,7 +1647,7 @@ const AdminDashboard = () => {
                                 padding: '10px',
                                 marginBottom: '15px',
                                 backgroundColor: '#E0E0E0',
-                                border: 'none',
+                                border: 'none', 
                                 borderRadius: '5px',
                                 color: '#000000',
                                 fontFamily: "'Roboto', sans-serif"
