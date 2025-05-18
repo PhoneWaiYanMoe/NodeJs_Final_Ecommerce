@@ -82,7 +82,7 @@ const Register = () => {
       >
         <div style={{ textAlign: 'center', marginBottom: '30px' }}>
           <img
-            src="/logo_placeholder.png"
+            src="/logo.png"
             alt="LuxeLane Logo"
             style={{ width: '50px', height: '50px', marginBottom: '15px' }}
           />
