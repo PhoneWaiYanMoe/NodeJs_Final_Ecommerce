@@ -345,7 +345,7 @@ const AdminDashboard = () => {
                         callbacks: {
                             label: function(context) {
                                 let label = context.dataset.label || '';
-                                ورزش if (label) {
+                                if (label) {
                                     label += ': ';
                                 }
                                 if (context.parsed.y !== null) {
