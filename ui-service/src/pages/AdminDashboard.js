@@ -68,6 +68,36 @@ const AdminDashboard = () => {
   return false;
 };
 
+// Add this function at the top of your component before you reference it elsewhere
+const fetchProducts = useCallback(async () => {
+  try {
+    const token = localStorage.getItem('token');
+    if (!token) throw new Error('No JWT token found in localStorage');
+    
+    // Explicitly include headers in this request
+    const headers = {
+      'Authorization': `Bearer ${token}`,
+      'Content-Type': 'application/json'
+    };
+
+    const response = await axios.get(`${PRODUCT_API_URL}/api/products`, {
+      params: { limit: 100 },
+      headers
+    });
+    
+    setProducts(response.data.products || []);
+    setProductError('');
+  } catch (err) {
+    setProducts([]);
+    setProductError(`Failed to fetch products: ${err.message}${err.response?.data?.error ? ` - ${err.response.data.error}` : ''}`);
+    if (err.response?.status === 401) {
+      await logout();
+      navigate('/login');
+    }
+  }
+}, [logout, navigate]);
+
+
 
   const fetchCategories = useCallback(async () => {
   try {
@@ -373,14 +403,15 @@ const AdminDashboard = () => {
         });
     }, [stats, timeInterval]);
 
-    const fetchData = useCallback(async () => {
-        await Promise.all([
-            fetchCategories(),
-            fetchProducts(),
-            fetchUsers(),
-            fetchDiscounts(),
-        ]);
-    }, [fetchCategories, fetchProducts, fetchUsers, fetchDiscounts]);
+// Fix the fetchData function to use the local fetchProducts
+const fetchData = useCallback(async () => {
+  await Promise.all([
+    fetchCategories(),
+    fetchProducts(),
+    fetchUsers(),
+    fetchDiscounts(),
+  ]);
+}, [fetchCategories, fetchProducts, fetchUsers, fetchDiscounts]);
 
     const handleGetData = () => {
         fetchOrders();
