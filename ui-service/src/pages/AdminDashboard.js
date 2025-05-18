@@ -59,65 +59,59 @@ const AdminDashboard = () => {
     const CART_API_URL = 'https://nodejs-final-ecommerce-1.onrender.com';
 
     const addAuthorizationHeader = () => {
-  const token = localStorage.getItem('token');
-  if (token) {
-    // Set the default header for all axios requests
-    axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
-    return true;
-  }
-  return false;
-};
-
-// Add this function at the top of your component before you reference it elsewhere
-const fetchProducts = useCallback(async () => {
-  try {
-    const token = localStorage.getItem('token');
-    if (!token) throw new Error('No JWT token found in localStorage');
-    
-    // Explicitly include headers in this request
-    const headers = {
-      'Authorization': `Bearer ${token}`,
-      'Content-Type': 'application/json'
+        const token = localStorage.getItem('token');
+        if (token) {
+            axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
+            return true;
+        }
+        return false;
     };
 
-    const response = await axios.get(`${PRODUCT_API_URL}/api/products`, {
-      params: { limit: 100 },
-      headers
-    });
-    
-    setProducts(response.data.products || []);
-    setProductError('');
-  } catch (err) {
-    setProducts([]);
-    setProductError(`Failed to fetch products: ${err.message}${err.response?.data?.error ? ` - ${err.response.data.error}` : ''}`);
-    if (err.response?.status === 401) {
-      await logout();
-      navigate('/login');
-    }
-  }
-}, [logout, navigate]);
+    const fetchProducts = useCallback(async () => {
+        try {
+            const token = localStorage.getItem('token');
+            if (!token) throw new Error('No JWT token found in localStorage');
+            
+            const headers = {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
+            };
 
+            const response = await axios.get(`${PRODUCT_API_URL}/api/products`, {
+                params: { limit: 100 },
+                headers
+            });
+            
+            setProducts(response.data.products || []);
+            setProductError('');
+        } catch (err) {
+            setProducts([]);
+            setProductError(`Failed to fetch products: ${err.message}${err.response?.data?.error ? ` - ${err.response.data.error}` : ''}`);
+            if (err.response?.status === 401) {
+                await logout();
+                navigate('/login');
+            }
+        }
+    }, [logout, navigate]);
 
+    const fetchCategories = useCallback(async () => {
+        try {
+            if (!addAuthorizationHeader()) {
+                throw new Error('No JWT token found in localStorage');
+            }
 
-  const fetchCategories = useCallback(async () => {
-  try {
-    if (!addAuthorizationHeader()) {
-      throw new Error('No JWT token found in localStorage');
-    }
-
-    const response = await axios.get(`${PRODUCT_API_URL}/api/categories`);
-    setCategories(Array.isArray(response.data) ? response.data : []);
-    setCategoryError('');
-  } catch (err) {
-    setCategories([]);
-    setCategoryError(`Failed to fetch categories: ${err.message}${err.response?.data?.error ? ` - ${err.response.data.error}` : ''}`);
-    if (err.response?.status === 401) {
-      await logout();
-      navigate('/login');
-    }
-  }
-}, [logout, navigate]);
-
+            const response = await axios.get(`${PRODUCT_API_URL}/api/categories`);
+            setCategories(Array.isArray(response.data) ? response.data : []);
+            setCategoryError('');
+        } catch (err) {
+            setCategories([]);
+            setCategoryError(`Failed to fetch categories: ${err.message}${err.response?.data?.error ? ` - ${err.response.data.error}` : ''}`);
+            if (err.response?.status === 401) {
+                await logout();
+                navigate('/login');
+            }
+        }
+    }, [logout, navigate]);
 
     const fetchUsers = useCallback(async () => {
         try {
@@ -131,12 +125,22 @@ const fetchProducts = useCallback(async () => {
             }
             const mappedUsers = response.data.map(user => ({
                 ...user,
-                id: user._id,
+                id: user._id || user.id,
+                _id: user._id || user.id,
                 createdAt: user.created_at || user.createdAt
             }));
             setUsers(mappedUsers);
             setError('');
         } catch (err) {
+            console.error('Error fetching users:', err);
+            if (err.response) {
+                console.error('Response status:', err.response.status);
+                console.error('Response data:', err.response.data);
+            } else if (err.request) {
+                console.error('Request made but no response received:', err.request);
+            } else {
+                console.error('Error setting up request:', err.message);
+            }
             setError(`Failed to fetch users: ${err.message}${err.response?.data?.message ? ` - ${err.response.data.message}` : ''}`);
             if (err.response?.status === 401) {
                 await logout();
@@ -181,7 +185,6 @@ const fetchProducts = useCallback(async () => {
             const response = await axios.get(`${CART_API_URL}/cart/admin/orders`, { params });
             setOrders(response.data.orders || []);
             setStats(response.data.stats || {});
-            // Calculate product stats (e.g., number of products sold and types)
             const productCount = response.data.orders.reduce((acc, order) => acc + order.items.length, 0);
             const productTypes = [...new Set(response.data.orders.flatMap(order => order.items.map(item => item.category)))];
             setProductStats({
@@ -252,7 +255,6 @@ const fetchProducts = useCallback(async () => {
             lineChartInstance.current.destroy();
         }
         
-        // Get time period labels based on interval
         const periodLabels = Object.keys(stats).sort();
         const revenueData = periodLabels.map(period => stats[period].totalRevenue || 0);
         const profitData = periodLabels.map(period => stats[period].totalProfit || 0);
@@ -340,7 +342,6 @@ const fetchProducts = useCallback(async () => {
             pieChartInstance.current.destroy();
         }
         
-        // Get time period labels based on interval
         const periodLabels = Object.keys(stats).sort();
         const ordersData = periodLabels.map(period => stats[period].ordersCount || 0);
         
@@ -403,21 +404,19 @@ const fetchProducts = useCallback(async () => {
         });
     }, [stats, timeInterval]);
 
-// Fix the fetchData function to use the local fetchProducts
-const fetchData = useCallback(async () => {
-  await Promise.all([
-    fetchCategories(),
-    fetchProducts(),
-    fetchUsers(),
-    fetchDiscounts(),
-  ]);
-}, [fetchCategories, fetchProducts, fetchUsers, fetchDiscounts]);
+    const fetchData = useCallback(async () => {
+        await Promise.all([
+            fetchCategories(),
+            fetchProducts(),
+            fetchUsers(),
+            fetchDiscounts(),
+        ]);
+    }, [fetchCategories, fetchProducts, fetchUsers, fetchDiscounts]);
 
     const handleGetData = () => {
         fetchOrders();
     };
 
-    // Render charts when stats or chartType changes
     useEffect(() => {
         if (Object.keys(stats).length > 0) {
             if (chartType === 'bar') {
@@ -430,19 +429,15 @@ const fetchData = useCallback(async () => {
         }
     }, [stats, chartType, renderBarChart, renderLineChart, renderOrderCountChart]);
 
-  
-// Initial data loading with auth check
-useEffect(() => {
-  if (!user || (user.email !== 'admin@example.com' && user.role !== 'admin')) {
-    navigate('/login');
-    return;
-  }
+    useEffect(() => {
+        if (!user || (user.email !== 'admin@example.com' && user.role !== 'admin')) {
+            navigate('/login');
+            return;
+        }
 
-  // Set the authorization header here as well
-  addAuthorizationHeader();
-  
-  fetchData();
-}, [user, navigate, fetchData]);
+        addAuthorizationHeader();
+        fetchData();
+    }, [user, navigate, fetchData]);
 
     const handleInputChange = (e) => {
         const { name, value } = e.target;
@@ -453,129 +448,170 @@ useEffect(() => {
         const { name, value } = e.target;
         setDiscountForm({ ...discountForm, [name]: value });
     };
-// Function to handle user form input
-const handleUserInputChange = (e) => {
-  const { name, value } = e.target;
-  setUserForm({ ...userForm, [name]: value });
-};
 
-// Function to create or update a user
-const handleCreateOrUpdateUser = async (e) => {
-  e.preventDefault();
-  try {
-    const token = localStorage.getItem('token');
-    if (!token) throw new Error('No JWT token found in localStorage');
-    
-    // Validate required fields
-    if (!userForm.email || (!userForm._id && !userForm.password) || !userForm.name) {
-      setError('Email, name, and password (for new users) are required');
-      return;
-    }
-    
-    // Explicitly include headers
-    const headers = {
-      'Authorization': `Bearer ${token}`,
-      'Content-Type': 'application/json'
+    const handleUserInputChange = (e) => {
+        const { name, value } = e.target;
+        setUserForm({ ...userForm, [name]: value });
     };
-    
-    console.log('User form data:', {...userForm, password: userForm.password ? '********' : 'unchanged'});
-    
-    // Prepare user data differently for create vs update
-    const userData = {
-      email: userForm.email,
-      name: userForm.name,
-      role: userForm.role
-    };
-    
-    // Only include password if it's provided or if creating a new user
-    if (userForm.password) {
-      userData.password = userForm.password;
-    }
-    
-    // For new users, include a default shipping address
-    if (!userForm._id) {
-      userData.shippingAddress = {
-        street: '',
-        city: '',
-        state: '',
-        zip: '',
-        country: '',
-      };
-    }
-    
-    let response;
-    if (userForm._id) {
-      console.log(`Updating user with ID: ${userForm._id}`);
-      response = await axios({
-        method: 'put',
-        url: `${ACCOUNT_API_URL}/user/admin/users/${userForm._id}`,
-        data: userData,
-        headers: headers
-      });
-    } else {
-      console.log('Creating new user');
-      response = await axios({
-        method: 'post',
-        url: `${ACCOUNT_API_URL}/user/admin/users`,
-        data: userData,
-        headers: headers
-      });
-    }
-    
-    console.log('User operation successful:', response.data);
-    
-    // Fetch updated user list
-    const fetchResponse = await axios.get(`${ACCOUNT_API_URL}/user/admin/users`, { headers });
-    
-    const mappedUsers = Array.isArray(fetchResponse.data) ? 
-      fetchResponse.data.map(user => ({
-        ...user,
-        id: user._id || user.id,
-        createdAt: user.created_at || user.createdAt
-      })) : [];
-    
-    setUsers(mappedUsers);
-    setUserForm({
-      _id: null,
-      email: '',
-      password: '',
-      name: '',
-      role: 'user'
-    });
-    setError('');
-    
-    // Show success message
-    alert(userForm._id ? 'User updated successfully!' : 'User created successfully!');
-  } catch (err) {
-    console.error('Error saving user:', err);
-    setError(`Failed to save user: ${err.message}${err.response?.data?.message ? ` - ${err.response.data.message}` : ''}`);
-    if (err.response?.status === 401) {
-      alert('Authentication error. You will be redirected to login.');
-      await logout();
-      navigate('/login');
-    }
-  }
-};
 
-// Function to set up form for editing a user
-const handleEditUser = (user) => {
-  setUserForm({
-    _id: user.id,
-    email: user.email,
-    password: '', // Don't populate password for security
-    name: user.name,
-    role: user.role
-  });
-  
-  // Scroll to the user form
-  window.scrollTo({
-    top: document.querySelector('.user-form-section').offsetTop,
-    behavior: 'smooth'
-  });
-};
+    const handleCreateOrUpdateUser = async (e) => {
+        e.preventDefault();
+        try {
+            const token = localStorage.getItem('token');
+            if (!token) throw new Error('No JWT token found in localStorage');
+            
+            if (!userForm.email || (!userForm._id && !userForm.password) || !userForm.name) {
+                setError('Email, name, and password (for new users) are required');
+                return;
+            }
+            
+            const headers = {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
+            };
+            
+            console.log('User form data:', {...userForm, password: userForm.password ? '********' : 'unchanged'});
+            
+            const userData = {
+                email: userForm.email,
+                name: userForm.name,
+                role: userForm.role
+            };
+            
+            if (userForm.password) {
+                userData.password = userForm.password;
+            }
+            
+            if (!userForm._id) {
+                userData.shippingAddress = {
+                    street: '',
+                    city: '',
+                    state: '',
+                    zip: '',
+                    country: '',
+                };
+            }
+            
+            let response;
+            if (userForm._id) {
+                console.log(`Updating user with ID: ${userForm._id}`);
+                response = await axios({
+                    method: 'put',
+                    url: `${ACCOUNT_API_URL}/user/admin/users/${userForm._id}`,
+                    data: userData,
+                    headers: headers
+                });
+            } else {
+                console.log('Creating new user');
+                response = await axios({
+                    method: 'post',
+                    url: `${ACCOUNT_API_URL}/user/admin/users`,
+                    data: userData,
+                    headers: headers
+                });
+            }
+            
+            console.log('User operation successful:', response.data);
+            
+            const fetchResponse = await axios.get(`${ACCOUNT_API_URL}/user/admin/users`, { headers });
+            
+            const mappedUsers = Array.isArray(fetchResponse.data) ? 
+                fetchResponse.data.map(user => ({
+                    ...user,
+                    id: user._id || user.id,
+                    _id: user._id || user.id,
+                    createdAt: user.created_at || user.createdAt
+                })) : [];
+            
+            setUsers(mappedUsers);
+            setUserForm({
+                _id: null,
+                email: '',
+                password: '',
+                name: '',
+                role: 'user'
+            });
+            setError('');
+            
+            alert(userForm._id ? 'User updated successfully!' : 'User created successfully!');
+        } catch (err) {
+            console.error('Error saving user:', err);
+            if (err.response) {
+                console.error('Response status:', err.response.status);
+                console.error('Response data:', err.response.data);
+            } else if (err.request) {
+                console.error('Request made but no response received:', err.request);
+            } else {
+                console.error('Error setting up request:', err.message);
+            }
+            setError(`Failed to save user: ${err.message}${err.response?.data?.message ? ` - ${err.response.data.message}` : ''}`);
+            if (err.response?.status === 401) {
+                alert('Authentication error. You will be redirected to login.');
+                await logout();
+                navigate('/login');
+            }
+        }
+    };
+
+    const handleEditUser = (user) => {
+        setUserForm({
+            _id: user._id,
+            email: user.email,
+            password: '',
+            name: user.name,
+            role: user.role || 'user'
+        });
+        
+        const userFormSection = document.querySelector('.user-form-section');
+        if (userFormSection) {
+            window.scrollTo({
+                top: userFormSection.offsetTop,
+                behavior: 'smooth'
+            });
+        }
+    };
+
+    const handleDeleteUser = async (id) => {
+        try {
+            if (!id) {
+                setError('Cannot delete user: Invalid user ID');
+                return;
+            }
+            
+            const token = localStorage.getItem('token');
+            if (!token) throw new Error('No JWT token found in localStorage');
+            
+            const headers = {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
+            };
+            
+            console.log(`Deleting user with ID: ${id}`);
+            
+            await axios.delete(`${ACCOUNT_API_URL}/user/admin/users/${id}`, { headers });
+            
+            setUsers(prevUsers => prevUsers.filter(user => user._id !== id));
+            setError('');
+        } catch (err) {
+            console.error('Error deleting user:', err);
+            if (err.response) {
+                console.error('Response status:', err.response.status);
+                console.error('Response data:', err.response.data);
+            } else if (err.request) {
+                console.error('Request made but no response received:', err.request);
+            } else {
+                console.error('Error setting up request:', err.message);
+            }
+            setError(`Failed to delete user: ${err.message}${err.response?.data?.message ? ` - ${err.response.data.message}` : ''}`);
+            if (err.response?.status === 401) {
+                await logout();
+                navigate('/login');
+            }
+        }
+    };
 
     const validateDiscountForm = () => {
-        if (!discountForm.code || discountForm.code.length !== 5 || !/^[a-zA-Z0-9]+$/.test(discountForm.code)) {
+        if (!discount彼此  discountForm.code || discountForm.code.length !== 5 || !/^[a-zA-Z0-9]+$/.test(discountForm.code)) {
             setError('Discount code must be a 5-character alphanumeric string.');
             return false;
         }
@@ -627,89 +663,85 @@ const handleEditUser = (user) => {
         }
     };
 
-const handleCreateOrUpdateProduct = async (e) => {
-  e.preventDefault();
-  try {
-    const token = localStorage.getItem('token');
-    if (!token) throw new Error('No JWT token found in localStorage');
-    
-    // Make sure headers are passed correctly
-    const headers = {
-      'Authorization': `Bearer ${token}`,
-      'Content-Type': 'application/json'
+    const handleCreateOrUpdateProduct = async (e) => {
+        e.preventDefault();
+        try {
+            const token = localStorage.getItem('token');
+            if (!token) throw new Error('No JWT token found in localStorage');
+            
+            const headers = {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
+            };
+            
+            console.log('Authorization header:', `Bearer ${token}`);
+            
+            const productData = {
+                name: formData.name,
+                brand: formData.brand,
+                description: formData.description,
+                images: formData.images.split(',').map(img => img.trim()),
+                variants: formData.variants.split(';').map(variant => {
+                    const [name, stock, price] = variant.split(',').map(item => item.trim());
+                    return { name, stock: Number(stock), price: Number(price) };
+                }),
+                category: formData.category,
+                tags: formData.tags.split(',').map(tag => tag.trim())
+            };
+            
+            console.log('Product data:', productData);
+            
+            let response;
+            if (formData._id) {
+                console.log(`Updating product with ID: ${formData._id}`);
+                response = await axios({
+                    method: 'put',
+                    url: `${PRODUCT_API_URL}/api/products/${formData._id}`,
+                    data: productData,
+                    headers: headers
+                });
+            } else {
+                console.log('Creating new product');
+                response = await axios({
+                    method: 'post',
+                    url: `${PRODUCT_API_URL}/api/products`,
+                    data: productData,
+                    headers: headers
+                });
+            }
+            
+            console.log('Product operation successful:', response.data);
+            
+            const fetchResponse = await axios.get(`${PRODUCT_API_URL}/api/products`, {
+                params: { limit: 100 },
+                headers: headers
+            });
+            
+            setProducts(fetchResponse.data.products || []);
+            setFormData({
+                _id: null,
+                name: '',
+                brand: '',
+                description: '',
+                images: '',
+                variants: '',
+                category: '',
+                tags: ''
+            });
+            setError('');
+            setProductError('');
+            
+            alert(formData._id ? 'Product updated successfully!' : 'Product created successfully!');
+        } catch (err) {
+            console.error('Error saving product:', err);
+            setError(`Failed to save product: ${err.message}${err.response?.data?.error ? ` - ${err.response.data.error}` : ''}`);
+            if (err.response?.status === 401) {
+                alert('Authentication error. You will be redirected to login.');
+                await logout();
+                navigate('/login');
+            }
+        }
     };
-    
-    console.log('Authorization header:', `Bearer ${token}`);
-    
-    const productData = {
-      name: formData.name,
-      brand: formData.brand,
-      description: formData.description,
-      images: formData.images.split(',').map(img => img.trim()),
-      variants: formData.variants.split(';').map(variant => {
-        const [name, stock, price] = variant.split(',').map(item => item.trim());
-        return { name, stock: Number(stock), price: Number(price) };
-      }),
-      category: formData.category,
-      tags: formData.tags.split(',').map(tag => tag.trim())
-    };
-    
-    console.log('Product data:', productData);
-    
-    let response;
-    if (formData._id) {
-      console.log(`Updating product with ID: ${formData._id}`);
-      response = await axios({
-        method: 'put',
-        url: `${PRODUCT_API_URL}/api/products/${formData._id}`,
-        data: productData,
-        headers: headers
-      });
-    } else {
-      console.log('Creating new product');
-      response = await axios({
-        method: 'post',
-        url: `${PRODUCT_API_URL}/api/products`,
-        data: productData,
-        headers: headers
-      });
-    }
-    
-    console.log('Product operation successful:', response.data);
-    
-    // Fetch updated product list
-    const fetchResponse = await axios.get(`${PRODUCT_API_URL}/api/products`, {
-      params: { limit: 100 },
-      headers: headers
-    });
-    
-    setProducts(fetchResponse.data.products || []);
-    setFormData({
-      _id: null,
-      name: '',
-      brand: '',
-      description: '',
-      images: '',
-      variants: '',
-      category: '',
-      tags: ''
-    });
-    setError('');
-    setProductError('');
-    
-    // Show success message
-    alert(formData._id ? 'Product updated successfully!' : 'Product created successfully!');
-  } catch (err) {
-    console.error('Error saving product:', err);
-    setError(`Failed to save product: ${err.message}${err.response?.data?.error ? ` - ${err.response.data.error}` : ''}`);
-    if (err.response?.status === 401) {
-      alert('Authentication error. You will be redirected to login.');
-      await logout();
-      navigate('/login');
-    }
-  }
-};
-
 
     const handleEditProduct = (product) => {
         setFormData({
@@ -741,41 +773,6 @@ const handleCreateOrUpdateProduct = async (e) => {
         }
     };
 
-  const handleDeleteUser = async (id) => {
-  try {
-    // Check if the ID is valid
-    if (!id) {
-      setError('Cannot delete user: Invalid user ID');
-      return;
-    }
-    
-    const token = localStorage.getItem('token');
-    if (!token) throw new Error('No JWT token found in localStorage');
-    
-    // Explicitly include headers
-    const headers = {
-      'Authorization': `Bearer ${token}`
-    };
-    
-    console.log(`Deleting user with ID: ${id}`);
-    
-    // Make the DELETE request with the headers
-    const response = await axios.delete(`${ACCOUNT_API_URL}/user/admin/users/${id}`, { headers });
-    
-    if (response.status === 200) {
-      // Remove the user from the users array
-      setUsers(prevUsers => prevUsers.filter(user => user.id !== id));
-      setError('');
-    }
-  } catch (err) {
-    console.error('Error deleting user:', err);
-    setError(`Failed to delete user: ${err.message}${err.response?.data?.message ? ` - ${err.response.data.message}` : ''}`);
-    if (err.response?.status === 401) {
-      await logout();
-      navigate('/login');
-    }
-  }
-};
     const handleOrderClick = (order) => {
         setSelectedOrder(order);
         setNewStatus(order.currentStatus);
@@ -1098,154 +1095,7 @@ const handleCreateOrUpdateProduct = async (e) => {
                     )}
                 </div>
 
-                <div style={{
-                    backgroundColor: '#1A1A1A',
-                    padding: '30px',
-                    borderRadius: '10px',
-                    maxWidth: '600px',
-                    margin: '0 auto 40px',
-                    boxShadow: '0 4px 10px rgba(0, 0, 0, 0.5)'
-                }}>
-                    <h2 style={{
-                        fontSize: '24px',
-                        color: '#D4AF37',
-                        marginBottom: '20px'
-                    }}>
-                        Create Discount Code
-                    </h2>
-                    {error && (
-                        <p style={{
-                            color: '#FF5555',
-                            marginBottom: '15px'
-                        }}>
-                            {error}
-                        </p>
-                    )}
-                    <div>
-                        <input
-                            type="text"
-                            name="code"
-                            placeholder="Discount Code (5-character alphanumeric)"
-                            value={discountForm.code}
-                            onChange={handleDiscountInputChange}
-                            style={{
-                                width: '100%',
-                                padding: '10px',
-                                marginBottom: '15px',
-                                backgroundColor: '#E0E0E0',
-                                border: 'none',
-                                borderRadius: '5px',
-                                color: '#000000',
-                                fontFamily: "'Roboto', sans-serif"
-                            }}
-                        />
-                        <input
-                            type="number"
-                            name="discount_percentage"
-                            placeholder="Discount Percentage (e.g., 10)"
-                            value={discountForm.discount_percentage}
-                            onChange={handleDiscountInputChange}
-                            style={{
-                                width: '100%',
-                                padding: '10px',
-                                marginBottom: '15px',
-                                backgroundColor: '#E0E0E0',
-                                border: 'none',
-                                borderRadius: '5px',
-                                color: '#000000',
-                                fontFamily: "'Roboto', sans-serif"
-                            }}
-                        />
-                        <input
-                            type="number"
-                            name="usageLimit"
-                            placeholder="Usage Limit (1-10)"
-                            value={discountForm.usageLimit}
-                            onChange={handleDiscountInputChange}
-                            style={{
-                                width: '100%',
-                                padding: '10px',
-                                marginBottom: '20px',
-                                backgroundColor: '#E0E0E0',
-                                border: 'none',
-                                borderRadius: '5px',
-                                color: '#000000',
-                                fontFamily: "'Roboto', sans-serif"
-                            }}
-                        />
-                        <button
-                            onClick={handleCreateDiscount}
-                            style={{
-                                width: '100%',
-                                padding: '10px',
-                                backgroundColor: '#D4AF37',
-                                color: '#000000',
-                                border: 'none',
-                                borderRadius: '5px',
-                                fontFamily: "'Roboto', sans-serif",
-                                cursor: 'pointer',
-                                transition: 'background-color 0.3s'
-                            }}
-                            onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#E0E0E0'}
-                            onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#D4AF37'}
-                        >
-                            Create Discount Code
-                        </button>
-                    </div>
-                </div>
-
-                <div style={{
-                    backgroundColor: '#1A1A1A',
-                    padding: '30px',
-                    borderRadius: '10px',
-                    boxShadow: '0 4px 10px rgba(0, 0, 0, 0.5)',
-                    marginBottom: '40px'
-                }}>
-                    <h2 style={{
-                        fontSize: '24px',
-                        color: '#D4AF37',
-                        marginBottom: '20px'
-                    }}>
-                        Discount Code List
-                    </h2>
-                    {discountError && (
-                        <p style={{
-                            color: '#FF5555',
-                            marginBottom: '15px'
-                        }}>
-                            {discountError}
-                        </p>
-                    )}
-                    {discounts.length === 0 && !discountError ? (
-                        <p style={{ color: '#E0E0E0' }}>No discount codes available.</p>
-                    ) : (
-                        <table style={{
-                            width: '100%',
-                            borderCollapse: 'collapse',
-                            color: '#FFFFFF',
-                            fontFamily: "'Roboto', sans-serif"
-                        }}>
-                            <thead>
-                                <tr style={{ borderBottom: '1px solid #D4AF37' }}>
-                                    <th style={{ padding: '10px', textAlign: 'left' }}>Code</th>
-                                    <th style={{ padding: '10px', textAlign: 'left' }}>Discount %</th>
-                                    <th style={{ padding: '10px', textAlign: 'left' }}>Usage</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {discounts.map(discount => (
-                                    <tr key={discount.code} style={{ borderBottom: '1px solid #333333' }}>
-                                        <td style={{ padding: '10px' }}>{discount.code}</td>
-                                        <td style={{ padding: '10px' }}>{discount.discountPercentage}%</td>
-                                        <td style={{ padding: '10px' }}>{discount.timesUsed}/{discount.usageLimit}</td>
-                                    </tr>
-                                ))}
-                            </tbody>
-                        </table>
-                    )}
-                </div>
-
-                <div style={{
+                <div className="user-form-section" style={{
                     backgroundColor: '#1A1A1A',
                     padding: '30px',
                     borderRadius: '10px',
@@ -1401,7 +1251,7 @@ const handleCreateOrUpdateProduct = async (e) => {
                             </thead>
                             <tbody>
                                 {users.map(user => (
-                                    <tr key={user.id} style={{ borderBottom: '1px solid #333333' }}>
+                                    <tr key={user._id} style={{ borderBottom: '1px solid #333333' }}>
                                         <td style={{ padding: '10px' }}>{user.email}</td>
                                         <td style={{ padding: '10px' }}>{user.name}</td>
                                         <td style={{ padding: '10px' }}>{user.role}</td>
@@ -1425,7 +1275,7 @@ const handleCreateOrUpdateProduct = async (e) => {
                                                 Edit
                                             </button>
                                             <button
-                                                onClick={() => handleDeleteUser(user.id)}
+                                                onClick={() => handleDeleteUser(user._id)}
                                                 style={{
                                                     padding: '5px 10px',
                                                     backgroundColor: '#FF5555',
@@ -1441,6 +1291,153 @@ const handleCreateOrUpdateProduct = async (e) => {
                                                 Delete
                                             </button>
                                         </td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    )}
+                </div>
+
+                <div style={{
+                    backgroundColor: '#1A1A1A',
+                    padding: '30px',
+                    borderRadius: '10px',
+                    maxWidth: '600px',
+                    margin: '0 auto 40px',
+                    boxShadow: '0 4px 10px rgba(0, 0, 0, 0.5)'
+                }}>
+                    <h2 style={{
+                        fontSize: '24px',
+                        color: '#D4AF37',
+                        marginBottom: '20px'
+                    }}>
+                        Create Discount Code
+                    </h2>
+                    {error && (
+                        <p style={{
+                            color: '#FF5555',
+                            marginBottom: '15px'
+                        }}>
+                            {error}
+                        </p>
+                    )}
+                    <div>
+                        <input
+                            type="text"
+                            name="code"
+                            placeholder="Discount Code (5-character alphanumeric)"
+                            value={discountForm.code}
+                            onChange={handleDiscountInputChange}
+                            style={{
+                                width: '100%',
+                                padding: '10px',
+                                marginBottom: '15px',
+                                backgroundColor: '#E0E0E0',
+                                border: 'none',
+                                borderRadius: '5px',
+                                color: '#000000',
+                                fontFamily: "'Roboto', sans-serif"
+                            }}
+                        />
+                        <input
+                            type="number"
+                            name="discount_percentage"
+                            placeholder="Discount Percentage (e.g., 10)"
+                            value={discountForm.discount_percentage}
+                            onChange={handleDiscountInputChange}
+                            style={{
+                                width: '100%',
+                                padding: '10px',
+                                marginBottom: '15px',
+                                backgroundColor: '#E0E0E0',
+                                border: 'none',
+                                borderRadius: '5px',
+                                color: '#000000',
+                                fontFamily: "'Roboto', sans-serif"
+                            }}
+                        />
+                        <input
+                            type="number"
+                            name="usageLimit"
+                            placeholder="Usage Limit (1-10)"
+                            value={discountForm.usageLimit}
+                            onChange={handleDiscountInputChange}
+                            style={{
+                                width: '100%',
+                                padding: '10px',
+                                marginBottom: '20px',
+                                backgroundColor: '#E0E0E0',
+                                border: 'none',
+                                borderRadius: '5px',
+                                color: '#000000',
+                                fontFamily: "'Roboto', sans-serif"
+                            }}
+                        />
+                        <button
+                            onClick={handleCreateDiscount}
+                            style={{
+                                width: '100%',
+                                padding: '10px',
+                                backgroundColor: '#D4AF37',
+                                color: '#000000',
+                                border: 'none',
+                                borderRadius: '5px',
+                                fontFamily: "'Roboto', sans-serif",
+                                cursor: 'pointer',
+                                transition: 'background-color 0.3s'
+                            }}
+                            onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#E0E0E0'}
+                            onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#D4AF37'}
+                        >
+                            Create Discount Code
+                        </button>
+                    </div>
+                </div>
+
+                <div style={{
+                    backgroundColor: '#1A1A1A',
+                    padding: '30px',
+                    borderRadius: '10px',
+                    boxShadow: '0 4px 10px rgba(0, 0, 0, 0.5)',
+                    marginBottom: '40px'
+                }}>
+                    <h2 style={{
+                        fontSize: '24px',
+                        color: '#D4AF37',
+                        marginBottom: '20px'
+                    }}>
+                        Discount Code List
+                    </h2>
+                    {discountError && (
+                        <p style={{
+                            color: '#FF5555',
+                            marginBottom: '15px'
+                        }}>
+                            {discountError}
+                        </p>
+                    )}
+                    {discounts.length === 0 && !discountError ? (
+                        <p style={{ color: '#E0E0E0' }}>No discount codes available.</p>
+                    ) : (
+                        <table style={{
+                            width: '100%',
+                            borderCollapse: 'collapse',
+                            color: '#FFFFFF',
+                            fontFamily: "'Roboto', sans-serif"
+                        }}>
+                            <thead>
+                                <tr style={{ borderBottom: '1px solid #D4AF37' }}>
+                                    <th style={{ padding: '10px', textAlign: 'left' }}>Code</th>
+                                    <th style={{ padding: '10px', textAlign: 'left' }}>Discount %</th>
+                                    <th style={{ padding: '10px', textAlign: 'left' }}>Usage</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {discounts.map(discount => (
+                                    <tr key={discount.code} style={{ borderBottom: '1px solid #333333' }}>
+                                        <td style={{ padding: '10px' }}>{discount.code}</td>
+                                        <td style={{ padding: '10px' }}>{discount.discountPercentage}%</td>
+                                        <td style={{ padding: '10px' }}>{discount.timesUsed}/{discount.usageLimit}</td>
                                     </tr>
                                 ))}
                             </tbody>
@@ -1636,7 +1633,9 @@ const handleCreateOrUpdateProduct = async (e) => {
                     borderRadius: '10px',
                     boxShadow: '0 4px 10px rgba(0, 0, 0, 0.5)'
                 }}>
-                    <h2 style={{
+                    <h
+
+2 style={{
                         fontSize: '24px',
                         color: '#D4AF37',
                         marginBottom: '20px'
