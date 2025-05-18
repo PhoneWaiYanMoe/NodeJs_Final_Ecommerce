@@ -689,7 +689,7 @@ const AdminDashboard = () => {
             }}>
                 <div style={{ display: 'flex', alignItems: 'center' }}>
                     <img
-                        src="/logo_placeholder.png"
+                        src="/logo.png"
                         alt="LuxeLane Logo"
                         style={{ width: '50px', height: '50px', marginRight: '15px' }}
                     />

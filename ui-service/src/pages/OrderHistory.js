@@ -9,6 +9,8 @@ const OrderHistory = () => {
   const [orders, setOrders] = useState([]);
   const [selectedOrder, setSelectedOrder] = useState(null);
   const [modalOpen, setModalOpen] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState('');
 
   const ORDERS_API_URL = 'https://nodejs-final-ecommerce-1.onrender.com/cart/orders';
 
@@ -21,35 +23,38 @@ const OrderHistory = () => {
   }, [user, navigate]);
 
   const fetchOrders = async () => {
+    setIsLoading(true);
+    setError('');
     try {
       const token = localStorage.getItem('token');
       if (!token) throw new Error('No token found');
 
+      console.log('Fetching orders...');
       const response = await axios.get(ORDERS_API_URL, {
         headers: { Authorization: `Bearer ${token}` },
       });
-      setOrders(response.data || []);
+      
+      console.log('Orders response:', response.data);
+      
+      if (Array.isArray(response.data)) {
+        setOrders(response.data);
+      } else {
+        console.error('Unexpected response format:', response.data);
+        setError('Unexpected response format from server');
+        setOrders([]);
+      }
     } catch (error) {
       console.error('Error fetching orders:', error);
+      setError('Failed to load orders. Please try again later.');
       setOrders([]);
+    } finally {
+      setIsLoading(false);
     }
   };
 
   const handleOrderClick = (order) => {
-    // Create a safe version of the order with null checking
-    const safeOrder = {
-      ...order,
-      orderId: order.orderId || '',
-      items: Array.isArray(order.items) 
-        ? order.items.map(item => ({
-            ...item,
-            productId: item.productId ? item.productId.toString() : 'unknown',
-          })) 
-        : [],
-      // Add other properties with null checks as needed
-    };
-    
-    setSelectedOrder(safeOrder);
+    console.log('Selected order:', order);
+    setSelectedOrder(order);
     setModalOpen(true);
   };
 
@@ -67,32 +72,13 @@ const OrderHistory = () => {
     }
   };
 
-  const formattedOrders = orders.map(order => ({
-    orderId: order._id ? order._id.toString() : '',
-    items: Array.isArray(order.items) ? order.items.map(item => ({
-      productId: item.productId ? item.productId.toString() : 'unknown',  // Add null check here
-      variantName: item.variantName || 'Default',
-      quantity: item.quantity || 0,
-      price: item.price || 0,
-    })) : [],
-    totalPrice: order.totalPrice || 0,
-    taxes: order.taxes || 0,
-    shippingFee: order.shippingFee || 0,
-    discountApplied: order.discountApplied || 0,
-    discountCode: order.discountCode || '',
-    pointsEarned: order.pointsEarned || 0,
-    pointsUsed: order.pointsUsed || 0,
-    statusHistory: order.statusHistory || [],
-    currentStatus: order.statusHistory && order.statusHistory.length > 0 
-      ? order.statusHistory[order.statusHistory.length - 1].status 
-      : 'ordered',
-    shippingAddress: order.shippingAddress || {},
-    paymentDetails: order.paymentDetails ? {
-      cardNumber: `**** **** **** ${order.paymentDetails.cardNumber.slice(-4)}`,
-      expiryDate: order.paymentDetails.expiryDate,
-    } : { cardNumber: 'N/A', expiryDate: 'N/A' },
-    createdAt: order.createdAt || new Date(),
-  }));
+  // Helper function to safely access nested properties
+  const safeGet = (obj, path, defaultValue = '') => {
+    const keys = path.split('.');
+    return keys.reduce((acc, key) => 
+      acc && acc[key] !== undefined && acc[key] !== null ? acc[key] : defaultValue
+    , obj);
+  };
 
   return (
     <div style={{
@@ -173,24 +159,6 @@ const OrderHistory = () => {
               Cart
             </button>
           </Link>
-          <Link to="/orders">
-            <button
-              style={{
-                padding: '10px 20px',
-                backgroundColor: '#D4AF37',
-                color: '#000000',
-                border: 'none',
-                borderRadius: '5px',
-                fontFamily: "'Roboto', sans-serif",
-                cursor: 'pointer',
-                transition: 'background-color 0.3s',
-              }}
-              onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#E0E0E0')}
-              onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = '#D4AF37')}
-            >
-              Order History
-            </button>
-          </Link>
           <button
             onClick={handleAuthAction}
             style={{
@@ -222,9 +190,17 @@ const OrderHistory = () => {
           Order History
         </h1>
 
-        {orders.length === 0 ? (
+        {isLoading ? (
           <p style={{ textAlign: 'center', fontSize: '18px', color: '#E0E0E0' }}>
-            No orders found.
+            Loading your orders...
+          </p>
+        ) : error ? (
+          <p style={{ textAlign: 'center', fontSize: '18px', color: '#FF5555' }}>
+            {error}
+          </p>
+        ) : orders.length === 0 ? (
+          <p style={{ textAlign: 'center', fontSize: '18px', color: '#E0E0E0' }}>
+            No orders found. Start shopping to see your order history here!
           </p>
         ) : (
           <div style={{
@@ -234,9 +210,9 @@ const OrderHistory = () => {
             maxWidth: '800px',
             margin: '0 auto',
           }}>
-            {formattedOrders.map((order) => (
+            {orders.map((order) => (
               <div
-                key={order.orderId}
+                key={order.orderId || order.id || order._id}
                 style={{
                   backgroundColor: '#1A1A1A',
                   padding: '20px',
@@ -249,17 +225,40 @@ const OrderHistory = () => {
                 onMouseLeave={(e) => (e.currentTarget.style.transform = 'scale(1.0)')}
               >
                 <h3 style={{ fontSize: '20px', color: '#D4AF37', marginBottom: '10px' }}>
-                  Order ID: {order.orderId}
+                  Order ID: {order.orderId || order.id || order._id || 'Unknown ID'}
                 </h3>
                 <p style={{ fontSize: '16px', color: '#E0E0E0', marginBottom: '5px' }}>
                   Date: {new Date(order.createdAt).toLocaleDateString()}
                 </p>
                 <p style={{ fontSize: '16px', color: '#E0E0E0', marginBottom: '5px' }}>
-                  Total: ₫{order.totalPrice.toFixed(2)}
+                  Total: ₫{(order.totalPrice || 0).toFixed(2)}
                 </p>
                 <p style={{ fontSize: '16px', color: '#D4AF37', marginBottom: '5px' }}>
-                  Status: {order.currentStatus.charAt(0).toUpperCase() + order.currentStatus.slice(1)}
+                  Status: {
+                    order.currentStatus ? 
+                    (order.currentStatus.charAt(0).toUpperCase() + order.currentStatus.slice(1)) :
+                    (order.statusHistory && order.statusHistory.length > 0 ? 
+                      (order.statusHistory[order.statusHistory.length - 1].status.charAt(0).toUpperCase() + 
+                       order.statusHistory[order.statusHistory.length - 1].status.slice(1)) : 
+                      'Processing')
+                  }
                 </p>
+                {(order.pointsEarned > 0 || order.pointsUsed > 0) && (
+                  <div style={{ 
+                    marginTop: '10px',
+                    fontSize: '14px',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '3px'
+                  }}>
+                    {order.pointsEarned > 0 && (
+                      <span style={{ color: '#55FF55' }}>Points Earned: +{order.pointsEarned}</span>
+                    )}
+                    {order.pointsUsed > 0 && (
+                      <span style={{ color: '#FF7F7F' }}>Points Used: -{order.pointsUsed}</span>
+                    )}
+                  </div>
+                )}
               </div>
             ))}
           </div>
@@ -307,54 +306,90 @@ const OrderHistory = () => {
               Close
             </button>
             <h2 style={{ fontSize: '24px', color: '#D4AF37', marginBottom: '20px' }}>
-              Order Details - ID: {selectedOrder.orderId}
+              Order Details - ID: {selectedOrder.orderId || selectedOrder.id || selectedOrder._id || 'Unknown ID'}
             </h2>
             <p style={{ fontSize: '16px', color: '#E0E0E0', marginBottom: '10px' }}>
               <strong>Date:</strong> {new Date(selectedOrder.createdAt).toLocaleDateString()}
             </p>
+            
             <p style={{ fontSize: '16px', color: '#D4AF37', marginBottom: '10px' }}>
-              <strong>Current Status:</strong> {selectedOrder.currentStatus.charAt(0).toUpperCase() + selectedOrder.currentStatus.slice(1)}
+              <strong>Current Status:</strong> {
+                selectedOrder.currentStatus ? 
+                (selectedOrder.currentStatus.charAt(0).toUpperCase() + selectedOrder.currentStatus.slice(1)) :
+                (selectedOrder.statusHistory && selectedOrder.statusHistory.length > 0 ? 
+                  (selectedOrder.statusHistory[selectedOrder.statusHistory.length - 1].status.charAt(0).toUpperCase() + 
+                   selectedOrder.statusHistory[selectedOrder.statusHistory.length - 1].status.slice(1)) : 
+                  'Processing')
+              }
             </p>
-            <h3 style={{ fontSize: '18px', color: '#D4AF37', marginBottom: '10px' }}>
-              Status History
-            </h3>
-            <ul style={{ listStyleType: 'none', padding: 0, marginBottom: '20px' }}>
-              {selectedOrder.statusHistory.map((status, index) => (
-                <li key={index} style={{ fontSize: '16px', color: '#E0E0E0', marginBottom: '5px' }}>
-                  {status.status.charAt(0).toUpperCase() + status.status.slice(1)} - {new Date(status.updatedAt).toLocaleString()}
-                </li>
-              ))}
-            </ul>
+            
+            {selectedOrder.statusHistory && selectedOrder.statusHistory.length > 0 && (
+              <>
+                <h3 style={{ fontSize: '18px', color: '#D4AF37', marginBottom: '10px' }}>
+                  Status History
+                </h3>
+                <ul style={{ listStyleType: 'none', padding: 0, marginBottom: '20px' }}>
+                  {selectedOrder.statusHistory.map((status, index) => (
+                    <li key={index} style={{ fontSize: '16px', color: '#E0E0E0', marginBottom: '5px' }}>
+                      {status.status.charAt(0).toUpperCase() + status.status.slice(1)} - {new Date(status.updatedAt).toLocaleString()}
+                    </li>
+                  ))}
+                </ul>
+              </>
+            )}
+            
             <h3 style={{ fontSize: '18px', color: '#D4AF37', marginBottom: '10px' }}>
               Items
             </h3>
-            <ul style={{ listStyleType: 'none', padding: 0, marginBottom: '20px' }}>
-              {selectedOrder.items.map((item, index) => (
-                <li key={index} style={{ fontSize: '16px', color: '#E0E0E0', marginBottom: '10px' }}>
-                  Product ID: {item.productId} | Variant: {item.variantName} | Quantity: {item.quantity} | Price: ${item.price.toFixed(2)}
-                </li>
-              ))}
-            </ul>
-            <p style={{ fontSize: '16px', color: '#E0E0E0', marginBottom: '10px' }}>
-              <strong>Subtotal:</strong> ${(selectedOrder.totalPrice - selectedOrder.taxes - selectedOrder.shippingFee + selectedOrder.discountApplied).toFixed(2)}
-            </p>
-            {selectedOrder.discountApplied > 0 && (
-              <p style={{ fontSize: '16px', color: '#D4AF37', marginBottom: '10px' }}>
-                <strong>Discount ({selectedOrder.discountCode}):</strong> -${selectedOrder.discountApplied.toFixed(2)}
+            {selectedOrder.items && selectedOrder.items.length > 0 ? (
+              <ul style={{ listStyleType: 'none', padding: 0, marginBottom: '20px' }}>
+                {selectedOrder.items.map((item, index) => (
+                  <li key={index} style={{ 
+                    fontSize: '16px', 
+                    color: '#E0E0E0', 
+                    marginBottom: '10px',
+                    backgroundColor: '#2A2A2A',
+                    padding: '10px',
+                    borderRadius: '5px'
+                  }}>
+                    <div><strong>Product ID:</strong> {item.productId}</div>
+                    <div><strong>Variant:</strong> {item.variantName || 'Default'}</div>
+                    <div><strong>Quantity:</strong> {item.quantity}</div>
+                    <div><strong>Price:</strong> ₫{(item.price || 0).toFixed(2)}</div>
+                    <div><strong>Total:</strong> ₫{((item.price || 0) * (item.quantity || 0)).toFixed(2)}</div>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p style={{ fontSize: '16px', color: '#E0E0E0', marginBottom: '20px' }}>
+                No items found for this order.
               </p>
             )}
+            
             <p style={{ fontSize: '16px', color: '#E0E0E0', marginBottom: '10px' }}>
-              <strong>Taxes:</strong> ${selectedOrder.taxes.toFixed(2)}
+              <strong>Subtotal:</strong> ₫{((selectedOrder.totalPrice || 0) - (selectedOrder.taxes || 0) - (selectedOrder.shippingFee || 0) + (selectedOrder.discountApplied || 0)).toFixed(2)}
             </p>
+            
+            {(selectedOrder.discountApplied || 0) > 0 && (
+              <p style={{ fontSize: '16px', color: '#D4AF37', marginBottom: '10px' }}>
+                <strong>Discount {selectedOrder.discountCode ? `(${selectedOrder.discountCode})` : ''}:</strong> -₫{(selectedOrder.discountApplied || 0).toFixed(2)}
+              </p>
+            )}
+            
             <p style={{ fontSize: '16px', color: '#E0E0E0', marginBottom: '10px' }}>
-              <strong>Shipping Fee:</strong> ${selectedOrder.shippingFee.toFixed(2)}
+              <strong>Taxes:</strong> ₫{(selectedOrder.taxes || 0).toFixed(2)}
             </p>
+            
+            <p style={{ fontSize: '16px', color: '#E0E0E0', marginBottom: '10px' }}>
+              <strong>Shipping Fee:</strong> ₫{(selectedOrder.shippingFee || 0).toFixed(2)}
+            </p>
+            
             <p style={{ fontSize: '18px', fontWeight: 'bold', color: '#D4AF37', marginBottom: '20px' }}>
-              <strong>Total:</strong> ${selectedOrder.totalPrice.toFixed(2)}
+              <strong>Total:</strong> ₫{(selectedOrder.totalPrice || 0).toFixed(2)}
             </p>
 
             {/* Points Information */}
-            {selectedOrder.pointsEarned > 0 || selectedOrder.pointsUsed > 0 ? (
+            {((selectedOrder.pointsEarned || 0) > 0 || (selectedOrder.pointsUsed || 0) > 0) && (
               <div style={{ 
                 backgroundColor: '#222222', 
                 padding: '15px', 
@@ -364,34 +399,51 @@ const OrderHistory = () => {
                 <h3 style={{ fontSize: '18px', color: '#D4AF37', marginBottom: '10px' }}>
                   Loyalty Points
                 </h3>
-                {selectedOrder.pointsEarned > 0 && (
+                {(selectedOrder.pointsEarned || 0) > 0 && (
                   <p style={{ fontSize: '16px', color: '#55FF55', marginBottom: '5px' }}>
                     <strong>Points Earned:</strong> +{selectedOrder.pointsEarned}
                   </p>
                 )}
-                {selectedOrder.pointsUsed > 0 && (
+                {(selectedOrder.pointsUsed || 0) > 0 && (
                   <p style={{ fontSize: '16px', color: '#FF7F7F', marginBottom: '5px' }}>
                     <strong>Points Used:</strong> -{selectedOrder.pointsUsed}
                   </p>
                 )}
               </div>
-            ) : null}
+            )}
 
-            <h3 style={{ fontSize: '18px', color: '#D4AF37', marginBottom: '10px' }}>
-              Shipping Address
-            </h3>
-            <p style={{ fontSize: '16px', color: '#E0E0E0', marginBottom: '20px' }}>
-              {selectedOrder.shippingAddress.street}, {selectedOrder.shippingAddress.city}, {selectedOrder.shippingAddress.state}, {selectedOrder.shippingAddress.zip}, {selectedOrder.shippingAddress.country}
-            </p>
-            <h3 style={{ fontSize: '18px', color: '#D4AF37', marginBottom: '10px' }}>
-              Payment Details
-            </h3>
-            <p style={{ fontSize: '16px', color: '#E0E0E0', marginBottom: '10px' }}>
-              <strong>Card Number:</strong> {selectedOrder.paymentDetails.cardNumber}
-            </p>
-            <p style={{ fontSize: '16px', color: '#E0E0E0', marginBottom: '10px' }}>
-              <strong>Expiry Date:</strong> {selectedOrder.paymentDetails.expiryDate}
-            </p>
+            {selectedOrder.shippingAddress && (
+              <>
+                <h3 style={{ fontSize: '18px', color: '#D4AF37', marginBottom: '10px' }}>
+                  Shipping Address
+                </h3>
+                <p style={{ fontSize: '16px', color: '#E0E0E0', marginBottom: '20px' }}>
+                  {safeGet(selectedOrder, 'shippingAddress.street')}, 
+                  {safeGet(selectedOrder, 'shippingAddress.city')}, 
+                  {safeGet(selectedOrder, 'shippingAddress.state')}, 
+                  {safeGet(selectedOrder, 'shippingAddress.zip')}, 
+                  {safeGet(selectedOrder, 'shippingAddress.country')}
+                </p>
+              </>
+            )}
+
+            {selectedOrder.paymentDetails && (
+              <>
+                <h3 style={{ fontSize: '18px', color: '#D4AF37', marginBottom: '10px' }}>
+                  Payment Details
+                </h3>
+                <p style={{ fontSize: '16px', color: '#E0E0E0', marginBottom: '10px' }}>
+                  <strong>Card Number:</strong> {
+                    safeGet(selectedOrder, 'paymentDetails.cardNumber', '****')
+                  }
+                </p>
+                <p style={{ fontSize: '16px', color: '#E0E0E0', marginBottom: '10px' }}>
+                  <strong>Expiry Date:</strong> {
+                    safeGet(selectedOrder, 'paymentDetails.expiryDate', 'N/A')
+                  }
+                </p>
+              </>
+            )}
           </div>
         </div>
       )}
