@@ -264,8 +264,6 @@ router.post('/apply-discount', userOrGuestAllowed, async (req, res) => {
   }
 });
 
-
-// Checkout Process - Require user login
 router.post('/checkout', [verifyToken, userRequired], async (req, res) => {
   const { paymentDetails, discountCode } = req.body;
 
@@ -356,17 +354,15 @@ router.post('/checkout', [verifyToken, userRequired], async (req, res) => {
     });
 
     // CRITICAL FIX: Calculate points earned from the FINAL order total
-    // This ensures users earn points on the entire amount they pay, including taxes and shipping
     const pointsEarned = Math.floor(total * POINTS_RATE);
     console.log('FIXED Points earned from purchase (10% of final total):', pointsEarned);
     
     // Process points
     if (pointsUsed > 0) {
-      // Record the points redemption transaction
       await recordPointsTransaction(
         req.user.id,
         -pointsUsed,
-        'Points redeemed for purchase discount'
+        'Points redeemed for purchase'
       );
     }
     
@@ -404,7 +400,7 @@ router.post('/checkout', [verifyToken, userRequired], async (req, res) => {
       discountApplied: discountAmount,
       discountCode: appliedDiscountCode,
       pointsUsed,
-      pointsEarned, // Newly calculated points based on final total
+      pointsEarned,
       statusHistory: [{ status: 'ordered', updatedAt: new Date() }],
       shippingAddress: user.shippingAddress,
       paymentDetails,
@@ -412,6 +408,15 @@ router.post('/checkout', [verifyToken, userRequired], async (req, res) => {
     
     const savedOrder = await order.save();
     console.log('Order saved with ID:', savedOrder._id.toString());
+    
+    // Send order confirmation email
+    try {
+      await sendOrderConfirmationEmail(user, savedOrder);
+      console.log(`Order confirmation email sent to ${user.email}`);
+    } catch (emailError) {
+      console.error('Failed to send order confirmation email:', emailError);
+      // Note: We don't fail the checkout process if email fails
+    }
     
     // Clean up the cart points application record
     await mongoose.connection.collection('cartPointsApplications').deleteMany({ userId: req.user.id });
@@ -938,140 +943,140 @@ module.exports = router;
 
 // Helper function to send order confirmation email
 
-// Helper function to send order confirmation email 
-const sendOrderConfirmationEmail = async (user, order) => { 
-  if (!process.env.EMAIL_USER || !process.env.EMAIL_PASS) { 
-    console.log('Email credentials not configured, skipping confirmation email'); 
-    return; 
-  } 
+// Helper function to send order confirmation email
+const sendOrderConfirmationEmail = async (user, order) => {
+  if (!process.env.EMAIL_USER || !process.env.EMAIL_PASS) {
+    console.log('Email credentials not configured, skipping confirmation email');
+    return;
+  }
 
-  try { 
-    // Set up nodemailer transporter 
-    const transporter = nodemailer.createTransport({ 
-      service: 'gmail', 
-      auth: { 
-        user: process.env.EMAIL_USER, 
-        pass: process.env.EMAIL_PASS, 
-      }, 
-    }); 
+  try {
+    // Set up nodemailer transporter
+    const transporter = nodemailer.createTransport({
+      service: 'gmail',
+      auth: {
+        user: process.env.EMAIL_USER,
+        pass: process.env.EMAIL_PASS,
+      },
+    });
 
-    // Format the order items for email 
-    const itemsHtml = order.items.map(item => ` 
-      <tr> 
-        <td style="padding: 10px; text-align: left; border-bottom: 1px solid #ddd;">${item.productId} (${item.variantName})</td> 
-        <td style="padding: 10px; text-align: left; border-bottom: 1px solid #ddd;">${item.quantity}</td> 
-        <td style="padding: 10px; text-align: left; border-bottom: 1px solid #ddd;">$${item.price.toFixed(2)}</td> 
-        <td style="padding: 10px; text-align: left; border-bottom: 1px solid #ddd;">$${(item.price * item.quantity).toFixed(2)}</td> 
-      </tr> 
-    `).join(''); 
+    // Format the order items for email
+    const itemsHtml = order.items.map(item => `
+      <tr>
+        <td style="padding: 10px; text-align: left; border-bottom: 1px solid #ddd;">${item.productId} (${item.variantName})</td>
+        <td style="padding: 10px; text-align: left; border-bottom: 1px solid #ddd;">${item.quantity}</td>
+        <td style="padding: 10px; text-align: left; border-bottom: 1px solid #ddd;">$${item.price.toFixed(2)}</td>
+        <td style="padding: 10px; text-align: left; border-bottom: 1px solid #ddd;">$${(item.price * item.quantity).toFixed(2)}</td>
+      </tr>
+    `).join('');
 
-    // Format the address for email 
-    const address = order.shippingAddress; 
-    const formattedAddress = `${address.street}, ${address.city}, ${address.state}, ${address.zip}, ${address.country}`; 
+    // Format the address for email
+    const address = order.shippingAddress;
+    const formattedAddress = `${address.street}, ${address.city}, ${address.state}, ${address.zip}, ${address.country}`;
 
-    // Calculate order summary values 
-    const subtotal = order.items.reduce((sum, item) => sum + (item.price * item.quantity), 0); 
-    const discountAmount = order.discountApplied || 0; 
-    const taxes = order.taxes || 0; 
-    const shipping = order.shippingFee || 0; 
+    // Calculate order summary values
+    const subtotal = order.items.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+    const discountAmount = order.discountApplied || 0;
+    const taxes = order.taxes || 0;
+    const shipping = order.shippingFee || 0;
 
-    // Send the order confirmation email 
-    await transporter.sendMail({ 
-      from: process.env.EMAIL_USER, 
-      to: user.email, 
-      subject: `LuxeLane Order Confirmation #${order._id}`, 
-      html: ` 
-        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; color: #333;"> 
-          <div style="text-align: center; margin-bottom: 20px;"> 
-            <h1 style="color: #D4AF37;">LuxeLane</h1> 
-            <p style="font-style: italic;">Elevate Your Everyday</p> 
-          </div> 
+    // Send the order confirmation email
+    await transporter.sendMail({
+      from: process.env.EMAIL_USER,
+      to: user.email,
+      subject: `LuxeLane Order Confirmation #${order._id}`,
+      html: `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; color: #333;">
+          <div style="text-align: center; margin-bottom: 20px;">
+            <h1 style="color: #D4AF37;">LuxeLane</h1>
+            <p style="font-style: italic;">Elevate Your Everyday</p>
+          </div>
           
-          <div style="background-color: #f8f8f8; padding: 20px; border-left: 4px solid #D4AF37; margin-bottom: 20px;"> 
-            <h2 style="margin-top: 0; color: #333;">Order Confirmation</h2> 
-            <p>Dear ${user.name},</p> 
-            <p>Thank you for your order. We're pleased to confirm that we've received your order and it's being processed.</p> 
-            <p><strong>Order ID:</strong> ${order._id}</p> 
-            <p><strong>Date:</strong> ${new Date(order.createdAt).toLocaleString()}</p> 
-            <p><strong>Status:</strong> ${order.statusHistory[order.statusHistory.length-1].status}</p> 
-          </div> 
+          <div style="background-color: #f8f8f8; padding: 20px; border-left: 4px solid #D4AF37; margin-bottom: 20px;">
+            <h2 style="margin-top: 0; color: #333;">Order Confirmation</h2>
+            <p>Dear ${user.name},</p>
+            <p>Thank you for your order. We're pleased to confirm that we've received your order and it's being processed.</p>
+            <p><strong>Order ID:</strong> ${order._id}</p>
+            <p><strong>Date:</strong> ${new Date(order.createdAt).toLocaleString()}</p>
+            <p><strong>Status:</strong> ${order.statusHistory[order.statusHistory.length-1].status}</p>
+          </div>
           
-          <h3 style="color: #D4AF37;">Order Summary</h3> 
-          <table style="width: 100%; border-collapse: collapse; margin-bottom: 20px;"> 
-            <thead> 
-              <tr style="background-color: #f2f2f2;"> 
-                <th style="padding: 10px; text-align: left; border-bottom: 2px solid #ddd;">Product</th> 
-                <th style="padding: 10px; text-align: left; border-bottom: 2px solid #ddd;">Quantity</th> 
-                <th style="padding: 10px; text-align: left; border-bottom: 2px solid #ddd;">Price</th> 
-                <th style="padding: 10px; text-align: left; border-bottom: 2px solid #ddd;">Total</th> 
-              </tr> 
-            </thead> 
-            <tbody> 
-              ${itemsHtml} 
-            </tbody> 
-          </table> 
+          <h3 style="color: #D4AF37;">Order Summary</h3>
+          <table style="width: 100%; border-collapse: collapse; margin-bottom: 20px;">
+            <thead>
+              <tr style="background-color: #f2f2f2;">
+                <th style="padding: 10px; text-align: left; border-bottom: 2px solid #ddd;">Product</th>
+                <th style="padding: 10px; text-align: left; border-bottom: 2px solid #ddd;">Quantity</th>
+                <th style="padding: 10px; text-align: left; border-bottom: 2px solid #ddd;">Price</th>
+                <th style="padding: 10px; text-align: left; border-bottom: 2px solid #ddd;">Total</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${itemsHtml}
+            </tbody>
+          </table>
           
-          <div style="background-color: #f8f8f8; padding: 15px; margin-bottom: 20px;"> 
-            <table style="width: 100%;"> 
-              <tr> 
-                <td style="padding: 5px;">Subtotal:</td> 
-                <td style="padding: 5px; text-align: right;">$${subtotal.toFixed(2)}</td> 
-              </tr> 
-              ${discountAmount > 0 ? ` 
-              <tr> 
-                <td style="padding: 5px;">Discount${order.discountCode ? ` (${order.discountCode})` : ''}:</td> 
-                <td style="padding: 5px; text-align: right; color: #D4AF37;">-$${discountAmount.toFixed(2)}</td> 
-              </tr> 
-              ` : ''} 
-              ${order.pointsUsed > 0 ? ` 
-              <tr> 
-                <td style="padding: 5px;">Points Applied (${order.pointsUsed} points):</td> 
-                <td style="padding: 5px; text-align: right; color: #D4AF37;">-$${(order.pointsUsed * 0.01).toFixed(2)}</td> 
-              </tr> 
-              ` : ''} 
-              <tr> 
-                <td style="padding: 5px;">Taxes:</td> 
-                <td style="padding: 5px; text-align: right;">$${taxes.toFixed(2)}</td> 
-              </tr> 
-              <tr> 
-                <td style="padding: 5px;">Shipping:</td> 
-                <td style="padding: 5px; text-align: right;">$${shipping.toFixed(2)}</td> 
-              </tr> 
-              <tr style="font-weight: bold;"> 
-                <td style="padding: 5px; border-top: 1px solid #ddd;">Total:</td> 
-                <td style="padding: 5px; text-align: right; border-top: 1px solid #ddd;">$${order.totalPrice.toFixed(2)}</td> 
-              </tr> 
-              ${order.pointsEarned > 0 ? ` 
-              <tr> 
-                <td style="padding: 5px; color: #55AA55;">Points Earned:</td> 
-                <td style="padding: 5px; text-align: right; color: #55AA55;">+${order.pointsEarned} points</td> 
-              </tr> 
-              ` : ''} 
-            </table> 
-          </div> 
+          <div style="background-color: #f8f8f8; padding: 15px; margin-bottom: 20px;">
+            <table style="width: 100%;">
+              <tr>
+                <td style="padding: 5px;">Subtotal:</td>
+                <td style="padding: 5px; text-align: right;">$${subtotal.toFixed(2)}</td>
+              </tr>
+              ${discountAmount > 0 ? `
+              <tr>
+                <td style="padding: 5px;">Discount${order.discountCode ? ` (${order.discountCode})` : ''}:</td>
+                <td style="padding: 5px; text-align: right; color: #D4AF37;">-$${discountAmount.toFixed(2)}</td>
+              </tr>
+              ` : ''}
+              ${order.pointsUsed > 0 ? `
+              <tr>
+                <td style="padding: 5px;">Points Applied (${order.pointsUsed} points):</td>
+                <td style="padding: 5px; text-align: right; color: #D4AF37;">-$${(order.pointsUsed * 0.01).toFixed(2)}</td>
+              </tr>
+              ` : ''}
+              <tr>
+                <td style="padding: 5px;">Taxes:</td>
+                <td style="padding: 5px; text-align: right;">$${taxes.toFixed(2)}</td>
+              </tr>
+              <tr>
+                <td style="padding: 5px;">Shipping:</td>
+                <td style="padding: 5px; text-align: right;">$${shipping.toFixed(2)}</td>
+              </tr>
+              <tr style="font-weight: bold;">
+                <td style="padding: 5px; border-top: 1px solid #ddd;">Total:</td>
+                <td style="padding: 5px; text-align: right; border-top: 1px solid #ddd;">$${order.totalPrice.toFixed(2)}</td>
+              </tr>
+              ${order.pointsEarned > 0 ? `
+              <tr>
+                <td style="padding: 5px; color: #55AA55;">Points Earned:</td>
+                <td style="padding: 5px; text-align: right; color: #55AA55;">+${order.pointsEarned} points</td>
+              </tr>
+              ` : ''}
+            </table>
+          </div>
           
-          <div style="margin-bottom: 20px;"> 
-            <h3 style="color: #D4AF37;">Shipping Address</h3> 
-            <p style="background-color: #f8f8f8; padding: 10px;">${formattedAddress}</p> 
-          </div> 
+          <div style="margin-bottom: 20px;">
+            <h3 style="color: #D4AF37;">Shipping Address</h3>
+            <p style="background-color: #f8f8f8; padding: 10px;">${formattedAddress}</p>
+          </div>
           
-          <div style="margin-bottom: 20px;"> 
-            <h3 style="color: #D4AF37;">Payment Information</h3> 
-            <p>Card ending in: ${order.paymentDetails.cardNumber.slice(-4)}</p> 
-          </div> 
+          <div style="margin-bottom: 20px;">
+            <h3 style="color: #D4AF37;">Payment Information</h3>
+            <p>Card ending in: ${order.paymentDetails.cardNumber.slice(-4)}</p>
+          </div>
           
-          <p>Thank you for shopping with LuxeLane. If you have any questions about your order, please contact our customer service.</p> 
+          <p>Thank you for shopping with LuxeLane. If you have any questions about your order, please contact our customer service.</p>
           
-          <div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #eee; text-align: center; color: #777; font-size: 12px;"> 
-            <p>&copy; 2025 LuxeLane. All rights reserved.</p> 
-          </div> 
-        </div> 
-      ` 
-    }); 
+          <div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #eee; text-align: center; color: #777; font-size: 12px;">
+            <p>© 2025 LuxeLane. All rights reserved.</p>
+          </div>
+        </div>
+      `
+    });
 
-    console.log(`Order confirmation email sent to ${user.email} for order ${order._id}`); 
-  } catch (err) { 
-    console.error('Error sending order confirmation email:', err); 
-    // Don't throw the error to prevent checkout failure 
-  } 
+    console.log(`Order confirmation email sent to ${user.email} for order ${order._id}`);
+  } catch (err) {
+    console.error('Error sending order confirmation email:', err);
+    // Don't throw the error to prevent checkout failure
+  }
 };
