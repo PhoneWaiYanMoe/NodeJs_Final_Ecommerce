@@ -965,8 +965,8 @@ const sendOrderConfirmationEmail = async (user, order) => {
       <tr>
         <td style="padding: 10px; text-align: left; border-bottom: 1px solid #ddd;">${item.productId} (${item.variantName})</td>
         <td style="padding: 10px; text-align: left; border-bottom: 1px solid #ddd;">${item.quantity}</td>
-        <td style="padding: 10px; text-align: left; border-bottom: 1px solid #ddd;">$${item.price.toFixed(2)}</td>
-        <td style="padding: 10px; text-align: left; border-bottom: 1px solid #ddd;">$${(item.price * item.quantity).toFixed(2)}</td>
+        <td style="padding: 10px; text-align: left; border-bottom: 1px solid #ddd;">${item.price.toFixed(2)}₫</td>
+        <td style="padding: 10px; text-align: left; border-bottom: 1px solid #ddd;">${(item.price * item.quantity).toFixed(2)}₫</td>
       </tr>
     `).join('');
 
@@ -1020,31 +1020,31 @@ const sendOrderConfirmationEmail = async (user, order) => {
             <table style="width: 100%;">
               <tr>
                 <td style="padding: 5px;">Subtotal:</td>
-                <td style="padding: 5px; text-align: right;">$${subtotal.toFixed(2)}</td>
+                <td style="padding: 5px; text-align: right;">${subtotal.toFixed(2)}₫</td>
               </tr>
               ${discountAmount > 0 ? `
               <tr>
                 <td style="padding: 5px;">Discount${order.discountCode ? ` (${order.discountCode})` : ''}:</td>
-                <td style="padding: 5px; text-align: right; color: #D4AF37;">-$${discountAmount.toFixed(2)}</td>
+                <td style="padding: 5px; text-align: right; color: #D4AF37;">-${discountAmount.toFixed(2)}₫</td>
               </tr>
               ` : ''}
               ${order.pointsUsed > 0 ? `
               <tr>
                 <td style="padding: 5px;">Points Applied (${order.pointsUsed} points):</td>
-                <td style="padding: 5px; text-align: right; color: #D4AF37;">-$${(order.pointsUsed * 0.01).toFixed(2)}</td>
+                <td style="padding: 5px; text-align: right; color: #D4AF37;">-${(order.pointsUsed * 0.01).toFixed(2)}₫</td>
               </tr>
               ` : ''}
               <tr>
                 <td style="padding: 5px;">Taxes:</td>
-                <td style="padding: 5px; text-align: right;">$${taxes.toFixed(2)}</td>
+                <td style="padding: 5px; text-align: right;">${taxes.toFixed(2)}₫</td>
               </tr>
               <tr>
                 <td style="padding: 5px;">Shipping:</td>
-                <td style="padding: 5px; text-align: right;">$${shipping.toFixed(2)}</td>
+                <td style="padding: 5px; text-align: right;">${shipping.toFixed(2)}₫</td>
               </tr>
               <tr style="font-weight: bold;">
                 <td style="padding: 5px; border-top: 1px solid #ddd;">Total:</td>
-                <td style="padding: 5px; text-align: right; border-top: 1px solid #ddd;">$${order.totalPrice.toFixed(2)}</td>
+                <td style="padding: 5px; text-align: right; border-top: 1px solid #ddd;">${order.totalPrice.toFixed(2)}₫</td>
               </tr>
               ${order.pointsEarned > 0 ? `
               <tr>
