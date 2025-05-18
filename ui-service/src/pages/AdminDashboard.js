@@ -61,19 +61,23 @@ const AdminDashboard = () => {
  // In AdminDashboard.js, fix the getProductApiHeaders function
 
 // Replace your current getProductApiHeaders function with this in AdminDashboard.js
+// Replace your getProductApiHeaders function with this:
 
 const getProductApiHeaders = () => {
-    // Ensure proper encoding for Basic Auth
-    // The credentials must be "admin@example.com:admin123" exactly as in your middleware
+    // The server is specifically looking for "Basic" authentication type
     const username = 'admin@example.com';
     const password = 'admin123';
     
-    // Create the Authorization header properly
-    // Make sure to encode it correctly - some browsers need this specific format
-    const basicAuth = 'Basic ' + btoa(username + ':' + password);
+    // Format the header exactly as expected by the auth middleware
+    // Note: Some browsers/environments handle this differently, so we're being explicit
+    const credentials = `${username}:${password}`;
+    const encodedCredentials = btoa(credentials);
+    const authHeader = `Basic ${encodedCredentials}`;
+    
+    console.log('Generated Auth Header:', authHeader);
     
     return {
-        'Authorization': basicAuth,
+        'Authorization': authHeader,
         'Content-Type': 'application/json'
     };
 };
