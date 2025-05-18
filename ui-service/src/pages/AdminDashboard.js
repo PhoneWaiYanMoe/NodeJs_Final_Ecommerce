@@ -1633,9 +1633,7 @@ const AdminDashboard = () => {
                     borderRadius: '10px',
                     boxShadow: '0 4px 10px rgba(0, 0, 0, 0.5)'
                 }}>
-                    <h
-
-2 style={{
+                    <h2 style={{
                         fontSize: '24px',
                         color: '#D4AF37',
                         marginBottom: '20px'
