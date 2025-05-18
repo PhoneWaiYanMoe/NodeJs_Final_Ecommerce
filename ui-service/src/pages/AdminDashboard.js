@@ -453,11 +453,126 @@ useEffect(() => {
         const { name, value } = e.target;
         setDiscountForm({ ...discountForm, [name]: value });
     };
+// Function to handle user form input
+const handleUserInputChange = (e) => {
+  const { name, value } = e.target;
+  setUserForm({ ...userForm, [name]: value });
+};
 
-    const handleUserInputChange = (e) => {
-        const { name, value } = e.target;
-        setUserForm({ ...userForm, [name]: value });
+// Function to create or update a user
+const handleCreateOrUpdateUser = async (e) => {
+  e.preventDefault();
+  try {
+    const token = localStorage.getItem('token');
+    if (!token) throw new Error('No JWT token found in localStorage');
+    
+    // Validate required fields
+    if (!userForm.email || (!userForm._id && !userForm.password) || !userForm.name) {
+      setError('Email, name, and password (for new users) are required');
+      return;
+    }
+    
+    // Explicitly include headers
+    const headers = {
+      'Authorization': `Bearer ${token}`,
+      'Content-Type': 'application/json'
     };
+    
+    console.log('User form data:', {...userForm, password: userForm.password ? '********' : 'unchanged'});
+    
+    // Prepare user data differently for create vs update
+    const userData = {
+      email: userForm.email,
+      name: userForm.name,
+      role: userForm.role
+    };
+    
+    // Only include password if it's provided or if creating a new user
+    if (userForm.password) {
+      userData.password = userForm.password;
+    }
+    
+    // For new users, include a default shipping address
+    if (!userForm._id) {
+      userData.shippingAddress = {
+        street: '',
+        city: '',
+        state: '',
+        zip: '',
+        country: '',
+      };
+    }
+    
+    let response;
+    if (userForm._id) {
+      console.log(`Updating user with ID: ${userForm._id}`);
+      response = await axios({
+        method: 'put',
+        url: `${ACCOUNT_API_URL}/user/admin/users/${userForm._id}`,
+        data: userData,
+        headers: headers
+      });
+    } else {
+      console.log('Creating new user');
+      response = await axios({
+        method: 'post',
+        url: `${ACCOUNT_API_URL}/user/admin/users`,
+        data: userData,
+        headers: headers
+      });
+    }
+    
+    console.log('User operation successful:', response.data);
+    
+    // Fetch updated user list
+    const fetchResponse = await axios.get(`${ACCOUNT_API_URL}/user/admin/users`, { headers });
+    
+    const mappedUsers = Array.isArray(fetchResponse.data) ? 
+      fetchResponse.data.map(user => ({
+        ...user,
+        id: user._id || user.id,
+        createdAt: user.created_at || user.createdAt
+      })) : [];
+    
+    setUsers(mappedUsers);
+    setUserForm({
+      _id: null,
+      email: '',
+      password: '',
+      name: '',
+      role: 'user'
+    });
+    setError('');
+    
+    // Show success message
+    alert(userForm._id ? 'User updated successfully!' : 'User created successfully!');
+  } catch (err) {
+    console.error('Error saving user:', err);
+    setError(`Failed to save user: ${err.message}${err.response?.data?.message ? ` - ${err.response.data.message}` : ''}`);
+    if (err.response?.status === 401) {
+      alert('Authentication error. You will be redirected to login.');
+      await logout();
+      navigate('/login');
+    }
+  }
+};
+
+// Function to set up form for editing a user
+const handleEditUser = (user) => {
+  setUserForm({
+    _id: user.id,
+    email: user.email,
+    password: '', // Don't populate password for security
+    name: user.name,
+    role: user.role
+  });
+  
+  // Scroll to the user form
+  window.scrollTo({
+    top: document.querySelector('.user-form-section').offsetTop,
+    behavior: 'smooth'
+  });
+};
 
     const validateDiscountForm = () => {
         if (!discountForm.code || discountForm.code.length !== 5 || !/^[a-zA-Z0-9]+$/.test(discountForm.code)) {
@@ -512,20 +627,20 @@ useEffect(() => {
         }
     };
 
-  // Fix for product creation/update function
 const handleCreateOrUpdateProduct = async (e) => {
   e.preventDefault();
   try {
-    if (!addAuthorizationHeader()) {
-      throw new Error('No JWT token found in localStorage');
-    }
-
-    // Make sure to include the authorization header directly with the request
+    const token = localStorage.getItem('token');
+    if (!token) throw new Error('No JWT token found in localStorage');
+    
+    // Make sure headers are passed correctly
     const headers = {
-      'Authorization': `Bearer ${localStorage.getItem('token')}`,
+      'Authorization': `Bearer ${token}`,
       'Content-Type': 'application/json'
     };
-
+    
+    console.log('Authorization header:', `Bearer ${token}`);
+    
     const productData = {
       name: formData.name,
       brand: formData.brand,
@@ -538,19 +653,37 @@ const handleCreateOrUpdateProduct = async (e) => {
       category: formData.category,
       tags: formData.tags.split(',').map(tag => tag.trim())
     };
-
+    
+    console.log('Product data:', productData);
+    
+    let response;
     if (formData._id) {
-      await axios.put(`${PRODUCT_API_URL}/api/products/${formData._id}`, productData, { headers });
+      console.log(`Updating product with ID: ${formData._id}`);
+      response = await axios({
+        method: 'put',
+        url: `${PRODUCT_API_URL}/api/products/${formData._id}`,
+        data: productData,
+        headers: headers
+      });
     } else {
-      await axios.post(`${PRODUCT_API_URL}/api/products`, productData, { headers });
+      console.log('Creating new product');
+      response = await axios({
+        method: 'post',
+        url: `${PRODUCT_API_URL}/api/products`,
+        data: productData,
+        headers: headers
+      });
     }
-
-    const response = await axios.get(`${PRODUCT_API_URL}/api/products`, {
+    
+    console.log('Product operation successful:', response.data);
+    
+    // Fetch updated product list
+    const fetchResponse = await axios.get(`${PRODUCT_API_URL}/api/products`, {
       params: { limit: 100 },
-      headers
+      headers: headers
     });
-
-    setProducts(response.data.products || []);
+    
+    setProducts(fetchResponse.data.products || []);
     setFormData({
       _id: null,
       name: '',
@@ -563,9 +696,14 @@ const handleCreateOrUpdateProduct = async (e) => {
     });
     setError('');
     setProductError('');
+    
+    // Show success message
+    alert(formData._id ? 'Product updated successfully!' : 'Product created successfully!');
   } catch (err) {
+    console.error('Error saving product:', err);
     setError(`Failed to save product: ${err.message}${err.response?.data?.error ? ` - ${err.response.data.error}` : ''}`);
     if (err.response?.status === 401) {
+      alert('Authentication error. You will be redirected to login.');
       await logout();
       navigate('/login');
     }
@@ -603,97 +741,41 @@ const handleCreateOrUpdateProduct = async (e) => {
         }
     };
 
-    // Function to handle user creation/update with proper authentication
-const handleCreateOrUpdateUser = async (e) => {
-  e.preventDefault();
+  const handleDeleteUser = async (id) => {
   try {
-    if (!addAuthorizationHeader()) {
-      throw new Error('No JWT token found in localStorage');
+    // Check if the ID is valid
+    if (!id) {
+      setError('Cannot delete user: Invalid user ID');
+      return;
     }
-
+    
+    const token = localStorage.getItem('token');
+    if (!token) throw new Error('No JWT token found in localStorage');
+    
     // Explicitly include headers
     const headers = {
-      'Authorization': `Bearer ${localStorage.getItem('token')}`,
-      'Content-Type': 'application/json'
+      'Authorization': `Bearer ${token}`
     };
-
-    const userData = {
-      email: userForm.email,
-      password: userForm.password,
-      name: userForm.name,
-      role: userForm.role,
-      // Add shipping address if creating a new user
-      shippingAddress: userForm._id ? undefined : {
-        street: '',
-        city: '',
-        state: '',
-        zip: '',
-        country: ''
-      }
-    };
-
-    const url = userForm._id ? `${ACCOUNT_API_URL}/user/admin/users/${userForm._id}` : `${ACCOUNT_API_URL}/user/admin/users`;
-    const method = userForm._id ? 'put' : 'post';
-
-    const result = await axios({
-      method,
-      url,
-      data: userData,
-      headers
-    });
-
-    const response = await axios.get(`${ACCOUNT_API_URL}/user/admin/users`, { headers });
-
-    const mappedUsers = response.data.map(user => ({
-      ...user,
-      id: user._id || user.id,
-      createdAt: user.created_at || user.createdAt
-    }));
     
-    setUsers(mappedUsers);
-    setUserForm({
-      _id: null,
-      email: '',
-      password: '',
-      name: '',
-      role: 'user'
-    });
-    setError('');
+    console.log(`Deleting user with ID: ${id}`);
+    
+    // Make the DELETE request with the headers
+    const response = await axios.delete(`${ACCOUNT_API_URL}/user/admin/users/${id}`, { headers });
+    
+    if (response.status === 200) {
+      // Remove the user from the users array
+      setUsers(prevUsers => prevUsers.filter(user => user.id !== id));
+      setError('');
+    }
   } catch (err) {
-    setError(`Failed to save user: ${err.message}${err.response?.data?.message ? ` - ${err.response.data.message}` : ''}`);
+    console.error('Error deleting user:', err);
+    setError(`Failed to delete user: ${err.message}${err.response?.data?.message ? ` - ${err.response.data.message}` : ''}`);
     if (err.response?.status === 401) {
       await logout();
       navigate('/login');
     }
   }
 };
-    const handleEditUser = (user) => {
-        setUserForm({
-            _id: user.id,
-            email: user.email,
-            password: '',
-            name: user.name,
-            role: user.role
-        });
-    };
-
-    const handleDeleteUser = async (id) => {
-        try {
-            const token = localStorage.getItem('token');
-            if (!token) throw new Error('No JWT token found in localStorage');
-            axios.defaults.headers.Authorization = `Bearer ${token}`;
-
-            await axios.delete(`${ACCOUNT_API_URL}/user/admin/users/${id}`);
-            setUsers(users.filter(user => user.id !== id));
-        } catch (err) {
-            setError(`Failed to delete user: ${err.message}${err.response?.data?.message ? ` - ${err.response.data.message}` : ''}`);
-            if (err.response?.status === 401) {
-                await logout();
-                navigate('/login');
-            }
-        }
-    };
-
     const handleOrderClick = (order) => {
         setSelectedOrder(order);
         setNewStatus(order.currentStatus);
