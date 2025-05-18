@@ -58,25 +58,29 @@ const AdminDashboard = () => {
     const ACCOUNT_API_URL = 'https://nodejs-final-ecommerce.onrender.com';
     const CART_API_URL = 'https://nodejs-final-ecommerce-1.onrender.com';
 
-    const addAuthorizationHeader = () => {
+    // Helper function to create Basic Auth headers for product API
+    const getProductApiHeaders = () => {
+        return {
+            'Authorization': 'Basic ' + btoa('admin@example.com:admin123'),
+            'Content-Type': 'application/json'
+        };
+    };
+
+    // Helper function to create JWT Auth headers for user and cart APIs
+    const getJwtApiHeaders = () => {
         const token = localStorage.getItem('token');
-        if (token) {
-            axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
-            return true;
-        }
-        return false;
+        if (!token) return null;
+        
+        return {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+        };
     };
 
     const fetchProducts = useCallback(async () => {
         try {
-            const token = localStorage.getItem('token');
-            if (!token) throw new Error('No JWT token found in localStorage');
+            const headers = getProductApiHeaders();
             
-            const headers = {
-                'Authorization': `Bearer ${token}`,
-                'Content-Type': 'application/json'
-            };
-
             const response = await axios.get(`${PRODUCT_API_URL}/api/products`, {
                 params: { limit: 100 },
                 headers
@@ -87,61 +91,65 @@ const AdminDashboard = () => {
         } catch (err) {
             setProducts([]);
             setProductError(`Failed to fetch products: ${err.message}${err.response?.data?.error ? ` - ${err.response.data.error}` : ''}`);
-            if (err.response?.status === 401) {
-                await logout();
-                navigate('/login');
+            
+            // Check for 401/403 errors
+            if (err.response?.status === 401 || err.response?.status === 403) {
+                console.error('Authentication error fetching products:', err.response?.data);
             }
         }
-    }, [logout, navigate]);
+    }, []);
 
     const fetchCategories = useCallback(async () => {
         try {
-            if (!addAuthorizationHeader()) {
-                throw new Error('No JWT token found in localStorage');
-            }
+            const headers = getProductApiHeaders();
 
-            const response = await axios.get(`${PRODUCT_API_URL}/api/categories`);
+            const response = await axios.get(`${PRODUCT_API_URL}/api/categories`, {
+                headers
+            });
+            
             setCategories(Array.isArray(response.data) ? response.data : []);
             setCategoryError('');
         } catch (err) {
             setCategories([]);
             setCategoryError(`Failed to fetch categories: ${err.message}${err.response?.data?.error ? ` - ${err.response.data.error}` : ''}`);
-            if (err.response?.status === 401) {
-                await logout();
-                navigate('/login');
+            
+            // Check for 401/403 errors
+            if (err.response?.status === 401 || err.response?.status === 403) {
+                console.error('Authentication error fetching categories:', err.response?.data);
             }
         }
-    }, [logout, navigate]);
+    }, []);
 
     const fetchUsers = useCallback(async () => {
         try {
-            const token = localStorage.getItem('token');
-            if (!token) throw new Error('No JWT token found in localStorage');
-            axios.defaults.headers.Authorization = `Bearer ${token}`;
+            const headers = getJwtApiHeaders();
+            if (!headers) throw new Error('No JWT token found in localStorage');
 
-            const response = await axios.get(`${ACCOUNT_API_URL}/user/admin/users`);
+            const response = await axios.get(`${ACCOUNT_API_URL}/user/admin/users`, { headers });
+            
             if (!Array.isArray(response.data)) {
                 throw new Error('Unexpected response format: response.data is not an array');
             }
+            
             const mappedUsers = response.data.map(user => ({
                 ...user,
                 id: user._id || user.id,
                 _id: user._id || user.id,
                 createdAt: user.created_at || user.createdAt
             }));
+            
             setUsers(mappedUsers);
             setError('');
         } catch (err) {
             console.error('Error fetching users:', err);
+            
             if (err.response) {
                 console.error('Response status:', err.response.status);
                 console.error('Response data:', err.response.data);
-            } else if (err.request) {
-                console.error('Request made but no response received:', err.request);
-            } else {
-                console.error('Error setting up request:', err.message);
             }
+            
             setError(`Failed to fetch users: ${err.message}${err.response?.data?.message ? ` - ${err.response.data.message}` : ''}`);
+            
             if (err.response?.status === 401) {
                 await logout();
                 navigate('/login');
@@ -151,19 +159,21 @@ const AdminDashboard = () => {
 
     const fetchDiscounts = useCallback(async () => {
         try {
-            const token = localStorage.getItem('token');
-            if (!token) throw new Error('No JWT token found in localStorage');
-            axios.defaults.headers.Authorization = `Bearer ${token}`;
+            const headers = getJwtApiHeaders();
+            if (!headers) throw new Error('No JWT token found in localStorage');
 
-            const response = await axios.get(`${CART_API_URL}/cart/admin/discounts`);
+            const response = await axios.get(`${CART_API_URL}/cart/admin/discounts`, { headers });
+            
             setDiscounts(Array.isArray(response.data) ? response.data.map(discount => ({
                 ...discount,
                 discountPercentage: discount.discount_percentage || discount.discountPercentage
             })) : []);
+            
             setDiscountError('');
         } catch (err) {
             setDiscounts([]);
             setDiscountError(`Failed to fetch discount codes: ${err.message}${err.response?.data?.error ? ` - ${err.response.data.error}` : ''}`);
+            
             if (err.response?.status === 401) {
                 await logout();
                 navigate('/login');
@@ -173,20 +183,26 @@ const AdminDashboard = () => {
 
     const fetchOrders = useCallback(async () => {
         try {
-            const token = localStorage.getItem('token');
-            if (!token) throw new Error('No JWT token found in localStorage');
-            axios.defaults.headers.Authorization = `Bearer ${token}`;
+            const headers = getJwtApiHeaders();
+            if (!headers) throw new Error('No JWT token found in localStorage');
 
             const params = { interval: timeInterval };
             if (startDate && endDate) {
                 params.startDate = startDate;
                 params.endDate = endDate;
             }
-            const response = await axios.get(`${CART_API_URL}/cart/admin/orders`, { params });
+            
+            const response = await axios.get(`${CART_API_URL}/cart/admin/orders`, { 
+                params,
+                headers
+            });
+            
             setOrders(response.data.orders || []);
             setStats(response.data.stats || {});
+            
             const productCount = response.data.orders.reduce((acc, order) => acc + order.items.length, 0);
             const productTypes = [...new Set(response.data.orders.flatMap(order => order.items.map(item => item.category)))];
+            
             setProductStats({
                 totalProducts: productCount,
                 uniqueProductTypes: productTypes.length
@@ -196,6 +212,7 @@ const AdminDashboard = () => {
             setStats({});
             setProductStats({});
             setError(`Failed to fetch orders: ${err.message}${err.response?.data?.error ? ` - ${err.response.data.error}` : ''}`);
+            
             if (err.response?.status === 401) {
                 await logout();
                 navigate('/login');
@@ -435,9 +452,9 @@ const AdminDashboard = () => {
             return;
         }
 
-        addAuthorizationHeader();
         fetchData();
-    }, [user, navigate, fetchData]);
+        fetchOrders();
+    }, [user, navigate, fetchData, fetchOrders]);
 
     const handleInputChange = (e) => {
         const { name, value } = e.target;
@@ -457,21 +474,15 @@ const AdminDashboard = () => {
     const handleCreateOrUpdateUser = async (e) => {
         e.preventDefault();
         try {
-            const token = localStorage.getItem('token');
-            if (!token) throw new Error('No JWT token found in localStorage');
+            const headers = getJwtApiHeaders();
+            if (!headers) throw new Error('No JWT token found in localStorage');
             
             if (!userForm.email || (!userForm._id && !userForm.password) || !userForm.name) {
                 setError('Email, name, and password (for new users) are required');
                 return;
             }
             
-            const headers = {
-                'Authorization': `Bearer ${token}`,
-                'Content-Type': 'application/json'
-            };
-            
-            console.log('User form data:', {...userForm, password: userForm.password ? '********' : 'unchanged'});
-            
+            // Prepare user data with proper validation for required fields
             const userData = {
                 email: userForm.email,
                 name: userForm.name,
@@ -482,15 +493,21 @@ const AdminDashboard = () => {
                 userData.password = userForm.password;
             }
             
+            // For new users, provide valid non-empty values for shipping address
             if (!userForm._id) {
                 userData.shippingAddress = {
-                    street: '',
-                    city: '',
-                    state: '',
-                    zip: '',
-                    country: '',
+                    street: 'Default Street',
+                    city: 'Default City',
+                    state: 'Default State',
+                    zip: '00000',
+                    country: 'Default Country',
                 };
             }
+            
+            console.log('User form data:', {
+                ...userData, 
+                password: userForm.password ? '********' : 'unchanged'
+            });
             
             let response;
             if (userForm._id) {
@@ -578,13 +595,8 @@ const AdminDashboard = () => {
                 return;
             }
             
-            const token = localStorage.getItem('token');
-            if (!token) throw new Error('No JWT token found in localStorage');
-            
-            const headers = {
-                'Authorization': `Bearer ${token}`,
-                'Content-Type': 'application/json'
-            };
+            const headers = getJwtApiHeaders();
+            if (!headers) throw new Error('No JWT token found in localStorage');
             
             console.log(`Deleting user with ID: ${id}`);
             
@@ -631,17 +643,16 @@ const AdminDashboard = () => {
         if (!validateDiscountForm()) return;
 
         try {
-            const token = localStorage.getItem('token');
-            if (!token) throw new Error('No JWT token found in localStorage');
-            axios.defaults.headers.Authorization = `Bearer ${token}`;
+            const headers = getJwtApiHeaders();
+            if (!headers) throw new Error('No JWT token found in localStorage');
 
             await axios.post(`${CART_API_URL}/cart/admin/discount`, {
                 code: discountForm.code,
                 discount_percentage: Number(discountForm.discount_percentage),
                 usageLimit: Number(discountForm.usageLimit)
-            });
+            }, { headers });
 
-            const response = await axios.get(`${CART_API_URL}/cart/admin/discounts`);
+            const response = await axios.get(`${CART_API_URL}/cart/admin/discounts`, { headers });
             setDiscounts(Array.isArray(response.data) ? response.data.map(discount => ({
                 ...discount,
                 discountPercentage: discount.discount_percentage || discount.discountPercentage
@@ -666,25 +677,50 @@ const AdminDashboard = () => {
     const handleCreateOrUpdateProduct = async (e) => {
         e.preventDefault();
         try {
-            const token = localStorage.getItem('token');
-            if (!token) throw new Error('No JWT token found in localStorage');
+            // Use Basic Auth for product API
+            const headers = getProductApiHeaders();
             
-            const headers = {
-                'Authorization': `Bearer ${token}`,
-                'Content-Type': 'application/json'
-            };
+            console.log('Product API Authorization header:', headers.Authorization);
             
-            console.log('Authorization header:', `Bearer ${token}`);
+            // Validate required fields
+            if (!formData.name || !formData.brand || !formData.description || 
+                !formData.images || !formData.variants || !formData.category) {
+                setError('All product fields are required');
+                return;
+            }
+            
+            // Parse variants format (name,stock,price;)
+            let parsedVariants;
+            try {
+                parsedVariants = formData.variants.split(';').filter(v => v.trim())
+                    .map(variant => {
+                        const [name, stock, price] = variant.split(',').map(item => item.trim());
+                        
+                        if (!name || stock === undefined || price === undefined) {
+                            throw new Error('Invalid variant format: each variant must have name, stock, and price');
+                        }
+                        
+                        return { 
+                            name, 
+                            stock: Number(stock), 
+                            price: Number(price) 
+                        };
+                    });
+                
+                if (parsedVariants.length < 2) {
+                    throw new Error('Product must have at least 2 variants');
+                }
+            } catch (variantError) {
+                setError(`Variant format error: ${variantError.message}`);
+                return;
+            }
             
             const productData = {
                 name: formData.name,
                 brand: formData.brand,
                 description: formData.description,
                 images: formData.images.split(',').map(img => img.trim()),
-                variants: formData.variants.split(';').map(variant => {
-                    const [name, stock, price] = variant.split(',').map(item => item.trim());
-                    return { name, stock: Number(stock), price: Number(price) };
-                }),
+                variants: parsedVariants,
                 category: formData.category,
                 tags: formData.tags.split(',').map(tag => tag.trim())
             };
@@ -735,10 +771,8 @@ const AdminDashboard = () => {
         } catch (err) {
             console.error('Error saving product:', err);
             setError(`Failed to save product: ${err.message}${err.response?.data?.error ? ` - ${err.response.data.error}` : ''}`);
-            if (err.response?.status === 401) {
-                alert('Authentication error. You will be redirected to login.');
-                await logout();
-                navigate('/login');
+            if (err.response?.status === 401 || err.response?.status === 403) {
+                alert('Authentication error with product API. Check admin credentials.');
             }
         }
     };
@@ -758,17 +792,15 @@ const AdminDashboard = () => {
 
     const handleDeleteProduct = async (id) => {
         try {
-            const token = localStorage.getItem('token');
-            if (!token) throw new Error('No JWT token found in localStorage');
-            axios.defaults.headers.Authorization = `Bearer ${token}`;
+            // Use Basic Auth for product API
+            const headers = getProductApiHeaders();
 
-            await axios.delete(`${PRODUCT_API_URL}/api/products/${id}`);
+            await axios.delete(`${PRODUCT_API_URL}/api/products/${id}`, { headers });
             setProducts(products.filter(product => product._id !== id));
         } catch (err) {
             setError(`Failed to delete product: ${err.message}${err.response?.data?.error ? ` - ${err.response.data.error}` : ''}`);
-            if (err.response?.status === 401) {
-                await logout();
-                navigate('/login');
+            if (err.response?.status === 401 || err.response?.status === 403) {
+                alert('Authentication error with product API. Check admin credentials.');
             }
         }
     };
@@ -782,12 +814,24 @@ const AdminDashboard = () => {
     const handleUpdateStatus = async (e) => {
         e.preventDefault();
         try {
-            const token = localStorage.getItem('token');
-            if (!token) throw new Error('No JWT token found in localStorage');
-            axios.defaults.headers.Authorization = `Bearer ${token}`;
+            const headers = getJwtApiHeaders();
+            if (!headers) throw new Error('No JWT token found in localStorage');
 
-            await axios.put(`${CART_API_URL}/cart/admin/orders/${selectedOrder.orderId}/status`, { status: newStatus });
-            setOrders(orders.map(order => order.orderId === selectedOrder.orderId ? { ...order, currentStatus: newStatus, statusHistory: [...order.statusHistory, { status: newStatus, updatedAt: new Date() }] } : order));
+            await axios.put(`${CART_API_URL}/cart/admin/orders/${selectedOrder.orderId}/status`, 
+                { status: newStatus }, 
+                { headers }
+            );
+            
+            setOrders(orders.map(order => 
+                order.orderId === selectedOrder.orderId 
+                    ? { 
+                        ...order, 
+                        currentStatus: newStatus, 
+                        statusHistory: [...order.statusHistory, { status: newStatus, updatedAt: new Date() }] 
+                    } 
+                    : order
+            ));
+            
             setModalOpen(false);
             alert('Order status updated successfully!');
         } catch (err) {
